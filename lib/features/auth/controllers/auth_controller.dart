@@ -1,5 +1,9 @@
 import 'package:get/get.dart';
 import 'package:email_validator/email_validator.dart';
+import 'package:help_ride/core/routes/app_routes.dart';
+import '../../../shared/services/api_client.dart';
+import '../../../shared/services/token_storage.dart';
+import '../services/auth_api.dart';
 
 class AuthController extends GetxController {
   final email = ''.obs;
@@ -7,6 +11,17 @@ class AuthController extends GetxController {
 
   final isLoading = false.obs;
   final error = RxnString();
+
+  late final TokenStorage _tokenStorage;
+  late final AuthApi _authApi;
+
+  @override
+  Future<void> onInit() async {
+    super.onInit();
+    _tokenStorage = TokenStorage();
+    final client = await ApiClient.create();
+    _authApi = AuthApi(client);
+  }
 
   bool get isEmailValid => EmailValidator.validate(email.value.trim());
   bool get isPasswordValid => password.value.trim().length >= 8;
@@ -32,18 +47,31 @@ class AuthController extends GetxController {
     error.value = null;
 
     try {
-      print(
-        'Logging in with email=${email.value} and password=${password.value}',
+      final token = await _authApi.loginWithEmail(
+        email: email.value.trim(),
+        password: password.value.trim(),
       );
-      // TODO: call API here
-      await Future.delayed(const Duration(milliseconds: 800));
 
-      // TODO: store token + navigate
-      Get.offAllNamed('/home');
+      await _tokenStorage.saveAccessToken(token);
+      Get.offAllNamed(AppRoutes.home);
+
+      // Optional sanity check:
+      // final user = await _authApi.me();
+
+      // TODO: navigate to home
+      // Get.offAllNamed('/home');
     } catch (e) {
-      error.value = 'Login failed. Try again.';
+      error.value = _prettyError(e);
     } finally {
       isLoading.value = false;
     }
+  }
+
+  String _prettyError(Object e) {
+    final s = e.toString();
+    if (s.contains('401')) return 'Invalid email or password.';
+    if (s.contains('404'))
+      return 'Login API not found. Backend missing /auth/login.';
+    return 'Login failed. ${s.length > 120 ? s.substring(0, 120) : s}';
   }
 }

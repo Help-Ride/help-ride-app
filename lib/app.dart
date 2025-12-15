@@ -1,25 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:help_ride/core/theme/theme_controller.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/routes/auth_routes.dart';
-import 'features/auth/views/login_view.dart';
-
-final themeController = Get.put(ThemeController(), permanent: true);
+import 'core/theme/theme_controller.dart';
+import 'core/routes/app_routes.dart';
+import 'shared/controllers/session_controller.dart';
 
 class HelpRideApp extends StatelessWidget {
   const HelpRideApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
-      title: 'HelpRide',
-      debugShowCheckedModeBanner: false,
-      darkTheme: AppTheme.dark(),
-      themeMode: themeController.themeMode,
-      initialRoute: AuthRoutes.login,
-      getPages: AuthRoutes.pages,
-      home: LoginView(), // fallback
+    Get.put(ThemeController(), permanent: true);
+    Get.put(SessionController(), permanent: true);
+
+    final theme = Get.find<ThemeController>();
+
+    return Obx(
+      () => GetMaterialApp(
+        title: 'HelpRide',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: theme.themeMode,
+        initialRoute: AppRoutes.gate,
+        getPages: AppRoutes.pages,
+      ),
     );
   }
 }
