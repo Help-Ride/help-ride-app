@@ -38,6 +38,7 @@ dependencies:
   flutter_secure_storage: ^10.0.0
   email_validator: ^3.0.0
   flutter_dotenv: ^6.0.0
+  get_storage: ^2.1.1
 
 dev_dependencies:
   flutter_test:

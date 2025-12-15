@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:help_ride/app.dart';
+import 'package:get_storage/get_storage.dart';
+import 'app.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await GetStorage.init();
   runApp(const HelpRideApp());
 }
