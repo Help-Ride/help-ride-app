@@ -10,6 +10,8 @@ class HomeView extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = Get.find<SessionController>();
 
+    print('User in HomeView: ${session.user.value}');
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Home'),

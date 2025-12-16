@@ -35,6 +35,7 @@ class ApiClient {
           return handler.next(options);
         },
         onError: (e, handler) async {
+          print('API Error: ${e.response?.statusCode} ${e.response?.data}');
           if (e.response?.statusCode == 401) {
             await tokenStorage.clear();
             // avoid import loops by using Get if available

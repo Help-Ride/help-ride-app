@@ -6,8 +6,8 @@ import '../../../shared/services/token_storage.dart';
 import '../services/auth_api.dart';
 
 class AuthController extends GetxController {
-  final email = ''.obs;
-  final password = ''.obs;
+  final email = 'patel.rishi3001@gmail.com'.obs;
+  final password = 'StrongPass123!'.obs;
 
   final isLoading = false.obs;
   final error = RxnString();
