@@ -18,7 +18,7 @@ class HomeView extends StatelessWidget {
       }
 
       final email = session.email;
-      final role = session.role;
+      final role = session.roleDefault;
 
       return Scaffold(
         appBar: AppBar(

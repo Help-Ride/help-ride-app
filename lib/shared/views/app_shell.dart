@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_controller.dart';
+import '../controllers/session_controller.dart';
+import '../../core/theme/app_colors.dart';
+
+// pages
 import '../../features/home/views/home_view.dart';
 import '../../features/profile/views/passenger_profile_view.dart';
 
@@ -15,6 +18,54 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int index = 0;
 
+  @override
+  Widget build(BuildContext context) {
+    final session = Get.find<SessionController>();
+    final theme = Get.find<ThemeController>();
+
+    return Obx(() {
+      // 🔒 Only show shell if authenticated
+      if (session.status.value != SessionStatus.authenticated) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+
+      final role = (session.user.value?.roleDefault ?? 'passenger')
+          .toString()
+          .toLowerCase();
+
+      final config = role == 'driver' ? _driverConfig() : _passengerConfig();
+
+      // ✅ Prevent "index out of range" when role changes
+      if (index >= config.items.length) index = 0;
+
+      return Scaffold(
+        body: config.pages[index],
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: _BottomNavBar(
+              index: index,
+              isDark: theme.isDark.value,
+              items: config.items,
+              onChanged: (i) => setState(() => index = i),
+            ),
+          ),
+        ),
+      );
+    });
+  }
+}
+
+/* -------------------- ROLE CONFIG -------------------- */
+
+class _NavConfig {
+  final List<_NavItemData> items;
+  final List<Widget> pages;
+  _NavConfig(this.items, this.pages);
+}
+
+_NavConfig _passengerConfig() {
   final pages = const [
     HomeView(),
     _Placeholder(title: 'My Rides'),
@@ -22,25 +73,40 @@ class _AppShellState extends State<AppShell> {
     PassengerProfileView(),
   ];
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Get.find<ThemeController>();
+  final items = const [
+    _NavItemData(label: 'Home', icon: Icons.home_rounded),
+    _NavItemData(label: 'My Rides', icon: Icons.access_time_rounded),
+    _NavItemData(label: 'Messages', icon: Icons.chat_bubble_outline_rounded),
+    _NavItemData(label: 'Profile', icon: Icons.person_outline_rounded),
+  ];
 
-    return Scaffold(
-      body: pages[index],
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-          child: _BottomNavBar(
-            index: index,
-            isDark: theme.isDark.value,
-            onChanged: (i) => setState(() => index = i),
-          ),
-        ),
-      ),
-    );
-  }
+  return _NavConfig(items, pages);
+}
+
+_NavConfig _driverConfig() {
+  final pages = const [
+    HomeView(),
+    _Placeholder(title: 'Create Ride'),
+    _Placeholder(title: 'Requests'),
+    PassengerProfileView(),
+  ];
+
+  final items = const [
+    _NavItemData(label: 'Home', icon: Icons.home_rounded),
+    _NavItemData(label: 'Create', icon: Icons.add_circle_outline_rounded),
+    _NavItemData(label: 'Requests', icon: Icons.list_alt_rounded),
+    _NavItemData(label: 'Profile', icon: Icons.person_outline_rounded),
+  ];
+
+  return _NavConfig(items, pages);
+}
+
+/* -------------------- UI COMPONENTS -------------------- */
+
+class _NavItemData {
+  final String label;
+  final IconData icon;
+  const _NavItemData({required this.label, required this.icon});
 }
 
 class _BottomNavBar extends StatelessWidget {
@@ -48,11 +114,13 @@ class _BottomNavBar extends StatelessWidget {
     required this.index,
     required this.onChanged,
     required this.isDark,
+    required this.items,
   });
 
   final int index;
   final ValueChanged<int> onChanged;
   final bool isDark;
+  final List<_NavItemData> items;
 
   @override
   Widget build(BuildContext context) {
@@ -74,40 +142,17 @@ class _BottomNavBar extends StatelessWidget {
         ],
       ),
       child: Row(
-        children: [
-          _NavItem(
-            label: 'Home',
-            icon: Icons.home_rounded,
-            selected: index == 0,
+        children: List.generate(items.length, (i) {
+          final item = items[i];
+          return _NavItem(
+            label: item.label,
+            icon: item.icon,
+            selected: index == i,
             active: active,
             inactive: inactive,
-            onTap: () => onChanged(0),
-          ),
-          _NavItem(
-            label: 'My Rides',
-            icon: Icons.access_time_rounded,
-            selected: index == 1,
-            active: active,
-            inactive: inactive,
-            onTap: () => onChanged(1),
-          ),
-          _NavItem(
-            label: 'Messages',
-            icon: Icons.chat_bubble_outline_rounded,
-            selected: index == 2,
-            active: active,
-            inactive: inactive,
-            onTap: () => onChanged(2),
-          ),
-          _NavItem(
-            label: 'Profile',
-            icon: Icons.person_outline_rounded,
-            selected: index == 3,
-            active: active,
-            inactive: inactive,
-            onTap: () => onChanged(3),
-          ),
-        ],
+            onTap: () => onChanged(i),
+          );
+        }),
       ),
     );
   }
@@ -146,13 +191,12 @@ class _NavItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(22),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min, // 🔑 prevents overflow
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 24, color: selected ? active : inactive),
               const SizedBox(height: 4),
               FittedBox(
-                // 🔑 text never overflows
                 child: Text(
                   label,
                   style: TextStyle(
