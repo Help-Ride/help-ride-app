@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../shared/controllers/session_controller.dart';
 import '../../../core/routes/app_routes.dart';
+import '../../../core/theme/theme_controller.dart';
 
 class HomeView extends StatelessWidget {
   const HomeView({super.key});
@@ -9,6 +10,7 @@ class HomeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = Get.find<SessionController>();
+    final theme = Get.find<ThemeController>();
 
     return Obx(() {
       // 🔒 Session guard
@@ -28,6 +30,17 @@ class HomeView extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Home'),
           actions: [
+            Row(
+              children: [
+                const Icon(Icons.light_mode, size: 18),
+                Switch(
+                  value: theme.isDark.value,
+                  onChanged: (v) => theme.setDark(v), // persists
+                ),
+                const Icon(Icons.dark_mode, size: 18),
+                const SizedBox(width: 8),
+              ],
+            ),
             IconButton(
               icon: const Icon(Icons.logout),
               onPressed: () async {
