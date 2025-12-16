@@ -13,31 +13,34 @@ class PassengerProfileView extends StatelessWidget {
     final theme = Get.find<ThemeController>();
 
     return Obx(() {
-      // Guard: only kick out on unauthenticated (NOT unknown)
-      final s = session.status.value;
+      final status = session.status.value;
 
-      if (s == SessionStatus.unknown) {
+      // 🔄 Still checking session
+      if (status == SessionStatus.unknown) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
 
-      if (s == SessionStatus.unauthenticated) {
+      // 🔒 Logged out
+      if (status == SessionStatus.unauthenticated) {
         Future.microtask(() => Get.offAllNamed(AppRoutes.login));
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
 
-      // ✅ authenticated
+      // ✅ Authenticated
+      final user = session.user.value;
+      if (user == null) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
 
-      final u = session.user.value ?? {};
-      final name = (u['name'] ?? u['fullName'] ?? 'Passenger') as String;
-      final email = (u['email'] ?? '—') as String;
-      final phone = (u['phone'] ?? '—') as String;
-      final location = (u['location'] ?? u['city'] ?? '—') as String;
+      final name = user.name.isNotEmpty ? user.name : 'Passenger';
+      final email = user.email;
+      final role = user.driverProfile != null ? 'driver' : user.roleDefault;
+      final avatarUrl = user.avatarUrl;
 
       return Scaffold(
         appBar: AppBar(
           title: const Text('Profile'),
           actions: [
-            // theme toggle (since you asked)
             Obx(
               () => Switch(value: theme.isDark.value, onChanged: theme.setDark),
             ),
@@ -53,36 +56,29 @@ class PassengerProfileView extends StatelessWidget {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _ProfileHeader(name: name, role: "session.role"),
+            _ProfileHeader(name: name, role: role, avatarUrl: avatarUrl),
             const SizedBox(height: 16),
 
             _SectionCard(
               title: 'Contact Information',
               children: [
-                _InfoRow(icon: Icons.phone, label: 'Phone', value: phone),
+                const _InfoRow(icon: Icons.phone, label: 'Phone', value: '—'),
                 _InfoRow(icon: Icons.email, label: 'Email', value: email),
-                _InfoRow(
+                const _InfoRow(
                   icon: Icons.location_on,
                   label: 'Location',
-                  value: location,
+                  value: '—',
                 ),
               ],
             ),
 
             const SizedBox(height: 16),
+
             _SectionCard(
               title: 'Account',
               children: [
-                _InfoRow(
-                  icon: Icons.verified_user,
-                  label: 'Role',
-                  value: "session.role",
-                ),
-                _InfoRow(
-                  icon: Icons.badge,
-                  label: 'User ID',
-                  value: '${u['id'] ?? '—'}',
-                ),
+                _InfoRow(icon: Icons.verified_user, label: 'Role', value: role),
+                _InfoRow(icon: Icons.badge, label: 'User ID', value: user.id),
               ],
             ),
           ],
@@ -92,10 +88,18 @@ class PassengerProfileView extends StatelessWidget {
   }
 }
 
+/* -------------------- UI COMPONENTS -------------------- */
+
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.name, required this.role});
+  const _ProfileHeader({
+    required this.name,
+    required this.role,
+    this.avatarUrl,
+  });
+
   final String name;
   final String role;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +111,15 @@ class _ProfileHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const CircleAvatar(radius: 28, child: Icon(Icons.person, size: 28)),
+          CircleAvatar(
+            radius: 28,
+            backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
+                ? NetworkImage(avatarUrl!)
+                : null,
+            child: (avatarUrl == null || avatarUrl!.isEmpty)
+                ? const Icon(Icons.person, size: 28)
+                : null,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -150,6 +162,7 @@ class _ProfileHeader extends StatelessWidget {
 
 class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.title, required this.children});
+
   final String title;
   final List<Widget> children;
 
@@ -182,6 +195,7 @@ class _InfoRow extends StatelessWidget {
     required this.label,
     required this.value,
   });
+
   final IconData icon;
   final String label;
   final String value;
