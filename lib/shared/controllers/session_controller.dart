@@ -9,6 +9,10 @@ class SessionController extends GetxController {
   final status = SessionStatus.unknown.obs;
   final user = Rxn<Map<String, dynamic>>();
 
+  String? get email => user.value?['email'];
+  String? get role => user.value?['role']; // driver / passenger
+  String? get userId => user.value?['id'];
+
   late final TokenStorage _tokenStorage;
   late final AuthApi _authApi;
 

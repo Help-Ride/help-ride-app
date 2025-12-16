@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:email_validator/email_validator.dart';
 import 'package:help_ride/core/routes/app_routes.dart';
+import 'package:help_ride/shared/controllers/session_controller.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/token_storage.dart';
 import '../services/auth_api.dart';
@@ -53,13 +54,11 @@ class AuthController extends GetxController {
       );
 
       await _tokenStorage.saveAccessToken(token);
+
+      final session = Get.find<SessionController>();
+      await session.bootstrap();
+
       Get.offAllNamed(AppRoutes.home);
-
-      // Optional sanity check:
-      // final user = await _authApi.me();
-
-      // TODO: navigate to home
-      // Get.offAllNamed('/home');
     } catch (e) {
       error.value = _prettyError(e);
     } finally {
