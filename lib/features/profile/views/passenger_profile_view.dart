@@ -26,7 +26,6 @@ class PassengerProfileView extends StatelessWidget {
       }
 
       // ✅ authenticated
-
       final u = session.user.value ?? {};
       final name = (u['name'] ?? u['fullName'] ?? 'Passenger') as String;
       final email = (u['email'] ?? '—') as String;
@@ -39,7 +38,12 @@ class PassengerProfileView extends StatelessWidget {
           actions: [
             // theme toggle (since you asked)
             Obx(
-              () => Switch(value: theme.isDark.value, onChanged: theme.setDark),
+              () => Switch(
+                value: theme.isDark.value,
+                onChanged: (bool value) {
+                  theme.setDark(value);
+                },
+              ),
             ),
             IconButton(
               icon: const Icon(Icons.logout),

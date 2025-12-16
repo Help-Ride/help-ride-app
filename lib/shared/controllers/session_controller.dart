@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:help_ride/core/routes/app_routes.dart';
 import '../services/token_storage.dart';
 import '../../features/auth/services/auth_api.dart';
 import '../services/api_client.dart';
@@ -38,6 +39,7 @@ class SessionController extends GetxController {
       final me = await _authApi.me(); // calls GET /auth/me with Bearer token
       user.value = me;
       status.value = SessionStatus.authenticated;
+      Get.offAllNamed(AppRoutes.shell);
     } catch (_) {
       await _tokenStorage.clear();
       status.value = SessionStatus.unauthenticated;

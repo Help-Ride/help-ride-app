@@ -59,6 +59,7 @@ class AuthController extends GetxController {
       await session.bootstrap();
 
       Get.offAllNamed(AppRoutes.home);
+      Get.offAllNamed(AppRoutes.shell);
     } catch (e) {
       error.value = _prettyError(e);
     } finally {

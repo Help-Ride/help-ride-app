@@ -12,10 +12,6 @@ class HomeView extends StatelessWidget {
 
     return Obx(() {
       // 🔒 Session guard
-      print('session statusss: ${session.status.value}');
-      print(
-        'Is not authenticated: ${session.status.value != SessionStatus.authenticated}',
-      );
       if (session.status.value != SessionStatus.authenticated) {
         Future.microtask(() => Get.offAllNamed(AppRoutes.login));
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -28,10 +24,6 @@ class HomeView extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Home'),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.person),
-              onPressed: () => Get.toNamed(AppRoutes.profile),
-            ),
             IconButton(
               icon: const Icon(Icons.logout),
               onPressed: () async {
