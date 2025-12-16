@@ -29,6 +29,10 @@ class HomeView extends StatelessWidget {
           title: const Text('Home'),
           actions: [
             IconButton(
+              icon: const Icon(Icons.person),
+              onPressed: () => Get.toNamed(AppRoutes.profile),
+            ),
+            IconButton(
               icon: const Icon(Icons.logout),
               onPressed: () async {
                 await session.logout();
