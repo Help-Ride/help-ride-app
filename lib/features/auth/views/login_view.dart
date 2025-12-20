@@ -6,7 +6,8 @@ import '../widgets/auth_text_field.dart';
 
 class LoginView extends GetView<AuthController> {
   LoginView({super.key}) {
-    Get.put(AuthController());
+    // ⚠️ Not best practice. Prefer Bindings.
+    Get.put(AuthController(), permanent: false);
   }
 
   @override
@@ -60,14 +61,17 @@ class LoginView extends GetView<AuthController> {
                     );
                   }),
 
+                  // EMAIL LOGIN
                   Obx(() {
+                    final emailLoading = controller.isLoading.value;
                     return SizedBox(
                       width: double.infinity,
+                      height: 52,
                       child: ElevatedButton(
-                        onPressed: controller.canSubmit
+                        onPressed: (controller.canSubmit && !emailLoading)
                             ? controller.loginWithEmail
                             : null,
-                        child: controller.isLoading.value
+                        child: emailLoading
                             ? const SizedBox(
                                 height: 18,
                                 width: 18,
@@ -80,10 +84,67 @@ class LoginView extends GetView<AuthController> {
                     );
                   }),
 
+                  const SizedBox(height: 18),
+
+                  // DIVIDER
+                  Row(
+                    children: const [
+                      Expanded(child: Divider(thickness: 1)),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'or',
+                          style: TextStyle(color: AppColors.lightMuted),
+                        ),
+                      ),
+                      Expanded(child: Divider(thickness: 1)),
+                    ],
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // GOOGLE OAUTH
+                  Obx(() {
+                    final oauthLoading = controller.oauthLoading.value;
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton(
+                        onPressed: oauthLoading
+                            ? null
+                            : controller.loginWithGoogle,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFE2E6EF)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: oauthLoading
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  // Replace later with proper Google logo asset
+                                  Icon(Icons.g_mobiledata, size: 28),
+                                  SizedBox(width: 10),
+                                  Text('Continue with Google'),
+                                ],
+                              ),
+                      ),
+                    );
+                  }),
+
                   const SizedBox(height: 14),
+
                   TextButton(
                     onPressed: () {
-                      // TODO: navigate to register/forgot password
+                      // TODO: navigate to forgot password / reset
                     },
                     child: const Text('Forgot password?'),
                   ),

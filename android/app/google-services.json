@@ -1,0 +1,82 @@
+{
+  "project_info": {
+    "project_number": "269308288512",
+    "project_id": "exocode-labs",
+    "storage_bucket": "exocode-labs.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:269308288512:android:0dd01efd28123165a142e5",
+        "android_client_info": {
+          "package_name": "com.exocodelabs.fba.firebase_auth"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "269308288512-t0l4r4kokp1qa03ud9ufhav3u909oeg2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEPrpvy29IUCAITRsLWmmL3AmLQYiLUII"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "269308288512-t0l4r4kokp1qa03ud9ufhav3u909oeg2.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "269308288512-jl2fpmb8a9k4tq8apvipvs7s1p42rmig.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.exocodelabs.fba.firebaseAuth"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:269308288512:android:7c4dbd3b19e13c0aa142e5",
+        "android_client_info": {
+          "package_name": "com.exocodelabs.help_ride"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "269308288512-t0l4r4kokp1qa03ud9ufhav3u909oeg2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEPrpvy29IUCAITRsLWmmL3AmLQYiLUII"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "269308288512-t0l4r4kokp1qa03ud9ufhav3u909oeg2.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "269308288512-jl2fpmb8a9k4tq8apvipvs7s1p42rmig.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.exocodelabs.fba.firebaseAuth"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
