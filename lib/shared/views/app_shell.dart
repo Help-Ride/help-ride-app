@@ -126,7 +126,7 @@ class _BottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bg = isDark ? const Color(0xFF121218) : Colors.white;
     final inactive = isDark ? const Color(0xFF9A9AA6) : const Color(0xFF8A8FA3);
-    final active = AppColors.primary;
+    final active = AppColors.lightMuted;
 
     return Container(
       height: 82,

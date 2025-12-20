@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Brand
-  static const primary = Color(0xFF00BC7D); // orange
+  // Brand by role
+  static const passengerPrimary = Color(0xFF00BC7D); // green
+  static const driverPrimary = Color(0xFF2B7FFF); // blue
 
   // ---------- DARK ----------
   static const darkBg = Color(0xFF0B0B0F);
@@ -16,6 +17,5 @@ class AppColors {
   static const lightText = Color(0xFF111111);
   static const lightMuted = Color(0xFF6B7280);
 
-  // Common
   static const error = Color(0xFFFF4D4D);
 }
