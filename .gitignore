@@ -1,16 +1,47 @@
 # Flutter
 .dart_tool/
-build/
+.pub-cache/
+.packages
 .flutter-plugins
 .flutter-plugins-dependencies
+pubspec.lock
+build/
+coverage/
 
 # iOS
 ios/Pods/
+ios/Podfile.lock
 ios/Flutter/ephemeral/
 ios/Flutter/Generated.xcconfig
 ios/Flutter/flutter_export_environment.sh
 ios/**/xcuserdata/
+ios/**/*.pbxuser
+ios/**/*.perspectivev3
+ios/**/*.xcworkspace/
 
 # Android
 android/.gradle/
 android/local.properties
+android/gradlew
+android/gradlew.bat
+android/.project
+android/.classpath
+android/.c9/
+android/*.launch
+android/captures/
+android/local.properties
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+*.swp
+*.swo
+*~
+.DS_Store
+
+# General
+*.log
+.env
