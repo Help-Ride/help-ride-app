@@ -41,6 +41,7 @@ dependencies:
   get_storage: ^2.1.1
   dio: ^5.9.0
   google_sign_in: 6.2.1
+  flutter_native_splash: ^2.4.7
 
 dev_dependencies:
   flutter_test:
@@ -56,6 +57,16 @@ dev_dependencies:
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
+flutter_native_splash:
+  color: "#00BC7D" # your passengerPrimary
+  image: assets/images/logo.png
+  android: true
+  ios: true
+  fullscreen: true
+  android_12:
+    color: "#00BC7D"
+    image: assets/images/logo.png
+
 # The following section is specific to Flutter packages.
 flutter:
   # The following line ensures that the Material Icons font is
@@ -64,6 +75,7 @@ flutter:
   uses-material-design: true
   assets:
     - .env
+    - assets/images/logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
