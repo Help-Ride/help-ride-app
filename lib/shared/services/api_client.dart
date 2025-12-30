@@ -8,6 +8,8 @@ class ApiClient {
   ApiClient._(this._dio);
   final Dio _dio;
 
+  Dio get dio => _dio;
+
   static Future<ApiClient> create() async {
     final baseUrl = dotenv.env['API_BASE_URL'];
     if (baseUrl == null || baseUrl.isEmpty) {

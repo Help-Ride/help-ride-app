@@ -42,7 +42,10 @@ class PassengerProfileView extends StatelessWidget {
           title: const Text('Profile'),
           actions: [
             Obx(
-              () => Switch(value: theme.isDark.value, onChanged: theme.setDark),
+              () => Switch(
+                value: theme.isDark.value,
+                onChanged: (_) => theme.toggleTheme(),
+              ),
             ),
             IconButton(
               icon: const Icon(Icons.logout),

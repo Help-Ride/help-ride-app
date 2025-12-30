@@ -19,8 +19,8 @@ class HelpRideApp extends StatelessWidget {
       () => GetMaterialApp(
         title: 'HelpRide',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
+        theme: AppTheme.light(theme.role.value),
+        darkTheme: AppTheme.dark(theme.role.value),
         themeMode: theme.themeMode,
         initialRoute: AppRoutes.gate,
         getPages: AppRoutes.pages,

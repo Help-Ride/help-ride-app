@@ -31,7 +31,7 @@ class HomeView extends StatelessWidget {
                 const Icon(Icons.light_mode, size: 18),
                 Switch(
                   value: theme.isDark.value,
-                  onChanged: (v) => theme.setDark(v), // persists
+                  onChanged: (v) => theme.toggleTheme(), // persists
                 ),
                 const Icon(Icons.dark_mode, size: 18),
                 const SizedBox(width: 8),
