@@ -5,10 +5,7 @@ import '../controllers/auth_controller.dart';
 import '../widgets/auth_text_field.dart';
 
 class LoginView extends GetView<AuthController> {
-  LoginView({super.key}) {
-    // ⚠️ Not best practice. Prefer Bindings.
-    Get.put(AuthController(), permanent: false);
-  }
+  const LoginView({super.key});
 
   @override
   Widget build(BuildContext context) {
