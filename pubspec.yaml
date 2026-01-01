@@ -41,6 +41,8 @@ dependencies:
   get_storage: ^2.1.1
   dio: ^5.9.0
   google_sign_in: 6.2.1
+  flutter_google_places_sdk: ^0.4.2
+  geolocator: ^13.0.2
 
 dev_dependencies:
   flutter_test:

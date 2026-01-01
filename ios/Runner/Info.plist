@@ -58,5 +58,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+	<key>GMSApiKey</key>
+	<string>AIzaSyDO-kwH3nnMJTj0e0VeqL4EgQjabSKEgBE</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We use your location to suggest nearby pickup points.</string>
 </dict>
 </plist>
