@@ -70,6 +70,7 @@ class _WhereToCardState extends State<WhereToCard> {
     if (!mounted || picked == null) return;
 
     controller.text = picked.fullText;
+    setState(() {});
     // If you want lat/lng later, you already have picked.latLng (can store in controller/state)
     debugPrint('Picked: ${picked.fullText} | ${picked.latLng}');
   }
@@ -154,38 +155,46 @@ class _TextFieldTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFFF3F5F8),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Row(
-            children: [
-              Icon(icon, color: iconColor ?? AppColors.lightMuted),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  controller.text.isEmpty ? hintText : controller.text,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: controller.text.isEmpty
-                        ? AppColors.lightMuted
-                        : AppColors.lightText,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final value = controller.text.trim();
+        final isEmpty = value.isEmpty;
+
+        return Material(
+          color: const Color(0xFFF3F5F8),
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onTap,
+            child: Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: [
+                  Icon(icon, color: iconColor ?? AppColors.lightMuted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      isEmpty ? hintText : value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isEmpty
+                            ? AppColors.lightMuted
+                            : AppColors.lightText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                ),
+                  const Icon(Icons.chevron_right, color: AppColors.lightMuted),
+                ],
               ),
-              const Icon(Icons.chevron_right, color: AppColors.lightMuted),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
