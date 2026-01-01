@@ -1,154 +1,206 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:help_ride/core/constants/app_images.dart';
+import '../../../core/constants/app_button.dart';
+import '../../../core/constants/app_text_style.dart';
 import '../../../core/theme/app_colors.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/auth_text_field.dart';
+import '../widgets/oauth_button.dart';
 
 class LoginView extends GetView<AuthController> {
   LoginView({super.key}) {
-    // ⚠️ Not best practice. Prefer Bindings.
     Get.put(AuthController(), permanent: false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(24),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Welcome back',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Login with your email to continue.',
-                    style: TextStyle(color: AppColors.lightMuted),
-                  ),
-                  const SizedBox(height: 22),
+              constraints: BoxConstraints(maxWidth: 420),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome',
+                      style: AppTextStyles.h2(),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Sign in to continue',
+                      style: AppTextStyles.subtitle(),
+                    ),
+                    SizedBox(height: 40),
 
-                  AuthTextField(
-                    label: 'Email',
-                    hint: 'name@email.com',
-                    keyboardType: TextInputType.emailAddress,
-                    onChanged: controller.setEmail,
-                  ),
-                  const SizedBox(height: 12),
-                  AuthTextField(
-                    label: 'Password',
-                    hint: '••••••••',
-                    obscureText: true,
-                    onChanged: controller.setPassword,
-                  ),
-                  const SizedBox(height: 14),
+                    // Email Address Label
+                    Text(
+                      'Email Address',
+                      style: AppTextStyles.labelLarge(),
+                    ),
+                    SizedBox(height: 8),
+                    AuthTextField(
+                      hint: 'you@example.com',
+                      keyboardType: TextInputType.emailAddress,
+                      onChanged: controller.setEmail,
+                    ),
 
-                  Obx(() {
-                    final err = controller.error.value;
-                    if (err == null) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Text(
-                        err,
-                        style: const TextStyle(color: AppColors.error),
+                    SizedBox(height: 20),
+
+                    // Password Label
+                    Text(
+                      'Password',
+                      style: AppTextStyles.labelLarge(),
+                    ),
+                    SizedBox(height: 8),
+                    AuthTextField(
+                      hint: 'Enter your password',
+                      obscureText: true,
+                      onChanged: controller.setPassword,
+                      suffixIcon: Icon(
+                        Icons.visibility_outlined,
+                        color: Colors.grey[400],
                       ),
-                    );
-                  }),
+                    ),
 
-                  // EMAIL LOGIN
+                    SizedBox(height: 12),
+
+                    // Forgot Password Link
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () {
+                          // TODO: navigate to forgot password
+                        },
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size(0, 0),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Forgot password?',
+                          style: AppTextStyles.link(),
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(height: 24),
+
+                    // Error Message
+                    Obx(() {
+                      final err = controller.error.value;
+                      if (err == null) return SizedBox.shrink();
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 16),
+                        child: Text(
+                          err,
+                          style: AppTextStyles.error(),
+                        ),
+                      );
+                    }),
+
+                    // Sign In Button
                   Obx(() {
                     final emailLoading = controller.isLoading.value;
-                    return SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: (controller.canSubmit && !emailLoading)
-                            ? controller.loginWithEmail
-                            : null,
-                        child: emailLoading
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Login'),
-                      ),
+
+                    return GradientAppButton(
+                      text: 'Sign In',
+                      isLoading: emailLoading,
+                      enabled: controller.canSubmit,
+                      onPressed: controller.loginWithEmail,
+                      prefixImage: AppImages.iconEmail, // optional
                     );
                   }),
 
-                  const SizedBox(height: 18),
+                    SizedBox(height: 10),
 
-                  // DIVIDER
-                  Row(
-                    children: const [
-                      Expanded(child: Divider(thickness: 1)),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
+                    // Use email verification code
+                    Center(
+                      child: TextButton(
+                        onPressed: () {
+                          // TODO: email verification flow
+                        },
                         child: Text(
-                          'or',
-                          style: TextStyle(color: AppColors.lightMuted),
-                        ),
-                      ),
-                      Expanded(child: Divider(thickness: 1)),
-                    ],
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  // GOOGLE OAUTH
-                  Obx(() {
-                    final oauthLoading = controller.oauthLoading.value;
-                    return SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: OutlinedButton(
-                        onPressed: oauthLoading
-                            ? null
-                            : controller.loginWithGoogle,
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFE2E6EF)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                          'Use email verification code instead',
+                          style: AppTextStyles.bodyMedium(
+                            color: Colors.grey[600],
                           ),
                         ),
-                        child: oauthLoading
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
-                                  // Replace later with proper Google logo asset
-                                  Icon(Icons.g_mobiledata, size: 28),
-                                  SizedBox(width: 10),
-                                  Text('Continue with Google'),
-                                ],
-                              ),
                       ),
-                    );
-                  }),
+                    ),
 
-                  const SizedBox(height: 14),
+                    SizedBox(height: 18),
 
-                  TextButton(
-                    onPressed: () {
-                      // TODO: navigate to forgot password / reset
-                    },
-                    child: const Text('Forgot password?'),
-                  ),
-                ],
+                    // DIVIDER
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Divider(thickness: 1, color: Colors.grey[300]),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            'Or continue with',
+                            style: AppTextStyles.bodyMedium(
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Divider(thickness: 1, color: Colors.grey[300]),
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: 24),
+
+                    // Google OAuth
+                    Obx(() {
+                      return OAuthButton(
+                        icon: Icons.g_mobiledata,
+                        iconSize: 28,
+                        label: 'Continue with Google',
+                        isLoading: controller.oauthLoading.value,
+                        onPressed: controller.loginWithGoogle,
+                      );
+                    }),
+
+                    SizedBox(height: 16),
+
+                    // Apple OAuth
+                    Obx(() {
+                      return OAuthButton(
+                        icon: Icons.apple,
+                        iconSize: 24,
+                        label: 'Continue with Apple',
+                        isLoading: controller.oauthLoading.value,
+                        onPressed: () {
+                          // TODO: Apple login
+                        },
+                      );
+                    }),
+
+                    SizedBox(height: 24),
+
+                    // Terms and Privacy
+                    Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20),
+                        child: Text(
+                          'By continuing, you agree to our Terms of Service and Privacy Policy',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.caption(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

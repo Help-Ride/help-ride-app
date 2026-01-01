@@ -109,6 +109,8 @@ class AuthController extends GetxController {
       Get.offAllNamed(AppRoutes.shell);
     } catch (e) {
       error.value = _prettyError(e);
+      print("Google auth error ${error.value}");
+
     } finally {
       oauthLoading.value = false;
     }
