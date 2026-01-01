@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_google_places_sdk/flutter_google_places_sdk.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../common/app_card.dart';
 
@@ -10,14 +13,94 @@ class WhereToCard extends StatefulWidget {
 }
 
 class _WhereToCardState extends State<WhereToCard> {
+  late final FlutterGooglePlacesSdk _places;
+
   final _pickupCtrl = TextEditingController();
   final _destCtrl = TextEditingController();
 
+  Timer? _debounce;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final key = dotenv.env['GMS_API_KEY'];
+    if (key == null || key.isEmpty) {
+      throw Exception('Missing GMS_API_KEY (dotenv not loaded or key empty)');
+    }
+    _places = FlutterGooglePlacesSdk(key);
+  }
+
   @override
   void dispose() {
+    _debounce?.cancel();
     _pickupCtrl.dispose();
     _destCtrl.dispose();
     super.dispose();
+  }
+
+  void _onChanged(TextEditingController controller, String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      final q = value.trim();
+      if (q.length < 2) return; // don’t spam API for 0-1 chars
+      await _openAutocomplete(controller, q);
+    });
+  }
+
+  Future<void> _openAutocomplete(
+    TextEditingController controller,
+    String query,
+  ) async {
+    try {
+      setState(() => _loading = true);
+
+      final res = await _places.findAutocompletePredictions(
+        query,
+        countries: const ['CA'],
+        // placeTypesFilter: PlaceTypeFilter.address, // <-- remove; not supported in your SDK version
+      );
+
+      if (!mounted) return;
+
+      final predictions = res.predictions;
+      if (predictions.isEmpty) return;
+
+      final selected = await showModalBottomSheet<AutocompletePrediction>(
+        context: context,
+        showDragHandle: true,
+        backgroundColor: Colors.white,
+        builder: (_) {
+          return ListView.separated(
+            padding: const EdgeInsets.all(12),
+            itemCount: predictions.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final p = predictions[i];
+              return ListTile(
+                title: Text(p.fullText),
+                subtitle: p.secondaryText == null
+                    ? null
+                    : Text(p.secondaryText!),
+                onTap: () => Navigator.pop(context, p),
+              );
+            },
+          );
+        },
+      );
+
+      if (!mounted || selected == null) return;
+
+      controller.text = selected.fullText;
+      controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: controller.text.length),
+      );
+    } catch (e) {
+      debugPrint('Places error: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -36,6 +119,8 @@ class _WhereToCardState extends State<WhereToCard> {
             controller: _pickupCtrl,
             icon: Icons.my_location,
             hintText: "Pickup location",
+            loading: _loading,
+            onChanged: (v) => _onChanged(_pickupCtrl, v),
           ),
           const SizedBox(height: 12),
 
@@ -44,15 +129,19 @@ class _WhereToCardState extends State<WhereToCard> {
             icon: Icons.place,
             iconColor: AppColors.passengerPrimary,
             hintText: "Destination",
+            loading: _loading,
+            onChanged: (v) => _onChanged(_destCtrl, v),
           ),
 
           const SizedBox(height: 14),
+
           SizedBox(
             height: 52,
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () {
-                // TODO: hook to search rides using _pickupCtrl.text and _destCtrl.text
+                debugPrint('Pickup: ${_pickupCtrl.text}');
+                debugPrint('Destination: ${_destCtrl.text}');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.passengerPrimary,
@@ -69,29 +158,6 @@ class _WhereToCardState extends State<WhereToCard> {
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 52,
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () {
-                // TODO: hook to create ride request
-              },
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFE2E6EF)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text(
-                "Create ride request",
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.passengerPrimary,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -103,13 +169,17 @@ class _TextFieldTile extends StatelessWidget {
     required this.controller,
     required this.icon,
     required this.hintText,
+    required this.onChanged,
     this.iconColor,
+    this.loading = false,
   });
 
   final TextEditingController controller;
   final IconData icon;
   final String hintText;
+  final ValueChanged<String> onChanged;
   final Color? iconColor;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -127,26 +197,22 @@ class _TextFieldTile extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
-              maxLines: 1,
-              textAlignVertical: TextAlignVertical.center,
-              cursorColor: AppColors.passengerPrimary,
+              onChanged: onChanged,
               decoration: InputDecoration(
                 hintText: hintText,
                 hintStyle: const TextStyle(color: AppColors.lightMuted),
                 border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                focusedErrorBorder: InputBorder.none,
                 isDense: true,
-                contentPadding: EdgeInsets.zero,
               ),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              keyboardType: TextInputType.text,
-              textInputAction: TextInputAction.next,
             ),
           ),
+          if (loading)
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
         ],
       ),
     );
