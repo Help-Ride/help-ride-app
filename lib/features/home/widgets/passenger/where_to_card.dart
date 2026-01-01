@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_google_places_sdk/flutter_google_places_sdk.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import '../../../../core/theme/app_colors.dart';
 import '../common/app_card.dart';
 
@@ -18,89 +19,59 @@ class _WhereToCardState extends State<WhereToCard> {
   final _pickupCtrl = TextEditingController();
   final _destCtrl = TextEditingController();
 
-  Timer? _debounce;
-  bool _loading = false;
-
   @override
   void initState() {
     super.initState();
-
-    final key = dotenv.env['GMS_API_KEY'];
-    if (key == null || key.isEmpty) {
-      throw Exception('Missing GMS_API_KEY (dotenv not loaded or key empty)');
-    }
-    _places = FlutterGooglePlacesSdk(key);
+    // NOTE: The SDK constructor requires a non-null apiKey string.
+    // Keep the key out of git by using .env (flutter_dotenv) or --dart-define.
+    final apiKey = dotenv.env['GMS_API_KEY'] ?? '';
+    assert(
+      apiKey.isNotEmpty,
+      'GMS_API_KEY is missing. Add it to .env or pass via --dart-define.',
+    );
+    _places = FlutterGooglePlacesSdk(apiKey);
   }
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _pickupCtrl.dispose();
     _destCtrl.dispose();
     super.dispose();
   }
 
-  void _onChanged(TextEditingController controller, String value) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), () async {
-      final q = value.trim();
-      if (q.length < 2) return; // don’t spam API for 0-1 chars
-      await _openAutocomplete(controller, q);
-    });
+  bool get _hasApiKey {
+    final apiKey = dotenv.env['GMS_API_KEY'] ?? '';
+    return apiKey.trim().isNotEmpty;
   }
 
-  Future<void> _openAutocomplete(
-    TextEditingController controller,
-    String query,
-  ) async {
-    try {
-      setState(() => _loading = true);
-
-      final res = await _places.findAutocompletePredictions(
-        query,
-        countries: const ['CA'],
-        // placeTypesFilter: PlaceTypeFilter.address, // <-- remove; not supported in your SDK version
+  Future<void> _openAutocomplete({
+    required TextEditingController controller,
+    required String title,
+  }) async {
+    if (!_hasApiKey) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Google Places API key missing (GMS_API_KEY).'),
+        ),
       );
-
-      if (!mounted) return;
-
-      final predictions = res.predictions;
-      if (predictions.isEmpty) return;
-
-      final selected = await showModalBottomSheet<AutocompletePrediction>(
-        context: context,
-        showDragHandle: true,
-        backgroundColor: Colors.white,
-        builder: (_) {
-          return ListView.separated(
-            padding: const EdgeInsets.all(12),
-            itemCount: predictions.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (_, i) {
-              final p = predictions[i];
-              return ListTile(
-                title: Text(p.fullText),
-                subtitle: p.secondaryText == null
-                    ? null
-                    : Text(p.secondaryText!),
-                onTap: () => Navigator.pop(context, p),
-              );
-            },
-          );
-        },
-      );
-
-      if (!mounted || selected == null) return;
-
-      controller.text = selected.fullText;
-      controller.selection = TextSelection.fromPosition(
-        TextPosition(offset: controller.text.length),
-      );
-    } catch (e) {
-      debugPrint('Places error: $e');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      return;
     }
+    final picked = await showModalBottomSheet<_PlacePick>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PlacesBottomSheet(
+        title: title,
+        places: _places,
+        initialText: controller.text,
+      ),
+    );
+
+    if (!mounted || picked == null) return;
+
+    controller.text = picked.fullText;
+    // If you want lat/lng later, you already have picked.latLng (can store in controller/state)
+    debugPrint('Picked: ${picked.fullText} | ${picked.latLng}');
   }
 
   @override
@@ -119,8 +90,10 @@ class _WhereToCardState extends State<WhereToCard> {
             controller: _pickupCtrl,
             icon: Icons.my_location,
             hintText: "Pickup location",
-            loading: _loading,
-            onChanged: (v) => _onChanged(_pickupCtrl, v),
+            onTap: () => _openAutocomplete(
+              controller: _pickupCtrl,
+              title: "Pickup location",
+            ),
           ),
           const SizedBox(height: 12),
 
@@ -129,8 +102,8 @@ class _WhereToCardState extends State<WhereToCard> {
             icon: Icons.place,
             iconColor: AppColors.passengerPrimary,
             hintText: "Destination",
-            loading: _loading,
-            onChanged: (v) => _onChanged(_destCtrl, v),
+            onTap: () =>
+                _openAutocomplete(controller: _destCtrl, title: "Destination"),
           ),
 
           const SizedBox(height: 14),
@@ -169,52 +142,289 @@ class _TextFieldTile extends StatelessWidget {
     required this.controller,
     required this.icon,
     required this.hintText,
-    required this.onChanged,
+    required this.onTap,
     this.iconColor,
-    this.loading = false,
   });
 
   final TextEditingController controller;
   final IconData icon;
   final String hintText;
-  final ValueChanged<String> onChanged;
+  final VoidCallback onTap;
   final Color? iconColor;
-  final bool loading;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F5F8),
+    return Material(
+      color: const Color(0xFFF3F5F8),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: iconColor ?? AppColors.lightMuted),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              decoration: InputDecoration(
-                hintText: hintText,
-                hintStyle: const TextStyle(color: AppColors.lightMuted),
-                border: InputBorder.none,
-                isDense: true,
+        onTap: onTap,
+        child: Container(
+          height: 56,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            children: [
+              Icon(icon, color: iconColor ?? AppColors.lightMuted),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  controller.text.isEmpty ? hintText : controller.text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: controller.text.isEmpty
+                        ? AppColors.lightMuted
+                        : AppColors.lightText,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+              const Icon(Icons.chevron_right, color: AppColors.lightMuted),
+            ],
           ),
-          if (loading)
-            const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-        ],
+        ),
       ),
     );
   }
+}
+
+/// Bottom sheet that:
+/// - debounces typing
+/// - uses a session token
+/// - shows predictions list
+/// - resolves place details to get lat/lng
+class _PlacesBottomSheet extends StatefulWidget {
+  const _PlacesBottomSheet({
+    required this.title,
+    required this.places,
+    this.initialText = '',
+  });
+
+  final String title;
+  final FlutterGooglePlacesSdk places;
+  final String initialText;
+
+  @override
+  State<_PlacesBottomSheet> createState() => _PlacesBottomSheetState();
+}
+
+class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
+  final _queryCtrl = TextEditingController();
+  Timer? _debounce;
+
+  // Session token not supported by the current flutter_google_places_sdk API we’re using.
+
+  bool _loading = false;
+  String? _error;
+  List<AutocompletePrediction> _predictions = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _queryCtrl.text = widget.initialText;
+    _queryCtrl.addListener(_onQueryChanged);
+
+    // If you already have text, prefetch
+    if (_queryCtrl.text.trim().isNotEmpty) {
+      _search(_queryCtrl.text.trim());
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _queryCtrl.removeListener(_onQueryChanged);
+    _queryCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onQueryChanged() {
+    final q = _queryCtrl.text.trim();
+    _debounce?.cancel();
+
+    // Don’t call API for short strings (wasteful + noisy)
+    if (q.length < 3) {
+      setState(() {
+        _predictions = const [];
+        _error = null;
+        _loading = false;
+      });
+      return;
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 350), () => _search(q));
+  }
+
+  Future<void> _search(String query) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final res = await widget.places.findAutocompletePredictions(
+        query,
+        countries: const ['CA'],
+        // placeTypesFilter can be null, or you can use other filters supported by your plugin version
+        // placeTypesFilter: PlaceTypeFilter.address, // <-- depends on plugin version; keep null to avoid enum issues
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _predictions = res.predictions;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _pick(AutocompletePrediction p) async {
+    setState(() => _loading = true);
+
+    try {
+      final details = await widget.places.fetchPlace(
+        p.placeId,
+        fields: [
+          PlaceField.Name,
+          PlaceField.AddressComponents,
+          PlaceField.Location,
+        ],
+      );
+
+      final place = details.place;
+      final text = p.fullText;
+      final latLng = place?.latLng;
+
+      if (!mounted) return;
+
+      Navigator.pop(context, _PlacePick(fullText: text, latLng: latLng));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = "Failed to fetch place details: $e";
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final h = MediaQuery.of(context).size.height;
+
+    return Container(
+      height: h * 0.88,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE6EAF2),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: TextField(
+                controller: _queryCtrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: "Search address / place",
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: const Color(0xFFF3F5F8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.only(top: 10),
+                child: CircularProgressIndicator(),
+              ),
+
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                itemCount: _predictions.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final p = _predictions[i];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.place_outlined),
+                    title: Text(
+                      p.primaryText,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(p.secondaryText),
+                    onTap: () => _pick(p),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlacePick {
+  final String fullText;
+  final LatLng? latLng;
+  const _PlacePick({required this.fullText, required this.latLng});
 }
