@@ -1,63 +1,66 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../shared/controllers/session_controller.dart';
-import '../../../core/routes/app_routes.dart';
-import '../../../core/theme/theme_controller.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/role_toggle.dart';
+import '../controllers/home_controller.dart';
+import '../widgets/passenger/passenger_home.dart';
+import '../widgets/driver/driver_home.dart';
 
-class HomeView extends StatelessWidget {
+class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final session = Get.find<SessionController>();
-    final theme = Get.find<ThemeController>();
+    final c = controller;
 
-    return Obx(() {
-      // 🔒 Session guard
-      if (session.status.value != SessionStatus.authenticated) {
-        Future.microtask(() => Get.offAllNamed(AppRoutes.login));
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
-      }
-
-      final email = session.email;
-      final role = session.roleDefault;
-
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Home'),
-          actions: [
-            Row(
-              children: [
-                const Icon(Icons.light_mode, size: 18),
-                Switch(
-                  value: theme.isDark.value,
-                  onChanged: (v) => theme.toggleTheme(), // persists
-                ),
-                const Icon(Icons.dark_mode, size: 18),
-                const SizedBox(width: 8),
-              ],
-            ),
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () async {
-                await session.logout();
-                Get.offAllNamed(AppRoutes.login);
-              },
-            ),
-          ],
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(16),
+    return Scaffold(
+      backgroundColor: AppColors.lightBg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Email: $email'),
-              const SizedBox(height: 8),
-              Text('Role: $role'),
+              Row(
+                children: [
+                  Expanded(
+                    child: Obx(() {
+                      final isPassenger = c.role.value == HomeRole.passenger;
+                      return Text(
+                        isPassenger ? "Hello, John" : "Driver Dashboard",
+                        style: const TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.lightText,
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(width: 10),
+
+                  // ✅ here
+                  Obx(() {
+                    return RoleToggle(
+                      role: c.role.value,
+                      onPassenger: () => c.setRole(HomeRole.passenger),
+                      onDriver: () => c.setRole(HomeRole.driver),
+                    );
+                  }),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              Expanded(
+                child: Obx(() {
+                  return c.role.value == HomeRole.passenger
+                      ? const PassengerHome()
+                      : const DriverHome();
+                }),
+              ),
             ],
           ),
         ),
-      );
-    });
+      ),
+    );
   }
 }

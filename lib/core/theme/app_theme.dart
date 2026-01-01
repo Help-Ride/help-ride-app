@@ -63,27 +63,43 @@ class AppTheme {
       ),
       textTheme: base.textTheme.apply(bodyColor: text, displayColor: text),
       inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: surface,
+        // We build pill/field backgrounds with custom Containers in the UI.
+        // Keep TextField decoration transparent so it doesn't draw its own box.
+        filled: false,
+        fillColor: Colors.transparent,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         hintStyle: TextStyle(color: muted),
         labelStyle: TextStyle(color: muted),
+        floatingLabelBehavior: FloatingLabelBehavior.never,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primary, width: 1.4),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.error),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.error, width: 1.2),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.error, width: 1.2),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primary,
-          foregroundColor: Colors.black,
+          foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),

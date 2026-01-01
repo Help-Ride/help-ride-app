@@ -41,12 +41,6 @@ class PassengerProfileView extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Profile'),
           actions: [
-            Obx(
-              () => Switch(
-                value: theme.isDark.value,
-                onChanged: (_) => theme.toggleTheme(),
-              ),
-            ),
             IconButton(
               icon: const Icon(Icons.logout),
               onPressed: () async {

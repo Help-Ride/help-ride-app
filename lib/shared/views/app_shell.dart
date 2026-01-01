@@ -24,7 +24,6 @@ class _AppShellState extends State<AppShell> {
     final theme = Get.find<ThemeController>();
 
     return Obx(() {
-      // 🔒 Only show shell if authenticated
       if (session.status.value != SessionStatus.authenticated) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
@@ -35,22 +34,15 @@ class _AppShellState extends State<AppShell> {
 
       final config = role == 'driver' ? _driverConfig() : _passengerConfig();
 
-      // ✅ Prevent "index out of range" when role changes
       if (index >= config.items.length) index = 0;
 
       return Scaffold(
         body: config.pages[index],
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            child: _BottomNavBar(
-              index: index,
-              isDark: theme.isDark.value,
-              items: config.items,
-              onChanged: (i) => setState(() => index = i),
-            ),
-          ),
+        bottomNavigationBar: _FigmaBottomNavBar(
+          index: index,
+          isDark: theme.isDark.value,
+          items: config.items,
+          onChanged: (i) => setState(() => index = i),
         ),
       );
     });
@@ -74,10 +66,26 @@ _NavConfig _passengerConfig() {
   ];
 
   final items = const [
-    _NavItemData(label: 'Home', icon: Icons.home_rounded),
-    _NavItemData(label: 'My Rides', icon: Icons.access_time_rounded),
-    _NavItemData(label: 'Messages', icon: Icons.chat_bubble_outline_rounded),
-    _NavItemData(label: 'Profile', icon: Icons.person_outline_rounded),
+    _NavItemData(
+      label: 'Home',
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+    ),
+    _NavItemData(
+      label: 'My Rides',
+      icon: Icons.location_on_outlined,
+      selectedIcon: Icons.location_on,
+    ),
+    _NavItemData(
+      label: 'Messages',
+      icon: Icons.chat_bubble_outline_rounded,
+      selectedIcon: Icons.chat_bubble_rounded,
+    ),
+    _NavItemData(
+      label: 'Profile',
+      icon: Icons.person_outline_rounded,
+      selectedIcon: Icons.person_rounded,
+    ),
   ];
 
   return _NavConfig(items, pages);
@@ -91,26 +99,51 @@ _NavConfig _driverConfig() {
     PassengerProfileView(),
   ];
 
+  // Keep same bottom nav labels if you want the exact Figma bar.
+  // Driver-specific tabs can come later.
   final items = const [
-    _NavItemData(label: 'Home', icon: Icons.home_rounded),
-    _NavItemData(label: 'Create', icon: Icons.add_circle_outline_rounded),
-    _NavItemData(label: 'Requests', icon: Icons.list_alt_rounded),
-    _NavItemData(label: 'Profile', icon: Icons.person_outline_rounded),
+    _NavItemData(
+      label: 'Home',
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+    ),
+    _NavItemData(
+      label: 'My Rides',
+      icon: Icons.location_on_outlined,
+      selectedIcon: Icons.location_on,
+    ),
+    _NavItemData(
+      label: 'Messages',
+      icon: Icons.chat_bubble_outline_rounded,
+      selectedIcon: Icons.chat_bubble_rounded,
+    ),
+    _NavItemData(
+      label: 'Profile',
+      icon: Icons.person_outline_rounded,
+      selectedIcon: Icons.person_rounded,
+    ),
   ];
 
   return _NavConfig(items, pages);
 }
 
-/* -------------------- UI COMPONENTS -------------------- */
+/* -------------------- MODELS -------------------- */
 
 class _NavItemData {
   final String label;
   final IconData icon;
-  const _NavItemData({required this.label, required this.icon});
+  final IconData selectedIcon;
+  const _NavItemData({
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+  });
 }
 
-class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar({
+/* -------------------- FIGMA BOTTOM NAV -------------------- */
+
+class _FigmaBottomNavBar extends StatelessWidget {
+  const _FigmaBottomNavBar({
     required this.index,
     required this.onChanged,
     required this.isDark,
@@ -124,95 +157,68 @@ class _BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = isDark ? const Color(0xFF121218) : Colors.white;
-    final inactive = isDark ? const Color(0xFF9A9AA6) : const Color(0xFF8A8FA3);
-    final active = AppColors.lightMuted;
+    // Figma look: flat white bar, no pill, minimal/no shadow
+    final bg = isDark ? const Color(0xFF0F1116) : Colors.white;
+    final border = isDark ? const Color(0xFF1C2130) : const Color(0xFFE9ECF2);
 
-    return Container(
-      height: 82,
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 22,
-            offset: Offset(0, 10),
-            color: Color(0x33000000),
-          ),
-        ],
-      ),
-      child: Row(
-        children: List.generate(items.length, (i) {
-          final item = items[i];
-          return _NavItem(
-            label: item.label,
-            icon: item.icon,
-            selected: index == i,
-            active: active,
-            inactive: inactive,
-            onTap: () => onChanged(i),
-          );
-        }),
-      ),
-    );
-  }
-}
+    // Selected = near-black in light mode (matches screenshot)
+    final selected = isDark ? Colors.white : const Color(0xFF111827);
+    final unselected = isDark
+        ? const Color(0xFF9AA3B2)
+        : const Color(0xFF6B7280);
 
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.active,
-    required this.inactive,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final Color active;
-  final Color inactive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
-          margin: const EdgeInsets.all(8),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? active.withOpacity(0.14) : Colors.transparent,
-            borderRadius: BorderRadius.circular(22),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 24, color: selected ? active : inactive),
-              const SizedBox(height: 4),
-              FittedBox(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: selected ? active : inactive,
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: bg,
+          border: Border(top: BorderSide(color: border, width: 1)),
+        ),
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(items.length, (i) {
+            final item = items[i];
+            final isSelected = index == i;
+            return Expanded(
+              child: InkWell(
+                onTap: () => onChanged(i),
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isSelected ? item.selectedIcon : item.icon,
+                        size: 24,
+                        color: isSelected ? selected : unselected,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.0,
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: isSelected ? selected : unselected,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ],
-          ),
+            );
+          }),
         ),
       ),
     );
   }
 }
+
+/* -------------------- PLACEHOLDER -------------------- */
 
 class _Placeholder extends StatelessWidget {
   const _Placeholder({required this.title});
