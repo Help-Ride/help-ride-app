@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../common/app_card.dart';
-import '../common/input_field_tile.dart';
 
-class WhereToCard extends StatelessWidget {
+class WhereToCard extends StatefulWidget {
   const WhereToCard({super.key});
+
+  @override
+  State<WhereToCard> createState() => _WhereToCardState();
+}
+
+class _WhereToCardState extends State<WhereToCard> {
+  final _pickupCtrl = TextEditingController();
+  final _destCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _pickupCtrl.dispose();
+    _destCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,28 +31,29 @@ class WhereToCard extends StatelessWidget {
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 14),
-          InputFieldTile(
+
+          _TextFieldTile(
+            controller: _pickupCtrl,
             icon: Icons.my_location,
-            label: "Pickup location",
-            onTap: () {
-              // TODO: open pickup search sheet
-            },
+            hintText: "Pickup location",
           ),
           const SizedBox(height: 12),
-          InputFieldTile(
+
+          _TextFieldTile(
+            controller: _destCtrl,
             icon: Icons.place,
             iconColor: AppColors.passengerPrimary,
-            label: "Destination",
-            onTap: () {
-              // TODO: open destination search sheet
-            },
+            hintText: "Destination",
           ),
+
           const SizedBox(height: 14),
           SizedBox(
             height: 52,
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                // TODO: hook to search rides using _pickupCtrl.text and _destCtrl.text
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.passengerPrimary,
                 foregroundColor: Colors.white,
@@ -59,7 +74,9 @@ class WhereToCard extends StatelessWidget {
             height: 52,
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: () {},
+              onPressed: () {
+                // TODO: hook to create ride request
+              },
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFFE2E6EF)),
                 shape: RoundedRectangleBorder(
@@ -73,6 +90,61 @@ class WhereToCard extends StatelessWidget {
                   color: AppColors.passengerPrimary,
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TextFieldTile extends StatelessWidget {
+  const _TextFieldTile({
+    required this.controller,
+    required this.icon,
+    required this.hintText,
+    this.iconColor,
+  });
+
+  final TextEditingController controller;
+  final IconData icon;
+  final String hintText;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F5F8),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor ?? AppColors.lightMuted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              maxLines: 1,
+              textAlignVertical: TextAlignVertical.center,
+              cursorColor: AppColors.passengerPrimary,
+              decoration: InputDecoration(
+                hintText: hintText,
+                hintStyle: const TextStyle(color: AppColors.lightMuted),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              keyboardType: TextInputType.text,
+              textInputAction: TextInputAction.next,
             ),
           ),
         ],
