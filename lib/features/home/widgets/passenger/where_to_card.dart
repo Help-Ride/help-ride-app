@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_google_places_sdk/flutter_google_places_sdk.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../common/app_card.dart';
@@ -14,7 +18,7 @@ class WhereToCard extends StatefulWidget {
 }
 
 class _WhereToCardState extends State<WhereToCard> {
-  late final FlutterGooglePlacesSdk _places;
+  late final _PlacesApi _places;
 
   final _pickupCtrl = TextEditingController();
   final _destCtrl = TextEditingController();
@@ -22,14 +26,16 @@ class _WhereToCardState extends State<WhereToCard> {
   @override
   void initState() {
     super.initState();
-    // NOTE: The SDK constructor requires a non-null apiKey string.
-    // Keep the key out of git by using .env (flutter_dotenv) or --dart-define.
-    final apiKey = dotenv.env['GMS_API_KEY'] ?? '';
+
+    // Keep keys out of git: load from .env or pass via --dart-define.
+    final apiKey = dotenv.env['GMS_API_KEY'];
+
     assert(
-      apiKey.isNotEmpty,
-      'GMS_API_KEY is missing. Add it to .env or pass via --dart-define.',
+      apiKey != null && apiKey.trim().isNotEmpty,
+      'Google Places API key missing. Add GMS_API_KEY to .env.',
     );
-    _places = FlutterGooglePlacesSdk(apiKey);
+
+    _places = _PlacesApi(apiKey!.trim());
   }
 
   @override
@@ -40,8 +46,8 @@ class _WhereToCardState extends State<WhereToCard> {
   }
 
   bool get _hasApiKey {
-    final apiKey = dotenv.env['GMS_API_KEY'] ?? '';
-    return apiKey.trim().isNotEmpty;
+    final apiKey = dotenv.env['GMS_API_KEY'];
+    return apiKey?.trim().isNotEmpty ?? false;
   }
 
   Future<void> _openAutocomplete({
@@ -212,7 +218,7 @@ class _PlacesBottomSheet extends StatefulWidget {
   });
 
   final String title;
-  final FlutterGooglePlacesSdk places;
+  final _PlacesApi places;
   final String initialText;
 
   @override
@@ -223,15 +229,18 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
   final _queryCtrl = TextEditingController();
   Timer? _debounce;
 
-  // Session token not supported by the current flutter_google_places_sdk API we’re using.
+  // Session token: generate once per autocomplete session (recommended by Google).
+  late final String _sessionToken;
 
   bool _loading = false;
   String? _error;
-  List<AutocompletePrediction> _predictions = const [];
+  List<_AutocompletePrediction> _predictions = const [];
 
   @override
   void initState() {
     super.initState();
+    _sessionToken = const Uuid().v4();
+
     _queryCtrl.text = widget.initialText;
     _queryCtrl.addListener(_onQueryChanged);
 
@@ -273,16 +282,15 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
     });
 
     try {
-      final res = await widget.places.findAutocompletePredictions(
-        query,
-        countries: const ['CA'],
-        // placeTypesFilter can be null, or you can use other filters supported by your plugin version
-        // placeTypesFilter: PlaceTypeFilter.address, // <-- depends on plugin version; keep null to avoid enum issues
+      final res = await widget.places.autocomplete(
+        query: query,
+        sessionToken: _sessionToken,
+        country: 'CA',
       );
 
       if (!mounted) return;
       setState(() {
-        _predictions = res.predictions;
+        _predictions = res;
         _loading = false;
       });
     } catch (e) {
@@ -294,30 +302,32 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
     }
   }
 
-  Future<void> _pick(AutocompletePrediction p) async {
-    setState(() => _loading = true);
+  Future<void> _pick(_AutocompletePrediction p) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
     try {
-      final details = await widget.places.fetchPlace(
-        p.placeId,
-        fields: [
-          PlaceField.Name,
-          PlaceField.AddressComponents,
-          PlaceField.Location,
-        ],
+      final details = await widget.places.placeDetails(
+        placeId: p.placeId,
+        sessionToken: _sessionToken,
       );
-
-      final place = details.place;
-      final text = p.fullText;
-      final latLng = place?.latLng;
 
       if (!mounted) return;
 
-      Navigator.pop(context, _PlacePick(fullText: text, latLng: latLng));
+      final display = (details.formattedAddress?.trim().isNotEmpty ?? false)
+          ? details.formattedAddress!.trim()
+          : p.description;
+
+      Navigator.pop(
+        context,
+        _PlacePick(fullText: display, latLng: details.latLng),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = "Failed to fetch place details: $e";
+        _error = 'Failed to fetch place details: $e';
         _loading = false;
       });
     }
@@ -416,10 +426,16 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.place_outlined),
                     title: Text(
-                      p.primaryText,
+                      p.structuredMainText ?? p.description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
-                    subtitle: Text(p.secondaryText),
+                    subtitle: Text(
+                      p.structuredSecondaryText ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     onTap: () => _pick(p),
                   );
                 },
@@ -434,6 +450,153 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
 
 class _PlacePick {
   final String fullText;
-  final LatLng? latLng;
+  final _LatLng? latLng;
   const _PlacePick({required this.fullText, required this.latLng});
+}
+
+class _LatLng {
+  final double lat;
+  final double lng;
+  const _LatLng(this.lat, this.lng);
+
+  @override
+  String toString() => '($lat, $lng)';
+}
+
+class _AutocompletePrediction {
+  final String placeId;
+  final String description;
+  final String? structuredMainText;
+  final String? structuredSecondaryText;
+
+  const _AutocompletePrediction({
+    required this.placeId,
+    required this.description,
+    this.structuredMainText,
+    this.structuredSecondaryText,
+  });
+
+  factory _AutocompletePrediction.fromJson(Map<String, dynamic> json) {
+    final structured = (json['structured_formatting'] as Map?)
+        ?.cast<String, dynamic>();
+    return _AutocompletePrediction(
+      placeId: (json['place_id'] ?? '').toString(),
+      description: (json['description'] ?? '').toString(),
+      structuredMainText: structured?['main_text']?.toString(),
+      structuredSecondaryText: structured?['secondary_text']?.toString(),
+    );
+  }
+}
+
+class _PlaceDetails {
+  final String? formattedAddress;
+  final _LatLng? latLng;
+
+  const _PlaceDetails({this.formattedAddress, this.latLng});
+
+  factory _PlaceDetails.fromJson(Map<String, dynamic> json) {
+    final result =
+        (json['result'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
+    final formattedAddress = result['formatted_address']?.toString();
+
+    final geometry = (result['geometry'] as Map?)?.cast<String, dynamic>();
+    final location = (geometry?['location'] as Map?)?.cast<String, dynamic>();
+
+    _LatLng? latLng;
+    final lat = location?['lat'];
+    final lng = location?['lng'];
+    if (lat != null && lng != null) {
+      latLng = _LatLng((lat as num).toDouble(), (lng as num).toDouble());
+    }
+
+    return _PlaceDetails(formattedAddress: formattedAddress, latLng: latLng);
+  }
+}
+
+class _PlacesApi {
+  _PlacesApi(this.apiKey);
+
+  final String apiKey;
+
+  Future<List<_AutocompletePrediction>> autocomplete({
+    required String query,
+    required String sessionToken,
+    String? country,
+  }) async {
+    final q = query.trim();
+    if (q.isEmpty) {
+      throw ArgumentError('Argument query can not be empty');
+    }
+
+    final uri =
+        Uri.https('maps.googleapis.com', '/maps/api/place/autocomplete/json', {
+          'input': q,
+          'key': apiKey,
+          'sessiontoken': sessionToken,
+          if (country != null && country.trim().isNotEmpty)
+            'components': 'country:${country.trim()}',
+        });
+
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Places autocomplete HTTP ${res.statusCode}: ${res.body}',
+      );
+    }
+
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final status = (data['status'] ?? '').toString();
+
+    if (status != 'OK' && status != 'ZERO_RESULTS') {
+      final msg = (data['error_message'] ?? data['status'] ?? 'Unknown error')
+          .toString();
+      throw Exception('Places autocomplete error: $msg');
+    }
+
+    final preds = (data['predictions'] as List? ?? const [])
+        .whereType<Map>()
+        .map((e) => _AutocompletePrediction.fromJson(e.cast<String, dynamic>()))
+        .toList(growable: false);
+
+    return preds;
+  }
+
+  Future<_PlaceDetails> placeDetails({
+    required String placeId,
+    required String sessionToken,
+  }) async {
+    final id = placeId.trim();
+    if (id.isEmpty) {
+      throw ArgumentError('placeId can not be empty');
+    }
+
+    final uri = Uri.https(
+      'maps.googleapis.com',
+      '/maps/api/place/details/json',
+      {
+        'place_id': id,
+        'key': apiKey,
+        'sessiontoken': sessionToken,
+        // Keep it minimal to reduce cost/latency.
+        'fields': 'formatted_address,geometry/location',
+      },
+    );
+
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      throw Exception('Places details HTTP ${res.statusCode}: ${res.body}');
+    }
+
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final status = (data['status'] ?? '').toString();
+
+    if (status != 'OK') {
+      final msg = (data['error_message'] ?? data['status'] ?? 'Unknown error')
+          .toString();
+      throw Exception('Places details error: $msg');
+    }
+
+    return _PlaceDetails.fromJson(data);
+  }
 }
