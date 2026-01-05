@@ -19,11 +19,30 @@ class RidesApi {
         'date': dateYYYYMMDD.trim(),
     };
 
-    final res = await _client.get<List<dynamic>>('/rides', query: q);
-    final raw = res.data ?? [];
+    final res = await _client.get<dynamic>('/rides', query: q);
+    final raw = res.data;
+
+    if (raw is! List) return <Ride>[];
+
     return raw
-        .whereType<Map<String, dynamic>>()
-        .map((j) => Ride.fromJson(j))
+        .whereType<Map>()
+        .map((m) => Ride.fromJson(m.cast<String, dynamic>()))
         .toList();
+  }
+
+  Future<Ride> getRideById(String id) async {
+    final rid = id.trim();
+    if (rid.isEmpty) {
+      throw ArgumentError('ride id can not be empty');
+    }
+
+    final res = await _client.get<dynamic>('/rides/$rid');
+    final raw = res.data;
+
+    if (raw is! Map) {
+      throw Exception('Invalid ride response');
+    }
+
+    return Ride.fromJson(raw.cast<String, dynamic>());
   }
 }

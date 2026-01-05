@@ -316,8 +316,14 @@ class _RideCard extends GetView<SearchRidesController> {
                 height: 44,
                 child: OutlinedButton(
                   onPressed: () {
-                    // TODO: details screen later
-                    Get.snackbar('Details', 'Open ride details for ${ride.id}');
+                    final seats = controller.getSelectedSeats(
+                      ride.id,
+                      ride.seatsAvailable,
+                    );
+                    Get.toNamed(
+                      '/rides/${ride.id}',
+                      arguments: {'seats': seats},
+                    );
                   },
                   style: OutlinedButton.styleFrom(
                     shape: RoundedRectangleBorder(
