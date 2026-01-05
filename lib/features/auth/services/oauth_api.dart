@@ -13,6 +13,7 @@ class OAuthApi {
   }) async {
     final res = await _client.post<Map<String, dynamic>>(
       '/auth/oauth',
+      skipAuthLogout: true,
       data: {
         'provider': provider,
         'providerUserId': providerUserId,
