@@ -207,6 +207,15 @@ class LoginView extends GetView<AuthController> {
                       ),
                       textAlign: TextAlign.center,
                     ),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => Get.toNamed('/register'),
+                        child: Text(
+                          "Don’t have an account? Create one",
+                          style: TextStyle(color: primary),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

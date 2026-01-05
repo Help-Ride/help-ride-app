@@ -1,7 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:email_validator/email_validator.dart';
 import 'package:help_ride/core/routes/app_routes.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
+import 'package:help_ride/shared/services/api_exception.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/token_storage.dart';
 import '../services/auth_api.dart';
@@ -11,10 +13,14 @@ import '../services/google_oauth_service.dart';
 class AuthController extends GetxController {
   final email = ''.obs;
   final password = ''.obs;
+  final name = ''.obs;
 
   final isLoading = false.obs; // email/password loading
   final oauthLoading = false.obs; // google loading
   final error = RxnString();
+
+  // prevents crash if user taps before init completes
+  final isReady = false.obs;
 
   late final TokenStorage _tokenStorage;
   late final AuthApi _authApi;
@@ -25,23 +31,27 @@ class AuthController extends GetxController {
   bool get isPasswordValid => password.value.trim().length >= 8;
 
   bool get canSubmit =>
+      isReady.value &&
       isEmailValid &&
       isPasswordValid &&
       !isLoading.value &&
       !oauthLoading.value;
 
+  bool get canRegister => canSubmit;
+
   @override
-  Future<void> onInit() async {
+  void onInit() {
     super.onInit();
+    _init(); // don’t make onInit async
+  }
 
+  Future<void> _init() async {
     _tokenStorage = TokenStorage();
-
     final apiClient = await ApiClient.create();
-
     _authApi = AuthApi(apiClient);
     _oauthApi = OAuthApi(apiClient);
-
     _googleOAuth = GoogleOAuthService();
+    isReady.value = true;
   }
 
   void setEmail(String v) {
@@ -51,6 +61,11 @@ class AuthController extends GetxController {
 
   void setPassword(String v) {
     password.value = v;
+    error.value = null;
+  }
+
+  void setName(String v) {
+    name.value = v;
     error.value = null;
   }
 
@@ -114,14 +129,46 @@ class AuthController extends GetxController {
     }
   }
 
-  String _prettyError(Object e) {
-    final s = e.toString();
-    if (s.contains('401')) return 'Invalid credentials.';
-    if (s.contains('403')) return 'Access denied.';
-    if (s.contains('404')) return 'Auth API not found.';
-    if (s.contains('SocketException') || s.contains('Connection')) {
-      return 'Network error. Check internet or base URL.';
+  Future<void> registerWithEmail() async {
+    if (!canRegister) {
+      error.value = 'Enter a valid email + password (8+ chars).';
+      return;
     }
-    return 'Login failed. ${s.length > 160 ? s.substring(0, 160) : s}';
+
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      final token = await _authApi.registerWithEmail(
+        email: email.value.trim(),
+        password: password.value.trim(),
+        name: name.value.trim().isEmpty ? null : name.value.trim(),
+      );
+
+      await _tokenStorage.saveAccessToken(token);
+
+      final session = Get.find<SessionController>();
+      await session.bootstrap();
+
+      Get.offAllNamed(AppRoutes.shell);
+    } catch (e) {
+      error.value = _prettyError(e);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  String _prettyError(Object e) {
+    // ✅ Our normalized API error
+    if (e is DioException && e.error is ApiException) {
+      return (e.error as ApiException).message;
+    }
+
+    // ✅ Network / unexpected issues
+    if (e is DioException) {
+      return 'Network error. Please try again.';
+    }
+
+    return 'Something went wrong. Please try again.';
   }
 }
