@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../common/app_card.dart';
+import 'package:get/get.dart';
 
 class WhereToCard extends StatefulWidget {
   const WhereToCard({super.key});
@@ -122,6 +123,15 @@ class _WhereToCardState extends State<WhereToCard> {
               onPressed: () {
                 debugPrint('Pickup: ${_pickupCtrl.text}');
                 debugPrint('Destination: ${_destCtrl.text}');
+
+                Get.toNamed(
+                  '/rides/search',
+                  arguments: {
+                    'fromCity': _pickupCtrl.text,
+                    'toCity': _destCtrl.text,
+                    'seats': 1,
+                  },
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.passengerPrimary,
