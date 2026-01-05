@@ -51,6 +51,9 @@ class _WhereToCardState extends State<WhereToCard> {
     return apiKey?.trim().isNotEmpty ?? false;
   }
 
+  bool get _canSearch =>
+      _pickupCtrl.text.trim().isNotEmpty && _destCtrl.text.trim().isNotEmpty;
+
   Future<void> _openAutocomplete({
     required TextEditingController controller,
     required String title,
@@ -115,37 +118,49 @@ class _WhereToCardState extends State<WhereToCard> {
           ),
 
           const SizedBox(height: 14),
-
           SizedBox(
             height: 52,
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                debugPrint('Pickup: ${_pickupCtrl.text}');
-                debugPrint('Destination: ${_destCtrl.text}');
+            child: AnimatedBuilder(
+              animation: Listenable.merge([_pickupCtrl, _destCtrl]),
+              builder: (context, _) {
+                final canSearch =
+                    _pickupCtrl.text.trim().isNotEmpty &&
+                    _destCtrl.text.trim().isNotEmpty;
 
-                Get.toNamed(
-                  '/rides/search',
-                  arguments: {
-                    'fromCity': _pickupCtrl.text,
-                    'toCity': _destCtrl.text,
-                    'seats': 1,
-                  },
+                return ElevatedButton.icon(
+                  onPressed: canSearch
+                      ? () {
+                          final from = _pickupCtrl.text.trim();
+                          final to = _destCtrl.text.trim();
+
+                          Get.toNamed(
+                            '/rides/search',
+                            arguments: {
+                              'fromCity': from,
+                              'toCity': to,
+                              'seats': 1,
+                            },
+                          );
+                        }
+                      : null, // ✅ disables button
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.passengerPrimary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFFE9EEF6),
+                    disabledForegroundColor: const Color(0xFF9AA3B2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.search, size: 18),
+                  label: const Text(
+                    "Search rides",
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 );
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.passengerPrimary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
-              icon: const Icon(Icons.search, size: 18),
-              label: const Text(
-                "Search rides",
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
             ),
           ),
         ],
