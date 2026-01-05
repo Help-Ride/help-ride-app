@@ -16,27 +16,33 @@ class RoleToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isPassenger = role == HomeRole.passenger;
+
     return Container(
+      height: 44,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F2F6),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFE6EAF2)),
+        color: const Color(0xFFF1F4F9),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE3E8F2)),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.min, // important
         children: [
-          _Pill(
-            label: "Passenger",
-            active: role == HomeRole.passenger,
-            activeColor: AppColors.passengerPrimary,
-            onTap: onPassenger,
+          Expanded(
+            child: _Segment(
+              selected: isPassenger,
+              label: 'Passenger',
+              onTap: onPassenger,
+            ),
           ),
-          _Pill(
-            label: "Driver",
-            active: role == HomeRole.driver,
-            activeColor: AppColors.driverPrimary,
-            onTap: onDriver,
+          const SizedBox(width: 4),
+          Expanded(
+            child: _Segment(
+              selected: !isPassenger,
+              label: 'Driver',
+              onTap: onDriver,
+            ),
           ),
         ],
       ),
@@ -44,46 +50,40 @@ class RoleToggle extends StatelessWidget {
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({
+class _Segment extends StatelessWidget {
+  const _Segment({
+    required this.selected,
     required this.label,
-    required this.active,
-    required this.activeColor,
     required this.onTap,
   });
 
+  final bool selected;
   final String label;
-  final bool active;
-  final Color activeColor;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-          boxShadow: active
-              ? const [
-                  BoxShadow(
-                    blurRadius: 18,
-                    offset: Offset(0, 10),
-                    color: Color(0x14000000),
-                  ),
-                ]
-              : const [],
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: active ? activeColor : AppColors.lightMuted,
+    return Material(
+      color: selected ? Colors.white : Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Center(
+          child: Padding(
+            // keep padding tight so it doesn't overflow on small widths
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: selected
+                    ? AppColors.passengerPrimary
+                    : const Color(0xFF7B8798),
+              ),
+            ),
           ),
         ),
       ),
