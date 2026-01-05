@@ -52,29 +52,26 @@ class _HomeHeader extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Cap toggle width so it doesn't crush the title.
-        final toggleMaxWidth = (constraints.maxWidth * 0.48).clamp(
-          170.0,
-          240.0,
-        );
+        // ✅ Option A: fixed toggle width so text never becomes "Passe..."
+        // Tune this number if needed (210–240 is usually safe).
+        const double toggleWidth = 230;
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left header: must be flexible and safe for long names/titles.
+            // Left header: flexible area for greeting/title
             Expanded(
               child: Obx(() {
                 final isPassenger = controller.role.value == HomeRole.passenger;
 
-                final firstName = (session?.user.value?.name ?? 'User')
+                final fullName = (session?.user.value?.name ?? 'User')
                     .toString()
                     .trim();
-                final name = firstName.isEmpty
+                final name = fullName.isEmpty
                     ? 'User'
-                    : firstName.split(' ').first;
+                    : fullName.split(' ').first;
 
                 if (isPassenger) {
-                  // "Hello," (small) + Name (big)
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -105,7 +102,6 @@ class _HomeHeader extends StatelessWidget {
                   );
                 }
 
-                // Driver title: allow 2 lines and ellipsis as last resort.
                 return const Text(
                   "Driver Dashboard",
                   maxLines: 2,
@@ -122,9 +118,9 @@ class _HomeHeader extends StatelessWidget {
 
             const SizedBox(width: 12),
 
-            // Right: role toggle with capped width.
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: toggleMaxWidth),
+            // Right: role toggle with fixed width
+            SizedBox(
+              width: toggleWidth,
               child: Align(
                 alignment: Alignment.topRight,
                 child: Obx(() {
