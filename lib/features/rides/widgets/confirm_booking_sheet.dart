@@ -108,16 +108,25 @@ class ConfirmBookingSheet extends StatelessWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row({required this.label, required this.value, this.bold = false});
+  const _Row({
+    required this.label,
+    required this.value,
+    this.bold = false,
+    this.valueMaxLines = 2,
+  });
+
   final String label;
   final String value;
   final bool bold;
+  final int valueMaxLines;
 
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
+        SizedBox(
+          width: 92, // keeps columns aligned
           child: Text(
             label,
             style: const TextStyle(
@@ -126,10 +135,16 @@ class _Row extends StatelessWidget {
             ),
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: bold ? FontWeight.w900 : FontWeight.w800,
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            value,
+            maxLines: valueMaxLines,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontWeight: bold ? FontWeight.w900 : FontWeight.w800,
+            ),
           ),
         ),
       ],
