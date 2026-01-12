@@ -11,6 +11,8 @@ class BookingSuccessView extends StatelessWidget {
 
     final route = (args['route'] ?? '').toString();
     final departure = (args['departure'] ?? '').toString();
+    final status = (args['status'] ?? 'pending').toString().toLowerCase();
+    final isConfirmed = status == 'confirmed';
     final ref = (args['ref'] ?? '').toString();
 
     final totalRaw = args['total'];
@@ -33,18 +35,30 @@ class BookingSuccessView extends StatelessWidget {
                   color: AppColors.passengerPrimary,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check, color: Colors.white, size: 42),
+                child: Icon(
+                  isConfirmed ? Icons.check : Icons.schedule,
+                  color: Colors.white,
+                  size: 42,
+                ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Booking Confirmed!',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              Text(
+                isConfirmed ? 'Booking Confirmed!' : 'Request Sent!',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Your ride has been successfully booked. The driver will contact you soon.',
+              Text(
+                isConfirmed
+                    ? 'Your ride is confirmed. The driver will contact you soon.'
+                    : 'Waiting for the driver to accept your request. You’ll be notified soon.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.lightMuted, height: 1.4),
+                style: const TextStyle(
+                  color: AppColors.lightMuted,
+                  height: 1.4,
+                ),
               ),
 
               const SizedBox(height: 20),
@@ -122,8 +136,8 @@ class BookingSuccessView extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
-                    'View My Rides',
+                  child: Text(
+                    isConfirmed ? 'View My Rides' : 'View My Requests',
                     style: TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),

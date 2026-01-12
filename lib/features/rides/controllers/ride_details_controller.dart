@@ -136,6 +136,8 @@ class RideDetailsController extends GetxController {
       // optional: refresh ride to update seatsAvailable if backend reduces it
       await fetch();
 
+      final status = (booking['status'] ?? 'pending').toString();
+
       // ✅ Navigate to success screen using real booking data
       Get.toNamed(
         '/booking/success',
@@ -146,6 +148,7 @@ class RideDetailsController extends GetxController {
           'ref': bookingId.isNotEmpty
               ? bookingId
               : 'RB-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch % 1000000}',
+          'status': status,
         },
       );
     } catch (e) {
