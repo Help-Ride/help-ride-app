@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:help_ride/features/bookings/controllers/my_rides_controller.dart';
+import 'package:help_ride/features/bookings/views/my_rides_view.dart';
 import '../../core/theme/theme_controller.dart';
 import '../controllers/session_controller.dart';
 import '../../core/theme/app_colors.dart';
@@ -17,6 +19,13 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+
+    Get.lazyPut<MyRidesController>(() => MyRidesController(), fenix: true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +69,7 @@ class _NavConfig {
 _NavConfig _passengerConfig() {
   final pages = const [
     HomeView(),
-    _Placeholder(title: 'My Rides'),
+    MyRidesView(),
     _Placeholder(title: 'Messages'),
     PassengerProfileView(),
   ];
