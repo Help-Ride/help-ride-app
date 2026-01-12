@@ -1,4 +1,5 @@
-import '../../../shared/services/api_client.dart';
+import 'package:help_ride/features/bookings/models/booking.dart';
+import 'package:help_ride/shared/services/api_client.dart';
 
 class BookingsApi {
   BookingsApi(this._client);
@@ -21,5 +22,16 @@ class BookingsApi {
     );
 
     return res.data ?? <String, dynamic>{};
+  }
+
+  Future<List<Booking>> myBookings() async {
+    final res = await _client.get<dynamic>('/bookings/me/list');
+    final raw = res.data;
+    if (raw is! List) return [];
+
+    return raw
+        .whereType<Map>()
+        .map((m) => Booking.fromJson(m.cast<String, dynamic>()))
+        .toList();
   }
 }
