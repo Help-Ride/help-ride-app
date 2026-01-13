@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../common/app_card.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../home/widgets/common/app_card.dart';
 
 class MiniStatCard extends StatelessWidget {
   const MiniStatCard({

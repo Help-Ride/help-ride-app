@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:help_ride/features/bookings/routes/booking_routes.dart';
+import 'package:help_ride/features/driver/routes/driver_routes.dart';
 import 'package:help_ride/features/rides/routes/rides_routes.dart';
 import 'package:help_ride/shared/bindings/shell_binding.dart';
 import 'package:help_ride/shared/views/app_shell.dart';
@@ -16,6 +17,7 @@ class AppRoutes {
     ...AuthRoutes.pages, // /login etc.
     ...RidesRoutes.pages, // /rides/search etc.
     ...BookingRoutes.pages, // /booking/success etc.
+    ...DriverRoutes.pages, // /driver/onboarding etc.
     GetPage(name: shell, page: () => const AppShell(), binding: ShellBinding()),
   ];
 }

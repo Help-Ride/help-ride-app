@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
+import 'package:help_ride/features/driver/views/driver_home_gate_view.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/role_toggle.dart';
 import '../../../shared/controllers/session_controller.dart';
 import '../controllers/home_controller.dart';
 import '../widgets/passenger/passenger_home.dart';
-import '../widgets/driver/driver_home.dart';
 
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
@@ -28,7 +27,7 @@ class HomeView extends GetView<HomeController> {
                 child: Obx(() {
                   return c.role.value == HomeRole.passenger
                       ? const PassengerHome()
-                      : const DriverHome();
+                      : const DriverHomeGateView();
                 }),
               ),
             ],

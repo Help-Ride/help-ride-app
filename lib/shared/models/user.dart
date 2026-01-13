@@ -33,10 +33,42 @@ class User {
 }
 
 class DriverProfile {
-  // add fields later when backend expands
-  DriverProfile();
+  final String id;
+  final String userId;
+  final String? carMake;
+  final String? carModel;
+  final String? carYear;
+  final String? carColor;
+  final String? plateNumber;
+  final String? licenseNumber;
+  final String? insuranceInfo;
+  final bool isVerified;
+
+  DriverProfile({
+    required this.id,
+    required this.userId,
+    this.carMake,
+    this.carModel,
+    this.carYear,
+    this.carColor,
+    this.plateNumber,
+    this.licenseNumber,
+    this.insuranceInfo,
+    required this.isVerified,
+  });
 
   factory DriverProfile.fromJson(Map<String, dynamic> json) {
-    return DriverProfile();
+    return DriverProfile(
+      id: (json['id'] ?? '').toString(),
+      userId: (json['userId'] ?? '').toString(),
+      carMake: json['carMake']?.toString(),
+      carModel: json['carModel']?.toString(),
+      carYear: json['carYear']?.toString(),
+      carColor: json['carColor']?.toString(),
+      plateNumber: json['plateNumber']?.toString(),
+      licenseNumber: json['licenseNumber']?.toString(),
+      insuranceInfo: json['insuranceInfo']?.toString(),
+      isVerified: (json['isVerified'] ?? false) == true,
+    );
   }
 }

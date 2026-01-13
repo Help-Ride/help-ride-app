@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors.dart';
 import 'mini_stat_card.dart';
 import 'ride_preview_card.dart';
 
-class DriverHome extends StatelessWidget {
-  const DriverHome({super.key});
+class DriverHomeView extends StatelessWidget {
+  const DriverHomeView({super.key});
 
   @override
   Widget build(BuildContext context) {

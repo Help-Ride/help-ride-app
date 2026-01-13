@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/features/bookings/controllers/my_rides_controller.dart';
 import 'package:help_ride/features/bookings/views/my_rides_view.dart';
+import 'package:help_ride/features/driver/controllers/driver_gate_controller.dart';
+import 'package:help_ride/features/driver/controllers/driver_onboarding_controller.dart';
 import '../../core/theme/theme_controller.dart';
 import '../controllers/session_controller.dart';
 import '../../core/theme/app_colors.dart';
@@ -25,6 +27,14 @@ class _AppShellState extends State<AppShell> {
     super.initState();
 
     Get.lazyPut<MyRidesController>(() => MyRidesController(), fenix: true);
+    Get.lazyPut<DriverGateController>(
+      () => DriverGateController(),
+      fenix: true,
+    );
+    Get.lazyPut<DriverOnboardingController>(
+      () => DriverOnboardingController(),
+      fenix: true,
+    );
   }
 
   @override
