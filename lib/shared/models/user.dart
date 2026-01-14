@@ -2,6 +2,7 @@ class User {
   final String id;
   final String name;
   final String email;
+  final String? phone;
   final bool emailVerified;
   final String? authProvider;
   final String roleDefault;
@@ -12,6 +13,7 @@ class User {
     required this.id,
     required this.name,
     required this.email,
+    this.phone,
     required this.emailVerified,
     this.authProvider,
     required this.roleDefault,
@@ -27,6 +29,7 @@ class User {
       id: json['id'],
       name: json['name'],
       email: json['email'],
+      phone: json['phone']?.toString(),
       emailVerified: _parseBool(
         json['emailVerified'] ??
             json['isEmailVerified'] ??
