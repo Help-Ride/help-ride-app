@@ -10,6 +10,8 @@ class RideTripDetailsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final duration = _formatDuration(ride.startTime, ride.arrivalTime);
     return AppCard(
       child: Column(
         children: [
@@ -18,7 +20,10 @@ class RideTripDetailsCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               ride.fromCity,
-              style: const TextStyle(fontWeight: FontWeight.w900),
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: isDark ? AppColors.darkText : AppColors.lightText,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -33,12 +38,18 @@ class RideTripDetailsCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               ride.toCity,
-              style: const TextStyle(fontWeight: FontWeight.w900),
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: isDark ? AppColors.darkText : AppColors.lightText,
+              ),
             ),
           ),
 
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFE9EEF6)),
+          Divider(
+            height: 1,
+            color: isDark ? const Color(0xFF232836) : const Color(0xFFE9EEF6),
+          ),
           const SizedBox(height: 12),
 
           Row(
@@ -50,10 +61,10 @@ class RideTripDetailsCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: MiniInfo(
                   label: 'Duration',
-                  value: '45 min (placeholder)',
+                  value: duration,
                 ),
               ),
             ],
@@ -61,5 +72,16 @@ class RideTripDetailsCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatDuration(DateTime start, DateTime? end) {
+    if (end == null) return '—';
+    final diff = end.difference(start);
+    if (diff.isNegative) return '—';
+    final mins = diff.inMinutes;
+    if (mins < 60) return '${mins} min';
+    final h = mins ~/ 60;
+    final m = mins % 60;
+    return m == 0 ? '${h}h' : '${h}h ${m}m';
   }
 }

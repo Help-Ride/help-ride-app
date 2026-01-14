@@ -16,6 +16,8 @@ class RideDriverCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final driverName = ride.driver?.name ?? 'Driver';
+    final driver = ride.driver;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AppCard(
       child: Row(
@@ -33,24 +35,27 @@ class RideDriverCard extends StatelessWidget {
                         driverName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 16,
+                          color: isDark ? AppColors.darkText : AppColors.lightText,
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Pill(text: 'Verified'),
+                    if (driver?.isVerified == true) const Pill(text: 'Verified'),
                   ],
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  '⭐ 4.9  •  127 rides  •  Since 2023',
-                  style: TextStyle(
-                    color: AppColors.lightMuted,
-                    fontWeight: FontWeight.w600,
+                if (_driverMetaText(driver) != null)
+                  Text(
+                    _driverMetaText(driver)!,
+                    style: TextStyle(
+                      color:
+                          isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -106,5 +111,21 @@ class RideDriverCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String? _driverMetaText(RideDriver? driver) {
+    if (driver == null) return null;
+    final parts = <String>[];
+    if (driver.rating != null) {
+      parts.add('⭐ ${driver.rating!.toStringAsFixed(1)}');
+    }
+    if (driver.ridesCount != null) {
+      parts.add('${driver.ridesCount} rides');
+    }
+    if (driver.sinceYear != null) {
+      parts.add('Since ${driver.sinceYear}');
+    }
+    if (parts.isEmpty) return null;
+    return parts.join('  •  ');
   }
 }

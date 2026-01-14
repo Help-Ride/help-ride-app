@@ -63,11 +63,11 @@ class RideDetailsBody extends GetView<RideDetailsController> {
           const SizedBox(height: 14),
 
           const SectionTitle('Amenities'),
-          const RideAmenitiesCard(),
+          RideAmenitiesCard(ride: ride),
           const SizedBox(height: 14),
 
           const SectionTitle('Pickup Instructions'),
-          const RidePickupInstructionsCard(),
+          RidePickupInstructionsCard(ride: ride),
         ],
       );
     });

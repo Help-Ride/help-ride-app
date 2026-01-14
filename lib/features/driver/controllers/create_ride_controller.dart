@@ -22,6 +22,8 @@ class CreateRideController extends GetxController {
 
   final date = Rxn<DateTime>();
   final time = Rxn<TimeOfDay>();
+  final canPublishFlag = false.obs;
+  final _workers = <Worker>[];
 
   final amenities = <String, bool>{
     'AC': false,
@@ -37,10 +39,29 @@ class CreateRideController extends GetxController {
     super.onInit();
     final client = await ApiClient.create();
     _api = DriverRidesApi(client);
+
+    fromCtrl.addListener(_recomputeCanPublish);
+    toCtrl.addListener(_recomputeCanPublish);
+    seatsCtrl.addListener(_recomputeCanPublish);
+    priceCtrl.addListener(_recomputeCanPublish);
+    _workers.addAll([
+      ever(fromPick, (_) => _recomputeCanPublish()),
+      ever(toPick, (_) => _recomputeCanPublish()),
+      ever(date, (_) => _recomputeCanPublish()),
+      ever(time, (_) => _recomputeCanPublish()),
+    ]);
+    _recomputeCanPublish();
   }
 
   @override
   void onClose() {
+    fromCtrl.removeListener(_recomputeCanPublish);
+    toCtrl.removeListener(_recomputeCanPublish);
+    seatsCtrl.removeListener(_recomputeCanPublish);
+    priceCtrl.removeListener(_recomputeCanPublish);
+    for (final w in _workers) {
+      w.dispose();
+    }
     fromCtrl.dispose();
     toCtrl.dispose();
     stopsCtrl.dispose();
@@ -51,6 +72,10 @@ class CreateRideController extends GetxController {
   }
 
   bool get canPublish {
+    return canPublishFlag.value;
+  }
+
+  bool _computeCanPublish() {
     final seats = int.tryParse(seatsCtrl.text.trim()) ?? 0;
     final price = double.tryParse(priceCtrl.text.trim()) ?? -1;
 
@@ -60,6 +85,10 @@ class CreateRideController extends GetxController {
         time.value != null &&
         seats > 0 &&
         price >= 0;
+  }
+
+  void _recomputeCanPublish() {
+    canPublishFlag.value = _computeCanPublish();
   }
 
   DateTime? get startDateTimeLocal {
@@ -78,7 +107,7 @@ class CreateRideController extends GetxController {
   Future<void> publish() async {
     error.value = null;
 
-    if (!canPublish) {
+    if (!_computeCanPublish()) {
       error.value = 'Fill route, date/time, seats and price.';
       return;
     }
