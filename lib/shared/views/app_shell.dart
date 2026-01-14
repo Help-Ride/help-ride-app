@@ -3,7 +3,9 @@ import 'package:get/get.dart';
 import 'package:help_ride/features/bookings/controllers/my_rides_controller.dart';
 import 'package:help_ride/features/bookings/views/my_rides_view.dart';
 import 'package:help_ride/features/driver/controllers/driver_gate_controller.dart';
+import 'package:help_ride/features/driver/controllers/driver_my_rides_controller.dart';
 import 'package:help_ride/features/driver/controllers/driver_onboarding_controller.dart';
+import 'package:help_ride/features/driver/views/driver_my_rides_view.dart';
 import '../../core/theme/theme_controller.dart';
 import '../controllers/session_controller.dart';
 import '../../core/constants/app_constants.dart';
@@ -26,7 +28,10 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-
+    Get.lazyPut<DriverMyRidesController>(
+      () => DriverMyRidesController(),
+      fenix: true,
+    );
     Get.lazyPut<MyRidesController>(() => MyRidesController(), fenix: true);
     Get.lazyPut<DriverGateController>(
       () => DriverGateController(),
@@ -125,8 +130,8 @@ _NavConfig _passengerConfig() {
 _NavConfig _driverConfig() {
   final pages = const [
     HomeView(),
-    _Placeholder(title: 'Create Ride'),
-    _Placeholder(title: 'Requests'),
+    DriverMyRidesView(),
+    _Placeholder(title: 'My Requests'),
     PassengerProfileView(),
   ];
 
@@ -137,8 +142,8 @@ _NavConfig _driverConfig() {
       selectedIcon: Icons.home_rounded,
     ),
     _NavItemData(
-      label: 'Create',
-      icon: Icons.add_circle_outline,
+      label: 'My Rides',
+      icon: Icons.location_on_outlined,
       selectedIcon: Icons.add_circle,
     ),
     _NavItemData(
