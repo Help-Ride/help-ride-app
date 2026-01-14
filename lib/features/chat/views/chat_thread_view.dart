@@ -20,6 +20,8 @@ class ChatThreadView extends StatefulWidget {
 class _ChatThreadViewState extends State<ChatThreadView> {
   late final ChatThreadController _controller;
   final TextEditingController _textController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  Worker? _messageWorker;
 
   @override
   void initState() {
@@ -28,11 +30,17 @@ class _ChatThreadViewState extends State<ChatThreadView> {
       ChatThreadController(conversation: widget.conversation),
       tag: widget.conversation.id,
     );
+    _messageWorker = ever<List<ChatMessage>>(
+      _controller.messages,
+      (_) => _scrollToBottom(),
+    );
   }
 
   @override
   void dispose() {
     _textController.dispose();
+    _scrollController.dispose();
+    _messageWorker?.dispose();
     if (Get.isRegistered<ChatThreadController>(tag: widget.conversation.id)) {
       Get.delete<ChatThreadController>(tag: widget.conversation.id);
     }
@@ -80,6 +88,7 @@ class _ChatThreadViewState extends State<ChatThreadView> {
               }
 
               return ListView.separated(
+                controller: _scrollController,
                 padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
                 itemCount: messages.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 14),
@@ -116,6 +125,18 @@ class _ChatThreadViewState extends State<ChatThreadView> {
     _controller.draft.value = _textController.text;
     _controller.sendCurrent();
     _textController.clear();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final target = _scrollController.position.maxScrollExtent;
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
   }
 }
 

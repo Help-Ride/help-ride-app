@@ -95,7 +95,7 @@ class ChatThreadController extends GetxController {
 
   @override
   void onClose() {
-    _pusher.disconnect();
+    _pusher.unsubscribeFromConversation();
     super.onClose();
   }
 

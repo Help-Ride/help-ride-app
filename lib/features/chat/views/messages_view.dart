@@ -125,7 +125,11 @@ class _MessagesViewState extends State<MessagesView> {
   }
 
   void _openThread(ChatConversation conversation) {
-    Get.to(() => ChatThreadView(conversation: conversation));
+    _controller.setActiveConversation(conversation.id);
+    Get.to(() => ChatThreadView(conversation: conversation))?.then((_) {
+      _controller.setActiveConversation(null);
+      _controller.fetch();
+    });
   }
 
   String _roleLabel(ChatConversation conversation, String fallback) {
