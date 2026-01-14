@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
 import 'mini_stat_card.dart';
 import 'ride_preview_card.dart';
@@ -15,7 +16,7 @@ class DriverHomeView extends StatelessWidget {
           height: 54,
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: () => Get.toNamed('/driver/create-ride'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.driverPrimary,
               foregroundColor: Colors.white,
