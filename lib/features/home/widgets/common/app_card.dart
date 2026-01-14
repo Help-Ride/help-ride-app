@@ -6,10 +6,12 @@ class AppCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
+    this.showShadow = true,
   });
 
   final Widget child;
   final EdgeInsets padding;
+  final bool showShadow;
 
   @override
   Widget build(BuildContext context) {
@@ -18,13 +20,16 @@ class AppCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.lightSurface,
         borderRadius: BorderRadius.circular(22),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 30,
-            offset: Offset(0, 18),
-            color: Color(0x14000000),
-          ),
-        ],
+        border: Border.all(color: const Color(0xFFE6EAF2)),
+        boxShadow: showShadow
+            ? const [
+                BoxShadow(
+                  blurRadius: 20,
+                  offset: Offset(0, 10),
+                  color: Color(0x0A000000),
+                ),
+              ]
+            : const [],
       ),
       child: child,
     );

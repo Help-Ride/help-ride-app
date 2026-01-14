@@ -6,10 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
-
-import '../../../../core/theme/app_colors.dart';
-import '../common/app_card.dart';
 import 'package:get/get.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../controllers/recent_searches_controller.dart';
+import '../common/app_card.dart';
 
 class WhereToCard extends StatefulWidget {
   const WhereToCard({super.key});
@@ -141,6 +141,22 @@ class _WhereToCardState extends State<WhereToCard> {
                       ? () {
                           final from = _pickupCtrl.text.trim();
                           final to = _destCtrl.text.trim();
+                          final recent = Get.isRegistered<
+                                  RecentSearchesController>()
+                              ? Get.find<RecentSearchesController>()
+                              : Get.put(RecentSearchesController());
+                          recent.addSearch(
+                            from: from,
+                            to: to,
+                            fromLat: _pickupLatLng?.lat,
+                            fromLng: _pickupLatLng?.lng,
+                            toLat: _destLatLng?.lat,
+                            toLng: _destLatLng?.lng,
+                            radiusKm: _pickupLatLng != null || _destLatLng != null
+                                ? _defaultRadiusKm
+                                : null,
+                            seats: 1,
+                          );
 
                           Get.toNamed(
                             '/rides/search',
