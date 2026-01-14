@@ -23,6 +23,9 @@ class _WhereToCardState extends State<WhereToCard> {
 
   final _pickupCtrl = TextEditingController();
   final _destCtrl = TextEditingController();
+  _LatLng? _pickupLatLng;
+  _LatLng? _destLatLng;
+  static const double _defaultRadiusKm = 10.0;
 
   @override
   void initState() {
@@ -80,6 +83,11 @@ class _WhereToCardState extends State<WhereToCard> {
     if (!mounted || picked == null) return;
 
     controller.text = picked.fullText;
+    if (controller == _pickupCtrl) {
+      _pickupLatLng = picked.latLng;
+    } else if (controller == _destCtrl) {
+      _destLatLng = picked.latLng;
+    }
     setState(() {});
     // If you want lat/lng later, you already have picked.latLng (can store in controller/state)
     debugPrint('Picked: ${picked.fullText} | ${picked.latLng}');
@@ -140,6 +148,17 @@ class _WhereToCardState extends State<WhereToCard> {
                               'fromCity': from,
                               'toCity': to,
                               'seats': 1,
+                              if (_pickupLatLng != null) ...{
+                                'fromLat': _pickupLatLng!.lat,
+                                'fromLng': _pickupLatLng!.lng,
+                              },
+                              if (_destLatLng != null) ...{
+                                'toLat': _destLatLng!.lat,
+                                'toLng': _destLatLng!.lng,
+                              },
+                              if (_pickupLatLng != null ||
+                                  _destLatLng != null)
+                                'radiusKm': _defaultRadiusKm,
                             },
                           );
                         }

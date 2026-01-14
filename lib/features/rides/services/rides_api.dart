@@ -9,12 +9,22 @@ class RidesApi {
     required String fromCity,
     required String toCity,
     required int seats,
+    double? fromLat,
+    double? fromLng,
+    double? toLat,
+    double? toLng,
+    double? radiusKm,
     String? dateYYYYMMDD, // optional
   }) async {
     final q = <String, dynamic>{
       'fromCity': fromCity,
       'toCity': toCity,
       'seats': seats,
+      if (fromLat != null) 'fromLat': fromLat,
+      if (fromLng != null) 'fromLng': fromLng,
+      if (toLat != null) 'toLat': toLat,
+      if (toLng != null) 'toLng': toLng,
+      if (radiusKm != null) 'radiusKm': radiusKm,
       if (dateYYYYMMDD != null && dateYYYYMMDD.trim().isNotEmpty)
         'date': dateYYYYMMDD.trim(),
     };

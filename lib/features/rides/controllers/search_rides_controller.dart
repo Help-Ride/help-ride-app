@@ -14,6 +14,11 @@ class SearchRidesController extends GetxController {
   final fromCity = ''.obs;
   final toCity = ''.obs;
   final seatsRequired = 1.obs;
+  final fromLat = RxnDouble();
+  final fromLng = RxnDouble();
+  final toLat = RxnDouble();
+  final toLng = RxnDouble();
+  final radiusKm = RxnDouble();
 
   // per-ride seat selection
   final selectedSeats = <String, int>{}.obs;
@@ -29,6 +34,11 @@ class SearchRidesController extends GetxController {
 
     fromCity.value = (args['fromCity'] ?? '').toString().trim();
     toCity.value = (args['toCity'] ?? '').toString().trim();
+    fromLat.value = _readDouble(args['fromLat']);
+    fromLng.value = _readDouble(args['fromLng']);
+    toLat.value = _readDouble(args['toLat']);
+    toLng.value = _readDouble(args['toLng']);
+    radiusKm.value = _readDouble(args['radiusKm']);
 
     final rawSeats = args['seats'];
     final parsedSeats = rawSeats is int
@@ -65,6 +75,11 @@ class SearchRidesController extends GetxController {
         fromCity: fromCity.value,
         toCity: toCity.value,
         seats: seatsRequired.value,
+        fromLat: fromLat.value,
+        fromLng: fromLng.value,
+        toLat: toLat.value,
+        toLng: toLng.value,
+        radiusKm: radiusKm.value,
       );
 
       rides.assignAll(list);
@@ -79,5 +94,11 @@ class SearchRidesController extends GetxController {
     } finally {
       loading.value = false;
     }
+  }
+
+  double? _readDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
   }
 }
