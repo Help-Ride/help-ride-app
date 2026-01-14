@@ -36,4 +36,38 @@ class DriverRidesApi {
     );
     return res.data ?? {};
   }
+
+  Future<Map<String, dynamic>> updateRide({
+    required String rideId,
+    required String fromCity,
+    required double fromLat,
+    required double fromLng,
+    required String toCity,
+    required double toLat,
+    required double toLng,
+    required DateTime startTimeUtc,
+    required int seatsTotal,
+    required double pricePerSeat,
+  }) async {
+    final id = rideId.trim();
+    if (id.isEmpty) {
+      throw ArgumentError('ride id can not be empty');
+    }
+
+    final res = await _client.put<Map<String, dynamic>>(
+      '/rides/$id',
+      data: {
+        'fromCity': fromCity,
+        'fromLat': fromLat,
+        'fromLng': fromLng,
+        'toCity': toCity,
+        'toLat': toLat,
+        'toLng': toLng,
+        'startTime': startTimeUtc.toIso8601String(),
+        'pricePerSeat': pricePerSeat,
+        'seatsTotal': seatsTotal,
+      },
+    );
+    return res.data ?? {};
+  }
 }

@@ -99,7 +99,7 @@ class DriverRideCard extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => Get.snackbar('Details', 'Ride: ${ride.id}'),
+                  onPressed: () => Get.toNamed('/driver/rides/${ride.id}'),
                   child: const Text('Details'),
                 ),
               ),
@@ -109,7 +109,7 @@ class DriverRideCard extends StatelessWidget {
                   onPressed:
                       (status == 'completed' || status.contains('cancel'))
                       ? null
-                      : () => Get.snackbar('Edit', 'Edit: ${ride.id}'),
+                      : () => Get.toNamed('/driver/rides/${ride.id}/edit'),
                   child: const Text('Edit'),
                 ),
               ),
