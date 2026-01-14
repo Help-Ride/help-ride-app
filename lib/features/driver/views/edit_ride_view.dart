@@ -1,0 +1,277 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/place_picker_field.dart';
+import '../controllers/edit_ride_controller.dart';
+import '../widgets/create_ride/chip.dart';
+import '../widgets/create_ride/info_box.dart';
+import '../widgets/create_ride/picker_tile.dart';
+import '../widgets/create_ride/section_title.dart';
+import '../widgets/create_ride/text_area.dart';
+import '../widgets/create_ride/text_field.dart';
+
+class EditRideView extends GetView<EditRideController> {
+  const EditRideView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = AppColors.driverPrimary;
+
+    return Scaffold(
+      backgroundColor: AppColors.lightBg,
+      appBar: AppBar(
+        backgroundColor: AppColors.lightBg,
+        elevation: 0,
+        foregroundColor: AppColors.lightText,
+        title: const Text(
+          'Edit Ride',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+      ),
+      body: SafeArea(
+        child: Obx(() {
+          if (controller.loading.value && controller.ride.value == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (controller.ride.value == null &&
+              controller.error.value != null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      controller.error.value!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.error),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: controller.refresh,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 90),
+            children: [
+              const Text(
+                'Update your ride details',
+                style: TextStyle(color: AppColors.lightMuted),
+              ),
+              const SizedBox(height: 18),
+
+              const SectionTitle('ROUTE'),
+              PlacePickerField(
+                label: 'Departure Location',
+                hintText: 'Where are you starting from?',
+                icon: Icons.place_outlined,
+                controller: controller.fromCtrl,
+                onPicked: (p) => controller.fromPick.value = p,
+              ),
+              const SizedBox(height: 12),
+              PlacePickerField(
+                label: 'Destination',
+                hintText: 'Where are you going?',
+                icon: Icons.place,
+                iconColor: primary,
+                controller: controller.toCtrl,
+                onPicked: (p) => controller.toPick.value = p,
+              ),
+              const SizedBox(height: 12),
+              ExoTextField(
+                label: 'Stops (Optional)',
+                hint: 'e.g., Downtown, Union Station',
+                controller: controller.stopsCtrl,
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Separate multiple stops with commas',
+                style: TextStyle(color: AppColors.lightMuted, fontSize: 12),
+              ),
+
+              const SizedBox(height: 18),
+              const SectionTitle('SCHEDULE'),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: PickerTile(
+                      label: 'Date',
+                      value: controller.date.value == null
+                          ? ''
+                          : _fmtDate(controller.date.value!),
+                      icon: Icons.calendar_today_outlined,
+                      onTap: () async {
+                        final now = DateTime.now();
+                        final picked = await showDatePicker(
+                          context: context,
+                          firstDate: now,
+                          lastDate: now.add(const Duration(days: 365)),
+                          initialDate: controller.date.value ?? now,
+                        );
+                        if (picked != null) controller.date.value = picked;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: PickerTile(
+                      label: 'Time',
+                      value: controller.time.value == null
+                          ? ''
+                          : controller.time.value!.format(context),
+                      icon: Icons.access_time,
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime:
+                              controller.time.value ?? TimeOfDay.now(),
+                        );
+                        if (picked != null) controller.time.value = picked;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+              const SectionTitle('CAPACITY & PRICING'),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: ExoTextField(
+                      label: 'Available Seats',
+                      hint: 'e.g. 3',
+                      controller: controller.seatsCtrl,
+                      keyboardType: TextInputType.number,
+                      prefixIcon: Icons.event_seat_outlined,
+                      onChanged: (_) {},
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ExoTextField(
+                      label: 'Price per Seat',
+                      hint: '25',
+                      controller: controller.priceCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      prefixIcon: Icons.attach_money,
+                      onChanged: (_) {},
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+              const SectionTitle('AMENITIES'),
+
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: controller.amenities.keys.map((k) {
+                  final active = controller.amenities[k] == true;
+                  return SelectChip(
+                    text: k,
+                    active: active,
+                    activeColor: primary,
+                    onTap: () => controller.toggleAmenity(k),
+                  );
+                }).toList(),
+              ),
+
+              const SizedBox(height: 18),
+              ExoTextArea(
+                label: 'Additional Notes (Optional)',
+                hint:
+                    'e.g., Pickup instructions, luggage space available, etc.',
+                controller: controller.notesCtrl,
+              ),
+
+              const SizedBox(height: 18),
+              const InfoBox(),
+              const SizedBox(height: 10),
+
+              if (controller.error.value != null)
+                Text(
+                  controller.error.value!,
+                  style: const TextStyle(color: AppColors.error),
+                ),
+            ],
+          );
+        }),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Obx(() {
+          final radius = BorderRadius.circular(16);
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+            child: SizedBox(
+              height: 52,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: controller.loading.value
+                          ? null
+                          : () => Get.back(),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: radius),
+                        side: BorderSide(
+                          color: AppColors.driverPrimary.withOpacity(0.35),
+                          width: 1.4,
+                        ),
+                        foregroundColor: AppColors.driverPrimary,
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: controller.loading.value
+                          ? null
+                          : (controller.canSave ? controller.save : null),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: radius),
+                        backgroundColor: AppColors.driverPrimary,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFFE9EEF6),
+                        disabledForegroundColor: const Color(0xFF9AA3B2),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Save Changes',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+String _fmtDate(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';

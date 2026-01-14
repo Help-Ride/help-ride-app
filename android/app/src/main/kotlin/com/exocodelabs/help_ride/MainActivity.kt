@@ -1,4 +1,4 @@
-package com.exocodelabs.help_ride
+package com.exocodelabs.helpride
 
 import io.flutter.embedding.android.FlutterActivity
 

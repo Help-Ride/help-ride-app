@@ -5,22 +5,28 @@ class AuthApi {
   final ApiClient _client;
 
   // ✅ This is what your UI expects (email/password)
-  Future<String> loginWithEmail({
+  Future<EmailLoginResult> loginWithEmail({
     required String email,
     required String password,
   }) async {
     final res = await _client.post<Map<String, dynamic>>(
       '/auth/login',
       data: {'email': email, 'password': password},
+      skipAuthLogout: true,
     );
 
     final data = res.data ?? {};
-    final tokens = data['tokens'] as Map<String, dynamic>?;
-    final token = tokens?['accessToken'] as String?;
-    if (token == null || token.isEmpty) {
+    if (data['user'] is Map) {
+      return EmailLoginResult(otpSent: true);
+    }
+    final tokens = _parseTokens(data);
+    if (tokens == null) {
       throw Exception('Missing accessToken in response');
     }
-    return token;
+    return EmailLoginResult(
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    );
   }
 
   // Optional: verify token / get user
@@ -28,4 +34,124 @@ class AuthApi {
     final res = await _client.get<Map<String, dynamic>>('/auth/me');
     return res.data ?? {};
   }
+
+  // ✅ Register (email/password)
+  Future<EmailRegisterResult> registerWithEmail({
+    required String email,
+    required String password,
+    String? name, // optional if backend supports it
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/auth/register', // change if your backend uses /auth/signup
+      skipAuthLogout: true,
+      data: {
+        'email': email,
+        'password': password,
+        if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+      },
+    );
+
+    final data = res.data ?? {};
+    if (data['user'] is Map) {
+      return EmailRegisterResult(otpSent: true);
+    }
+    final tokens = _parseTokens(data);
+    if (tokens == null) {
+      throw Exception('Missing accessToken in response');
+    }
+    return EmailRegisterResult(
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    );
+  }
+
+  Future<void> sendVerifyEmailOtp({required String email}) async {
+    await _client.post<Map<String, dynamic>>(
+      '/auth/verify-email/send-otp',
+      skipAuthLogout: true,
+      data: {'email': email},
+    );
+  }
+
+  Future<VerifyEmailResult?> verifyEmailOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/auth/verify-email/verify-otp',
+      skipAuthLogout: true,
+      data: {'email': email, 'otp': otp},
+    );
+    final data = res.data ?? {};
+    final tokens = _parseTokens(data);
+    final user = data['user'];
+    return VerifyEmailResult(
+      tokens: tokens,
+      user: user is Map ? Map<String, dynamic>.from(user) : null,
+    );
+  }
+
+  AuthTokens? _parseTokens(Map<String, dynamic> data) {
+    final access = data['accessToken'];
+    final refresh = data['refreshToken'];
+    if (access is String && access.isNotEmpty) {
+      return AuthTokens(
+        accessToken: access,
+        refreshToken:
+            refresh is String && refresh.isNotEmpty ? refresh : null,
+      );
+    }
+
+    final tokens = data['tokens'];
+    if (tokens is Map && tokens['accessToken'] is String) {
+      final t = tokens['accessToken'] as String;
+      if (t.isNotEmpty) {
+        final r = tokens['refreshToken'];
+        return AuthTokens(
+          accessToken: t,
+          refreshToken: r is String && r.isNotEmpty ? r : null,
+        );
+      }
+    }
+
+    return null;
+  }
+}
+
+class AuthTokens {
+  final String accessToken;
+  final String? refreshToken;
+
+  AuthTokens({required this.accessToken, this.refreshToken});
+}
+
+class VerifyEmailResult {
+  final AuthTokens? tokens;
+  final Map<String, dynamic>? user;
+
+  VerifyEmailResult({this.tokens, this.user});
+}
+
+class EmailLoginResult {
+  final String? accessToken;
+  final String? refreshToken;
+  final bool otpSent;
+
+  EmailLoginResult({
+    this.accessToken,
+    this.refreshToken,
+    this.otpSent = false,
+  });
+}
+
+class EmailRegisterResult {
+  final String? accessToken;
+  final String? refreshToken;
+  final bool otpSent;
+
+  EmailRegisterResult({
+    this.accessToken,
+    this.refreshToken,
+    this.otpSent = false,
+  });
 }
