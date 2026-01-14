@@ -8,11 +8,16 @@ class RoleToggle extends StatelessWidget {
     required this.role,
     required this.onPassenger,
     required this.onDriver,
+    this.passengerColor = AppColors.passengerPrimary,
+    this.driverColor = AppColors.driverPrimary,
   });
 
   final HomeRole role;
   final VoidCallback onPassenger;
   final VoidCallback onDriver;
+
+  final Color passengerColor;
+  final Color driverColor;
 
   @override
   Widget build(BuildContext context) {
@@ -27,13 +32,14 @@ class RoleToggle extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE3E8F2)),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min, // important
+        mainAxisSize: MainAxisSize.min,
         children: [
           Expanded(
             child: _Segment(
               selected: isPassenger,
               label: 'Passenger',
               onTap: onPassenger,
+              selectedColor: passengerColor,
             ),
           ),
           const SizedBox(width: 4),
@@ -42,6 +48,7 @@ class RoleToggle extends StatelessWidget {
               selected: !isPassenger,
               label: 'Driver',
               onTap: onDriver,
+              selectedColor: driverColor,
             ),
           ),
         ],
@@ -55,11 +62,13 @@ class _Segment extends StatelessWidget {
     required this.selected,
     required this.label,
     required this.onTap,
+    required this.selectedColor,
   });
 
   final bool selected;
   final String label;
   final VoidCallback onTap;
+  final Color selectedColor;
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +80,6 @@ class _Segment extends StatelessWidget {
         onTap: onTap,
         child: Center(
           child: Padding(
-            // keep padding tight so it doesn't overflow on small widths
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Text(
               label,
@@ -79,9 +87,7 @@ class _Segment extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: selected
-                    ? AppColors.passengerPrimary
-                    : const Color(0xFF7B8798),
+                color: selected ? selectedColor : const Color(0xFF7B8798),
               ),
             ),
           ),

@@ -1,4 +1,6 @@
 import 'package:get/get.dart';
+import 'package:help_ride/core/constants/app_constants.dart';
+import 'package:help_ride/core/theme/theme_controller.dart';
 import '../../../shared/controllers/session_controller.dart';
 
 enum HomeRole { passenger, driver }
@@ -6,20 +8,35 @@ enum HomeRole { passenger, driver }
 class HomeController extends GetxController {
   final role = HomeRole.passenger.obs;
 
+  late final ThemeController _theme;
   late final SessionController _session;
 
   @override
   void onInit() {
     super.onInit();
+    _theme = Get.find<ThemeController>();
     _session = Get.find<SessionController>();
+
+    // sync initial
+    role.value = _theme.role.value == AppRole.driver
+        ? HomeRole.driver
+        : HomeRole.passenger;
+
+    // keep syncing if role changes elsewhere
+    ever(_theme.role, (AppRole r) {
+      role.value = r == AppRole.driver ? HomeRole.driver : HomeRole.passenger;
+    });
   }
 
-  void setRole(HomeRole r) => role.value = r;
+  void setRole(HomeRole r) {
+    role.value = r;
 
-  /// Use a safe display name for the home header.
-  /// - Prefer first name
-  /// - Fallback to email prefix
-  /// - Final fallback: "User"
+    // persist + make it global
+    _theme.switchRole(
+      r == HomeRole.driver ? AppRole.driver : AppRole.passenger,
+    );
+  }
+
   String get headerName {
     final user = _session.user.value;
 
@@ -38,3 +55,7 @@ class HomeController extends GetxController {
     return 'User';
   }
 }
+
+  /// - Final fallback: "User"
+
+
