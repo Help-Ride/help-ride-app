@@ -21,10 +21,17 @@ class ExoTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: isDark ? AppColors.darkText : AppColors.lightText,
+          ),
+        ),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
@@ -34,9 +41,12 @@ class ExoTextField extends StatelessWidget {
             hintText: hint,
             prefixIcon: prefixIcon == null
                 ? null
-                : Icon(prefixIcon, color: AppColors.lightMuted),
+                : Icon(
+                    prefixIcon,
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
             filled: true,
-            fillColor: const Color(0xFFF3F5F8),
+            fillColor: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 16,

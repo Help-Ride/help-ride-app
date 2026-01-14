@@ -33,6 +33,8 @@ class ChatConversationTile extends StatelessWidget {
     final avatarBg = accentColor.withOpacity(isDark ? 0.25 : 0.15);
     final tileBg =
         hasUnread ? accentColor.withOpacity(isDark ? 0.14 : 0.06) : Colors.transparent;
+    final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
+    final textMuted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
     return Material(
       color: Colors.transparent,
@@ -61,20 +63,24 @@ class ChatConversationTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (conversation.participant.isOnline)
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1BC47D),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
+                  if (conversation.participant.isOnline)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1BC47D),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color:
+                                isDark ? AppColors.darkSurface : Colors.white,
+                            width: 2,
                           ),
                         ),
                       ),
+                    ),
                   ],
                 ),
                 const SizedBox(width: 12),
@@ -86,17 +92,17 @@ class ChatConversationTile extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              conversation.participant.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight:
-                                    hasUnread ? FontWeight.w800 : FontWeight.w700,
-                                color: AppColors.lightText,
-                              ),
+                            conversation.participant.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight:
+                                  hasUnread ? FontWeight.w800 : FontWeight.w700,
+                              color: textPrimary,
                             ),
                           ),
+                        ),
                           if (hasUnread)
                             Container(
                               margin: const EdgeInsets.only(right: 6),
@@ -112,8 +118,7 @@ class ChatConversationTile extends StatelessWidget {
                               timeLabel,
                               style: TextStyle(
                                 fontSize: 12,
-                                color:
-                                    hasUnread ? AppColors.lightText : AppColors.lightMuted,
+                                color: hasUnread ? textPrimary : textMuted,
                                 fontWeight:
                                     hasUnread ? FontWeight.w700 : FontWeight.w500,
                               ),
@@ -138,9 +143,7 @@ class ChatConversationTile extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: hasUnread
-                                    ? AppColors.lightText
-                                    : AppColors.lightMuted,
+                                color: hasUnread ? textPrimary : textMuted,
                                 fontSize: 14,
                                 fontWeight:
                                     hasUnread ? FontWeight.w600 : FontWeight.w400,
@@ -164,17 +167,17 @@ class ChatConversationTile extends StatelessWidget {
                                     color: Color(0xFFFFB347),
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    conversation.participant.rating!
-                                        .toStringAsFixed(1),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.lightMuted,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                Text(
+                                  conversation.participant.rating!
+                                      .toStringAsFixed(1),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: textMuted,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
+                            ),
                             ),
                         ],
                       ),

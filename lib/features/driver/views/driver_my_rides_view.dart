@@ -10,12 +10,14 @@ class DriverMyRidesView extends GetView<DriverMyRidesController> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.lightBg,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        foregroundColor: AppColors.lightText,
+        foregroundColor: isDark ? AppColors.darkText : AppColors.lightText,
         title: const Text(
           'My Rides',
           style: TextStyle(fontWeight: FontWeight.w900),
@@ -65,11 +67,11 @@ class DriverMyRidesView extends GetView<DriverMyRidesController> {
 
                 final list = controller.filtered;
                 if (list.isEmpty) {
-                  return const Expanded(
+                  return Expanded(
                     child: Center(
                       child: Text(
                         'No rides yet. Use “Create a Ride” from Home.',
-                        style: TextStyle(color: AppColors.lightMuted),
+                        style: TextStyle(color: muted),
                         textAlign: TextAlign.center,
                       ),
                     ),

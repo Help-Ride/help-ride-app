@@ -14,8 +14,9 @@ class HomeView extends GetView<HomeController> {
   Widget build(BuildContext context) {
     final c = controller;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
@@ -48,6 +49,7 @@ class _HomeHeader extends StatelessWidget {
     final session = Get.isRegistered<SessionController>()
         ? Get.find<SessionController>()
         : null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -74,14 +76,14 @@ class _HomeHeader extends StatelessWidget {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         "Hello,",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 30,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.lightText,
+                          color: isDark ? AppColors.darkText : AppColors.lightText,
                           height: 1.0,
                         ),
                       ),
@@ -90,10 +92,10 @@ class _HomeHeader extends StatelessWidget {
                         name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 36,
                           fontWeight: FontWeight.w900,
-                          color: AppColors.lightText,
+                          color: isDark ? AppColors.darkText : AppColors.lightText,
                           height: 1.0,
                         ),
                       ),
@@ -101,14 +103,14 @@ class _HomeHeader extends StatelessWidget {
                   );
                 }
 
-                return const Text(
+                return Text(
                   "Driver Dashboard",
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.lightText,
+                    color: isDark ? AppColors.darkText : AppColors.lightText,
                     height: 1.05,
                   ),
                 );

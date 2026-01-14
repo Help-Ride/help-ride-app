@@ -95,17 +95,21 @@ class _PlacePickerFieldState extends State<PlacePickerField> {
       builder: (context, _) {
         final value = widget.controller.text.trim();
         final isEmpty = value.isEmpty;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               widget.label,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: isDark ? AppColors.darkText : AppColors.lightText,
+              ),
             ),
             const SizedBox(height: 8),
             Material(
-              color: const Color(0xFFF3F5F8),
+              color: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
               borderRadius: BorderRadius.circular(16),
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
@@ -117,7 +121,8 @@ class _PlacePickerFieldState extends State<PlacePickerField> {
                     children: [
                       Icon(
                         widget.icon,
-                        color: widget.iconColor ?? AppColors.lightMuted,
+                        color: widget.iconColor ??
+                            (isDark ? AppColors.darkMuted : AppColors.lightMuted),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -127,16 +132,16 @@ class _PlacePickerFieldState extends State<PlacePickerField> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: isEmpty
-                                ? AppColors.lightMuted
-                                : AppColors.lightText,
+                                ? (isDark ? AppColors.darkMuted : AppColors.lightMuted)
+                                : (isDark ? AppColors.darkText : AppColors.lightText),
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.chevron_right,
-                        color: AppColors.lightMuted,
+                        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
                       ),
                     ],
                   ),
@@ -271,12 +276,13 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final h = MediaQuery.of(context).size.height;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       height: h * 0.88,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       ),
       child: SafeArea(
         top: false,
@@ -287,7 +293,7 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: const Color(0xFFE6EAF2),
+                color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
@@ -321,9 +327,13 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
                 autofocus: true,
                 decoration: InputDecoration(
                   hintText: "Search address / place",
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
                   filled: true,
-                  fillColor: const Color(0xFFF3F5F8),
+                  fillColor:
+                      isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,

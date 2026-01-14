@@ -12,8 +12,9 @@ class LoginView extends GetView<AuthController> {
   @override
   Widget build(BuildContext context) {
     final theme = Get.find<ThemeController>();
-    final bg = AppColors.lightBg;
-    final surface = AppColors.lightSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = Theme.of(context).scaffoldBackgroundColor;
+    final surface = Theme.of(context).colorScheme.surface;
 
     return Obx(() {
       final primary = theme.role.value == AppRole.driver
@@ -33,29 +34,36 @@ class LoginView extends GetView<AuthController> {
                   decoration: BoxDecoration(
                     color: surface,
                     borderRadius: BorderRadius.circular(22),
-                    boxShadow: const [
-                      BoxShadow(
-                        blurRadius: 30,
-                        offset: Offset(0, 18),
-                        color: Color(0x14000000),
-                      ),
-                    ],
+                    border: Border.all(
+                      color:
+                          isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
+                    ),
+                    boxShadow: isDark
+                        ? []
+                        : const [
+                            BoxShadow(
+                              blurRadius: 30,
+                              offset: Offset(0, 18),
+                              color: Color(0x14000000),
+                            ),
+                          ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         "Welcome",
                         style: TextStyle(
                           fontSize: 30,
                           fontWeight: FontWeight.w800,
+                          color: isDark ? AppColors.darkText : AppColors.lightText,
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
+                      Text(
                         "Sign in to continue",
                         style: TextStyle(
-                          color: AppColors.lightMuted,
+                          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
                           fontSize: 14,
                         ),
                       ),
@@ -126,8 +134,10 @@ class LoginView extends GetView<AuthController> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primary,
                             foregroundColor: Colors.white,
-                            disabledBackgroundColor: const Color(0xFFE9EEF6),
-                            disabledForegroundColor: const Color(0xFF9AA3B2),
+                            disabledBackgroundColor:
+                                isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
+                            disabledForegroundColor:
+                                isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
@@ -140,19 +150,20 @@ class LoginView extends GetView<AuthController> {
                     const SizedBox(height: 16),
 
                     Row(
-                      children: const [
-                        Expanded(child: Divider(height: 1)),
+                      children: [
+                        const Expanded(child: Divider(height: 1)),
                         Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
                             "Or continue with",
                             style: TextStyle(
-                              color: AppColors.lightMuted,
+                              color:
+                                  isDark ? AppColors.darkMuted : AppColors.lightMuted,
                               fontSize: 12,
                             ),
                           ),
                         ),
-                        Expanded(child: Divider(height: 1)),
+                        const Expanded(child: Divider(height: 1)),
                       ],
                     ),
 
@@ -168,7 +179,10 @@ class LoginView extends GetView<AuthController> {
                               ? null
                               : controller.loginWithGoogle,
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFFE2E6EF)),
+                            side: BorderSide(
+                              color:
+                                  isDark ? const Color(0xFF232836) : const Color(0xFFE2E6EF),
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
@@ -205,10 +219,10 @@ class LoginView extends GetView<AuthController> {
                     }),
 
                     const SizedBox(height: 14),
-                    const Text(
+                    Text(
                       "By continuing, you agree to our Terms of Service and Privacy Policy",
                       style: TextStyle(
-                        color: AppColors.lightMuted,
+                        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
                         fontSize: 11,
                         height: 1.4,
                       ),

@@ -53,16 +53,22 @@ class _ChatThreadViewState extends State<ChatThreadView> {
     final roleColor = theme.role.value == AppRole.driver
         ? AppColors.driverPrimary
         : AppColors.passengerPrimary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _ChatHeader(
         conversation: widget.conversation,
         accentColor: roleColor,
+        isDark: isDark,
       ),
       body: Column(
         children: [
-          _TripSummaryCard(conversation: widget.conversation, accentColor: roleColor),
+          _TripSummaryCard(
+            conversation: widget.conversation,
+            accentColor: roleColor,
+            isDark: isDark,
+          ),
           Expanded(
             child: Obx(() {
               if (_controller.loading.value) {
@@ -72,17 +78,22 @@ class _ChatThreadViewState extends State<ChatThreadView> {
                 return Center(
                   child: Text(
                     'Unable to load messages.',
-                    style: TextStyle(color: Colors.black.withOpacity(0.6)),
+                    style: TextStyle(
+                      color:
+                          isDark ? AppColors.darkMuted : Colors.black.withOpacity(0.6),
+                    ),
                   ),
                 );
               }
 
               final messages = _controller.messages;
               if (messages.isEmpty) {
-                return const Center(
+                return Center(
                   child: Text(
                     'Say hello to start the chat.',
-                    style: TextStyle(color: AppColors.lightMuted),
+                    style: TextStyle(
+                      color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                    ),
                   ),
                 );
               }
@@ -98,7 +109,7 @@ class _ChatThreadViewState extends State<ChatThreadView> {
                     message: msg,
                     isMine: _isMine(msg),
                     accentColor: roleColor,
-                    isDark: theme.isDark.value,
+                    isDark: isDark,
                   );
                 },
               );
@@ -107,6 +118,7 @@ class _ChatThreadViewState extends State<ChatThreadView> {
           _Composer(
             controller: _textController,
             accentColor: roleColor,
+            isDark: isDark,
             onChanged: (value) => _controller.draft.value = value,
             onSend: _handleSend,
           ),
@@ -141,20 +153,25 @@ class _ChatThreadViewState extends State<ChatThreadView> {
 }
 
 class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
-  const _ChatHeader({required this.conversation, required this.accentColor});
+  const _ChatHeader({
+    required this.conversation,
+    required this.accentColor,
+    required this.isDark,
+  });
 
   final ChatConversation conversation;
   final Color accentColor;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
       elevation: 0,
       centerTitle: false,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
-        color: AppColors.lightText,
+        color: isDark ? AppColors.darkText : AppColors.lightText,
         onPressed: () => Get.back(),
       ),
       titleSpacing: 0,
@@ -182,10 +199,10 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
                   conversation.participant.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.lightText,
+                    color: isDark ? AppColors.darkText : AppColors.lightText,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -204,9 +221,9 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
                     const SizedBox(width: 6),
                     Text(
                       conversation.participant.isOnline ? 'Online' : 'Offline',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.lightMuted,
+                        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
                       ),
                     ),
                   ],
@@ -220,12 +237,12 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
         IconButton(
           onPressed: () {},
           icon: const Icon(Icons.call_outlined),
-          color: AppColors.lightMuted,
+          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
         ),
         IconButton(
           onPressed: () {},
           icon: const Icon(Icons.more_vert),
-          color: AppColors.lightMuted,
+          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
         ),
       ],
     );
@@ -236,10 +253,15 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
 }
 
 class _TripSummaryCard extends StatelessWidget {
-  const _TripSummaryCard({required this.conversation, required this.accentColor});
+  const _TripSummaryCard({
+    required this.conversation,
+    required this.accentColor,
+    required this.isDark,
+  });
 
   final ChatConversation conversation;
   final Color accentColor;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -254,9 +276,9 @@ class _TripSummaryCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: accentColor.withOpacity(0.08),
+          color: accentColor.withOpacity(isDark ? 0.16 : 0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: accentColor.withOpacity(0.2)),
+          border: Border.all(color: accentColor.withOpacity(isDark ? 0.35 : 0.2)),
         ),
         child: Row(
           children: [
@@ -264,7 +286,7 @@ class _TripSummaryCard extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.15),
+                color: accentColor.withOpacity(isDark ? 0.25 : 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.route, color: accentColor),
@@ -274,11 +296,11 @@ class _TripSummaryCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Upcoming Trip',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: AppColors.lightText,
+                      color: isDark ? AppColors.darkText : AppColors.lightText,
                     ),
                   ),
                   if (summary.isNotEmpty)
@@ -286,7 +308,9 @@ class _TripSummaryCard extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         summary,
-                        style: const TextStyle(color: AppColors.lightMuted),
+                        style: TextStyle(
+                          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                        ),
                       ),
                     ),
                 ],
@@ -295,11 +319,17 @@ class _TripSummaryCard extends StatelessWidget {
             if (time.isNotEmpty)
               Row(
                 children: [
-                  const Icon(Icons.access_time, size: 16, color: AppColors.lightMuted),
+                  Icon(
+                    Icons.access_time,
+                    size: 16,
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     time,
-                    style: const TextStyle(color: AppColors.lightMuted),
+                    style: TextStyle(
+                      color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                    ),
                   ),
                 ],
               ),
@@ -314,12 +344,14 @@ class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
     required this.accentColor,
+    required this.isDark,
     required this.onChanged,
     required this.onSend,
   });
 
   final TextEditingController controller;
   final Color accentColor;
+  final bool isDark;
   final ValueChanged<String> onChanged;
   final VoidCallback onSend;
 
@@ -329,9 +361,13 @@ class _Composer extends StatelessWidget {
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE3E8F2))),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          border: Border(
+            top: BorderSide(
+              color: isDark ? const Color(0xFF232836) : const Color(0xFFE3E8F2),
+            ),
+          ),
         ),
         child: Row(
           children: [
@@ -345,7 +381,8 @@ class _Composer extends StatelessWidget {
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   filled: true,
-                  fillColor: const Color(0xFFF3F5F9),
+                  fillColor:
+                      isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F9),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
                     borderSide: BorderSide.none,

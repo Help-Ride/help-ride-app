@@ -10,12 +10,14 @@ class DriverRequestsView extends GetView<DriverRequestsController> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.lightBg,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        foregroundColor: AppColors.lightText,
+        foregroundColor: isDark ? AppColors.darkText : AppColors.lightText,
         title: const Text(
           'Booking Requests',
           style: TextStyle(fontWeight: FontWeight.w900),
@@ -38,7 +40,7 @@ class DriverRequestsView extends GetView<DriverRequestsController> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     count == 1 ? '1 new request' : '$count new requests',
-                    style: const TextStyle(color: AppColors.lightMuted),
+                    style: TextStyle(color: muted),
                   ),
                 );
               }),
@@ -83,11 +85,11 @@ class DriverRequestsView extends GetView<DriverRequestsController> {
 
                 final list = controller.filtered;
                 if (list.isEmpty) {
-                  return const Expanded(
+                  return Expanded(
                     child: Center(
                       child: Text(
                         'No booking requests yet.',
-                        style: TextStyle(color: AppColors.lightMuted),
+                        style: TextStyle(color: muted),
                         textAlign: TextAlign.center,
                       ),
                     ),

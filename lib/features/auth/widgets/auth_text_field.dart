@@ -27,16 +27,17 @@ class AuthTextField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = AppColors.passengerPrimary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: AppColors.lightText,
+            color: isDark ? AppColors.darkText : AppColors.lightText,
           ),
         ),
         const SizedBox(height: 8),
@@ -50,12 +51,12 @@ class AuthTextField extends StatelessWidget {
           cursorColor: primary,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(
-              color: Color(0xFF9AA3B2),
+            hintStyle: TextStyle(
+              color: isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
               fontWeight: FontWeight.w500,
             ),
             filled: true,
-            fillColor: const Color(0xFFF3F5F8),
+            fillColor: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 16,

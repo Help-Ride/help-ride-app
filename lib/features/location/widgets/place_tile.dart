@@ -10,18 +10,27 @@ class PlaceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       onTap: onTap,
-      leading: const Icon(Icons.place, color: AppColors.lightMuted),
+      leading: Icon(
+        Icons.place,
+        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+      ),
       title: Text(
         place.primaryText,
-        style: const TextStyle(fontWeight: FontWeight.w800),
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: isDark ? AppColors.darkText : AppColors.lightText,
+        ),
       ),
       subtitle: place.secondaryText.isEmpty
           ? null
           : Text(
               place.secondaryText,
-              style: const TextStyle(color: AppColors.lightMuted),
+              style: TextStyle(
+                color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+              ),
             ),
     );
   }

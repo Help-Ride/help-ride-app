@@ -7,19 +7,24 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE6EAF2)),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 20,
-            offset: Offset(0, 10),
-            color: Color(0x0A000000),
-          ),
-        ],
+        border: Border.all(
+          color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
+        ),
+        boxShadow: isDark
+            ? []
+            : const [
+                BoxShadow(
+                  blurRadius: 20,
+                  offset: Offset(0, 10),
+                  color: Color(0x0A000000),
+                ),
+              ],
       ),
       child: child,
     );
@@ -32,11 +37,16 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+          fontSize: 14,
+          color: isDark ? AppColors.darkText : AppColors.lightText,
+        ),
       ),
     );
   }
@@ -58,9 +68,14 @@ class TripRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
-        Icon(icon, color: iconColor ?? AppColors.lightMuted),
+        Icon(
+          icon,
+          color: iconColor ??
+              (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+        ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
@@ -68,8 +83,8 @@ class TripRow extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  color: AppColors.lightMuted,
+                style: TextStyle(
+                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                 ),
@@ -78,7 +93,10 @@ class TripRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   value,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? AppColors.darkText : AppColors.lightText,
+                  ),
                 ),
               ],
             ],
@@ -96,19 +114,26 @@ class MiniInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: AppColors.lightMuted,
+          style: TextStyle(
+            color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
             fontWeight: FontWeight.w700,
             fontSize: 12,
           ),
         ),
         const SizedBox(height: 2),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            color: isDark ? AppColors.darkText : AppColors.lightText,
+          ),
+        ),
       ],
     );
   }
@@ -120,17 +145,21 @@ class Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 44,
       width: 44,
-      decoration: const BoxDecoration(
-        color: Color(0xFFE9EEF6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
       child: Text(
         initials,
-        style: const TextStyle(fontWeight: FontWeight.w900),
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+          color: isDark ? AppColors.darkText : AppColors.lightText,
+        ),
       ),
     );
   }
@@ -142,18 +171,19 @@ class Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
+        color: isDark ? const Color(0xFF122033) : const Color(0xFFEFF6FF),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w800,
-          color: Color(0xFF2F6BFF),
+          color: AppColors.driverPrimary,
         ),
       ),
     );
@@ -174,18 +204,21 @@ class SeatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFE7F8EF) : Colors.white,
+          color: active
+              ? (isDark ? const Color(0xFF14382B) : const Color(0xFFE7F8EF))
+              : (isDark ? AppColors.darkSurface : Colors.white),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: active
                 ? AppColors.passengerPrimary
-                : const Color(0xFFE2E6EF),
+                : (isDark ? const Color(0xFF232836) : const Color(0xFFE2E6EF)),
             width: 1.5,
           ),
         ),
@@ -193,7 +226,9 @@ class SeatChip extends StatelessWidget {
           text,
           style: TextStyle(
             fontWeight: FontWeight.w900,
-            color: active ? AppColors.passengerPrimary : AppColors.lightText,
+            color: active
+                ? AppColors.passengerPrimary
+                : (isDark ? AppColors.darkText : AppColors.lightText),
           ),
         ),
       ),
@@ -207,16 +242,23 @@ class Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F5F8),
+        color: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFE6EAF2)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
+        ),
       ),
       child: Text(
         text,
-        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+          color: isDark ? AppColors.darkText : AppColors.lightText,
+        ),
       ),
     );
   }

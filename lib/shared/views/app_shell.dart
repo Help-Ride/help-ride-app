@@ -79,11 +79,12 @@ class _AppShellState extends State<AppShell> {
 
       if (index >= config.items.length) index = 0;
 
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       return Scaffold(
         body: config.pages[index],
         bottomNavigationBar: _FigmaBottomNavBar(
           index: index,
-          isDark: theme.isDark.value,
+          isDark: isDark,
           items: config.items,
           onChanged: (i) => setState(() => index = i),
         ),

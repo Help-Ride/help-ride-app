@@ -18,14 +18,21 @@ class PickerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isEmpty = value.trim().isEmpty;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: isDark ? AppColors.darkText : AppColors.lightText,
+          ),
+        ),
         const SizedBox(height: 8),
         Material(
-          color: const Color(0xFFF3F5F8),
+          color: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
           borderRadius: BorderRadius.circular(16),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
@@ -35,7 +42,10 @@ class PickerTile extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(
                 children: [
-                  Icon(icon, color: AppColors.lightMuted),
+                  Icon(
+                    icon,
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -44,8 +54,8 @@ class PickerTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: isEmpty
-                            ? AppColors.lightMuted
-                            : AppColors.lightText,
+                            ? (isDark ? AppColors.darkMuted : AppColors.lightMuted)
+                            : (isDark ? AppColors.darkText : AppColors.lightText),
                         fontWeight: FontWeight.w700,
                       ),
                     ),

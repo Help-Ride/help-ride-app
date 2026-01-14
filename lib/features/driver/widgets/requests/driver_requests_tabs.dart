@@ -18,12 +18,15 @@ class DriverRequestsTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF2F6),
+        color: isDark ? const Color(0xFF1C2331) : const Color(0xFFEFF2F6),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE3E8F2)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF232836) : const Color(0xFFE3E8F2),
+        ),
       ),
       child: Row(
         children: [
@@ -32,6 +35,7 @@ class DriverRequestsTabs extends StatelessWidget {
               text: 'All Requests',
               active: active == DriverRequestsTab.all,
               onTap: () => onChange(DriverRequestsTab.all),
+              isDark: isDark,
             ),
           ),
           Expanded(
@@ -39,6 +43,7 @@ class DriverRequestsTabs extends StatelessWidget {
               text: newCount > 0 ? 'New  $newCount' : 'New',
               active: active == DriverRequestsTab.newRequests,
               onTap: () => onChange(DriverRequestsTab.newRequests),
+              isDark: isDark,
             ),
           ),
           Expanded(
@@ -46,6 +51,7 @@ class DriverRequestsTabs extends StatelessWidget {
               text: offeredCount > 0 ? 'Offered  $offeredCount' : 'Offered',
               active: active == DriverRequestsTab.offered,
               onTap: () => onChange(DriverRequestsTab.offered),
+              isDark: isDark,
             ),
           ),
         ],
@@ -55,11 +61,17 @@ class DriverRequestsTabs extends StatelessWidget {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({required this.text, required this.active, required this.onTap});
+  const _Pill({
+    required this.text,
+    required this.active,
+    required this.onTap,
+    required this.isDark,
+  });
 
   final String text;
   final bool active;
   final VoidCallback onTap;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -70,14 +82,18 @@ class _Pill extends StatelessWidget {
         height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.transparent,
+          color: active
+              ? (isDark ? const Color(0xFF111827) : Colors.white)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           boxShadow: active
-              ? const [
+              ? [
                   BoxShadow(
                     blurRadius: 12,
-                    offset: Offset(0, 6),
-                    color: Color(0x12000000),
+                    offset: const Offset(0, 6),
+                    color: isDark
+                        ? Colors.black.withOpacity(0.4)
+                        : const Color(0x12000000),
                   ),
                 ]
               : const [],
@@ -86,7 +102,9 @@ class _Pill extends StatelessWidget {
           text,
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            color: active ? AppColors.lightText : AppColors.lightMuted,
+            color: active
+                ? (isDark ? AppColors.darkText : AppColors.lightText)
+                : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
           ),
         ),
       ),

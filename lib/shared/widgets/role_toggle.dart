@@ -22,14 +22,17 @@ class RoleToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPassenger = role == HomeRole.passenger;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       height: 44,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F4F9),
+        color: isDark ? const Color(0xFF1C2331) : const Color(0xFFF1F4F9),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE3E8F2)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF232836) : const Color(0xFFE3E8F2),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -40,6 +43,7 @@ class RoleToggle extends StatelessWidget {
               label: 'Passenger',
               onTap: onPassenger,
               selectedColor: passengerColor,
+              isDark: isDark,
             ),
           ),
           const SizedBox(width: 4),
@@ -49,6 +53,7 @@ class RoleToggle extends StatelessWidget {
               label: 'Driver',
               onTap: onDriver,
               selectedColor: driverColor,
+              isDark: isDark,
             ),
           ),
         ],
@@ -63,17 +68,21 @@ class _Segment extends StatelessWidget {
     required this.label,
     required this.onTap,
     required this.selectedColor,
+    required this.isDark,
   });
 
   final bool selected;
   final String label;
   final VoidCallback onTap;
   final Color selectedColor;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? Colors.white : Colors.transparent,
+      color: selected
+          ? (isDark ? const Color(0xFF111827) : Colors.white)
+          : Colors.transparent,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -87,7 +96,9 @@ class _Segment extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: selected ? selectedColor : const Color(0xFF7B8798),
+                color: selected
+                    ? selectedColor
+                    : (isDark ? const Color(0xFF9AA3B2) : const Color(0xFF7B8798)),
               ),
             ),
           ),

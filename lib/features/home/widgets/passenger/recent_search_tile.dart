@@ -18,6 +18,7 @@ class RecentSearchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
@@ -30,7 +31,10 @@ class RecentSearchTile extends StatelessWidget {
             showShadow: false,
             child: Row(
               children: [
-                const Icon(Icons.history, color: AppColors.lightMuted),
+                Icon(
+                  Icons.history,
+                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -38,12 +42,17 @@ class RecentSearchTile extends StatelessWidget {
                     children: [
                       Text(
                         "$from  →  $to",
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? AppColors.darkText : AppColors.lightText,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         when,
-                        style: const TextStyle(color: AppColors.lightMuted),
+                        style: TextStyle(
+                          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                        ),
                       ),
                     ],
                   ),

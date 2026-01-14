@@ -45,10 +45,78 @@
       "client_info": {
         "mobilesdk_app_id": "1:269308288512:android:7c4dbd3b19e13c0aa142e5",
         "android_client_info": {
+          "package_name": "com.exocodelabs.help_ride"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "269308288512-3g20669bftdvdevpckl0sk0vgclokist.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.exocodelabs.help_ride",
+            "certificate_hash": "42a8e91a9d3832b486e492b46098331cb90afadf"
+          }
+        },
+        {
+          "client_id": "269308288512-i5prrfsgk58vopb58sb2ilc25mkgqn7u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.exocodelabs.help_ride",
+            "certificate_hash": "eb45bea42414f5f0a7a389ce81e16cac6383407e"
+          }
+        },
+        {
+          "client_id": "269308288512-rjeujqhqejlg84215c2keaedt5ptjvmn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.exocodelabs.help_ride",
+            "certificate_hash": "83ed3ff810d67db54017ce1131350f04b2d92b74"
+          }
+        },
+        {
+          "client_id": "269308288512-t0l4r4kokp1qa03ud9ufhav3u909oeg2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEPrpvy29IUCAITRsLWmmL3AmLQYiLUII"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "269308288512-t0l4r4kokp1qa03ud9ufhav3u909oeg2.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "269308288512-jl2fpmb8a9k4tq8apvipvs7s1p42rmig.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.exocodelabs.fba.firebaseAuth"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:269308288512:android:c035e73317a7c8c6a142e5",
+        "android_client_info": {
           "package_name": "com.exocodelabs.helpride"
         }
       },
       "oauth_client": [
+        {
+          "client_id": "269308288512-edgtkhulju5b7ntfj1jgm41i3ripjubb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.exocodelabs.helpride",
+            "certificate_hash": "eb45bea42414f5f0a7a389ce81e16cac6383407e"
+          }
+        },
         {
           "client_id": "269308288512-t0l4r4kokp1qa03ud9ufhav3u909oeg2.apps.googleusercontent.com",
           "client_type": 3

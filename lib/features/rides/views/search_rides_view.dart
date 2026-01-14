@@ -10,12 +10,13 @@ class SearchRidesView extends GetView<SearchRidesController> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.lightBg,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        foregroundColor: AppColors.lightText,
+        foregroundColor: isDark ? AppColors.darkText : AppColors.lightText,
         title: const Text(
           'Available Rides',
           style: TextStyle(fontWeight: FontWeight.w800),
@@ -67,11 +68,13 @@ class SearchRidesView extends GetView<SearchRidesController> {
 
                 final rides = controller.rides;
                 if (rides.isEmpty) {
-                  return const Expanded(
+                  return Expanded(
                     child: Center(
                       child: Text(
                         'No rides found.',
-                        style: TextStyle(color: AppColors.lightMuted),
+                        style: TextStyle(
+                          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                        ),
                       ),
                     ),
                   );

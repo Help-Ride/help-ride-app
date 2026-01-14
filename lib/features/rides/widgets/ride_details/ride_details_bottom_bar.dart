@@ -13,12 +13,18 @@ class RideDetailsBottomBar extends GetView<RideDetailsController> {
       if (ride == null) return const SizedBox.shrink();
 
       final total = controller.totalPrice;
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
       return Container(
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE9EEF6))),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          border: Border(
+            top: BorderSide(
+              color: isDark ? const Color(0xFF232836) : const Color(0xFFE9EEF6),
+            ),
+          ),
         ),
         child: Row(
           children: [
@@ -29,16 +35,17 @@ class RideDetailsBottomBar extends GetView<RideDetailsController> {
                 children: [
                   Text(
                     '\$${total.toStringAsFixed(0)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
+                      color: isDark ? AppColors.darkText : AppColors.lightText,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '\$${ride.pricePerSeat.toStringAsFixed(0)} × ${controller.selectedSeats.value} seat',
-                    style: const TextStyle(
-                      color: AppColors.lightMuted,
+                    style: TextStyle(
+                      color: muted,
                       fontSize: 12,
                     ),
                   ),
@@ -54,8 +61,10 @@ class RideDetailsBottomBar extends GetView<RideDetailsController> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.passengerPrimary,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFFE9EEF6),
-                  disabledForegroundColor: const Color(0xFF9AA3B2),
+                  disabledBackgroundColor:
+                      isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
+                  disabledForegroundColor:
+                      isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),

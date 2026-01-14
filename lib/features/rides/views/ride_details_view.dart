@@ -10,12 +10,13 @@ class RideDetailsView extends GetView<RideDetailsController> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.lightBg,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        foregroundColor: AppColors.lightText,
+        foregroundColor: isDark ? AppColors.darkText : AppColors.lightText,
         title: const Text(
           'Ride Details',
           style: TextStyle(fontWeight: FontWeight.w800),

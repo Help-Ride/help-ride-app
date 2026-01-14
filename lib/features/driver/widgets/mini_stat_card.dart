@@ -18,6 +18,7 @@ class MiniStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -27,7 +28,10 @@ class MiniStatCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? AppColors.darkText : AppColors.lightText,
+                  ),
                 ),
               ),
               if (badge != null)
@@ -52,7 +56,12 @@ class MiniStatCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Text(subtitle, style: const TextStyle(color: AppColors.lightMuted)),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+            ),
+          ),
         ],
       ),
     );

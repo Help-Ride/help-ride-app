@@ -16,6 +16,9 @@ class RideCard extends GetView<SearchRidesController> {
     final rating = 4.8; // placeholder
     final totalRides = 93; // placeholder
     final durationMin = 50; // placeholder
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
 
     return AppCard(
       child: Column(
@@ -40,9 +43,10 @@ class RideCard extends GetView<SearchRidesController> {
                             driverName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 16,
+                              color: textPrimary,
                             ),
                           ),
                         ),
@@ -61,17 +65,17 @@ class RideCard extends GetView<SearchRidesController> {
                         const SizedBox(width: 4),
                         Text(
                           rating.toStringAsFixed(1),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                          ),
                         ),
                         const SizedBox(width: 8),
-                        const Text(
-                          '•',
-                          style: TextStyle(color: AppColors.lightMuted),
-                        ),
+                        Text('•', style: TextStyle(color: muted)),
                         const SizedBox(width: 8),
                         Text(
                           '$totalRides rides',
-                          style: const TextStyle(color: AppColors.lightMuted),
+                          style: TextStyle(color: muted),
                         ),
                       ],
                     ),
@@ -85,24 +89,23 @@ class RideCard extends GetView<SearchRidesController> {
 
           Row(
             children: [
-              const Icon(
-                Icons.calendar_today_outlined,
-                size: 18,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.calendar_today_outlined, size: 18, color: muted),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   formatDateTime(ride.startTime),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: textPrimary,
+                  ),
                 ),
               ),
-              const Icon(Icons.schedule, size: 18, color: AppColors.lightMuted),
+              Icon(Icons.schedule, size: 18, color: muted),
               const SizedBox(width: 6),
               Text(
                 '$durationMin min',
-                style: const TextStyle(
-                  color: AppColors.lightMuted,
+                style: TextStyle(
+                  color: muted,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -113,27 +116,26 @@ class RideCard extends GetView<SearchRidesController> {
 
           Row(
             children: [
-              const Icon(
-                Icons.event_seat_outlined,
-                size: 18,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.event_seat_outlined, size: 18, color: muted),
               const SizedBox(width: 8),
               Text(
                 '${ride.seatsAvailable} seats available',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: textPrimary,
+                ),
               ),
             ],
           ),
 
           const SizedBox(height: 14),
 
-          const Align(
+          Align(
             alignment: Alignment.centerLeft,
             child: Text(
               'Select seats:',
               style: TextStyle(
-                color: AppColors.lightMuted,
+                color: muted,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -160,7 +162,10 @@ class RideCard extends GetView<SearchRidesController> {
           }),
 
           const SizedBox(height: 14),
-          const Divider(height: 1, color: Color(0xFFE9EEF6)),
+          Divider(
+            height: 1,
+            color: isDark ? const Color(0xFF232836) : const Color(0xFFE9EEF6),
+          ),
           const SizedBox(height: 14),
 
           Row(
@@ -179,16 +184,17 @@ class RideCard extends GetView<SearchRidesController> {
                     children: [
                       Text(
                         '\$${total.toStringAsFixed(0)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 22,
+                          color: textPrimary,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '\$${ride.pricePerSeat.toStringAsFixed(0)} × $selected seat',
-                        style: const TextStyle(
-                          color: AppColors.lightMuted,
+                        style: TextStyle(
+                          color: muted,
                           fontSize: 12,
                         ),
                       ),
@@ -215,7 +221,9 @@ class RideCard extends GetView<SearchRidesController> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    side: const BorderSide(color: Color(0xFFE2E6EF)),
+                    side: BorderSide(
+                      color: isDark ? const Color(0xFF232836) : const Color(0xFFE2E6EF),
+                    ),
                   ),
                   child: const Text('Details'),
                 ),

@@ -22,8 +22,12 @@ class ChatBubble extends StatelessWidget {
     final bubbleColor = isMine
         ? accentColor
         : (isDark ? const Color(0xFF1D2431) : Colors.white);
-    final textColor = isMine ? Colors.white : AppColors.lightText;
-    final timeColor = isMine ? Colors.white70 : AppColors.lightMuted;
+    final textColor = isMine
+        ? Colors.white
+        : (isDark ? AppColors.darkText : AppColors.lightText);
+    final timeColor = isMine
+        ? Colors.white70
+        : (isDark ? AppColors.darkMuted : AppColors.lightMuted);
 
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
@@ -48,7 +52,9 @@ class ChatBubble extends StatelessWidget {
                   ? null
                   : [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: isDark
+                            ? Colors.black.withOpacity(0.2)
+                            : Colors.black.withOpacity(0.06),
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),

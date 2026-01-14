@@ -95,6 +95,7 @@ class _WhereToCardState extends State<WhereToCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,6 +110,7 @@ class _WhereToCardState extends State<WhereToCard> {
             controller: _pickupCtrl,
             icon: Icons.my_location,
             hintText: "Pickup location",
+            isDark: isDark,
             onTap: () => _openAutocomplete(
               controller: _pickupCtrl,
               title: "Pickup location",
@@ -121,6 +123,7 @@ class _WhereToCardState extends State<WhereToCard> {
             icon: Icons.place,
             iconColor: AppColors.passengerPrimary,
             hintText: "Destination",
+            isDark: isDark,
             onTap: () =>
                 _openAutocomplete(controller: _destCtrl, title: "Destination"),
           ),
@@ -182,8 +185,10 @@ class _WhereToCardState extends State<WhereToCard> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.passengerPrimary,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: const Color(0xFFE9EEF6),
-                    disabledForegroundColor: const Color(0xFF9AA3B2),
+                    disabledBackgroundColor:
+                        isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
+                    disabledForegroundColor:
+                        isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -210,6 +215,7 @@ class _TextFieldTile extends StatelessWidget {
     required this.icon,
     required this.hintText,
     required this.onTap,
+    required this.isDark,
     this.iconColor,
   });
 
@@ -217,6 +223,7 @@ class _TextFieldTile extends StatelessWidget {
   final IconData icon;
   final String hintText;
   final VoidCallback onTap;
+  final bool isDark;
   final Color? iconColor;
 
   @override
@@ -228,7 +235,7 @@ class _TextFieldTile extends StatelessWidget {
         final isEmpty = value.isEmpty;
 
         return Material(
-          color: const Color(0xFFF3F5F8),
+          color: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
           borderRadius: BorderRadius.circular(16),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
@@ -238,7 +245,11 @@ class _TextFieldTile extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(
                 children: [
-                  Icon(icon, color: iconColor ?? AppColors.lightMuted),
+                  Icon(
+                    icon,
+                    color: iconColor ??
+                        (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -247,14 +258,17 @@ class _TextFieldTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: isEmpty
-                            ? AppColors.lightMuted
-                            : AppColors.lightText,
+                            ? (isDark ? AppColors.darkMuted : AppColors.lightMuted)
+                            : (isDark ? AppColors.darkText : AppColors.lightText),
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: AppColors.lightMuted),
+                  Icon(
+                    Icons.chevron_right,
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
                 ],
               ),
             ),
@@ -396,12 +410,13 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final h = MediaQuery.of(context).size.height;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       height: h * 0.88,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       ),
       child: SafeArea(
         top: false,
@@ -412,7 +427,7 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: const Color(0xFFE6EAF2),
+                color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
@@ -446,9 +461,13 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
                 autofocus: true,
                 decoration: InputDecoration(
                   hintText: "Search address / place",
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
                   filled: true,
-                  fillColor: const Color(0xFFF3F5F8),
+                  fillColor:
+                      isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,

@@ -10,12 +10,15 @@ class RidesTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF2F6),
+        color: isDark ? const Color(0xFF1C2331) : const Color(0xFFEFF2F6),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE3E8F2)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF232836) : const Color(0xFFE3E8F2),
+        ),
       ),
       child: Row(
         children: [
@@ -24,6 +27,7 @@ class RidesTabs extends StatelessWidget {
               text: 'Upcoming',
               active: active == MyRidesTab.upcoming,
               onTap: () => onChange(MyRidesTab.upcoming),
+              isDark: isDark,
             ),
           ),
           Expanded(
@@ -31,6 +35,7 @@ class RidesTabs extends StatelessWidget {
               text: 'Past',
               active: active == MyRidesTab.past,
               onTap: () => onChange(MyRidesTab.past),
+              isDark: isDark,
             ),
           ),
         ],
@@ -44,11 +49,13 @@ class _TabPill extends StatelessWidget {
     required this.text,
     required this.active,
     required this.onTap,
+    required this.isDark,
   });
 
   final String text;
   final bool active;
   final VoidCallback onTap;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -59,14 +66,18 @@ class _TabPill extends StatelessWidget {
         height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.transparent,
+          color: active
+              ? (isDark ? const Color(0xFF111827) : Colors.white)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           boxShadow: active
-              ? const [
+              ? [
                   BoxShadow(
                     blurRadius: 12,
-                    offset: Offset(0, 6),
-                    color: Color(0x12000000),
+                    offset: const Offset(0, 6),
+                    color: isDark
+                        ? Colors.black.withOpacity(0.4)
+                        : const Color(0x12000000),
                   ),
                 ]
               : const [],
@@ -75,7 +86,9 @@ class _TabPill extends StatelessWidget {
           text,
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            color: active ? AppColors.lightText : AppColors.lightMuted,
+            color: active
+                ? (isDark ? AppColors.darkText : AppColors.lightText)
+                : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
           ),
         ),
       ),

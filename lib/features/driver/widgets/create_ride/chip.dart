@@ -17,6 +17,7 @@ class SelectChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -25,10 +26,14 @@ class SelectChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: active ? activeColor.withOpacity(0.12) : Colors.white,
+            color: active
+                ? activeColor.withOpacity(isDark ? 0.22 : 0.12)
+                : (isDark ? AppColors.darkSurface : Colors.white),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: active ? activeColor : const Color(0xFFE2E6EF),
+              color: active
+                  ? activeColor
+                  : (isDark ? const Color(0xFF232836) : const Color(0xFFE2E6EF)),
               width: 1.4,
             ),
           ),
@@ -36,7 +41,9 @@ class SelectChip extends StatelessWidget {
             text,
             style: TextStyle(
               fontWeight: FontWeight.w800,
-              color: active ? activeColor : AppColors.lightText,
+              color: active
+                  ? activeColor
+                  : (isDark ? AppColors.darkText : AppColors.lightText),
             ),
           ),
         ),

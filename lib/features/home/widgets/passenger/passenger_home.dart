@@ -26,6 +26,7 @@ class _PassengerHomeState extends State<PassengerHome> {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       final items = _recent.items;
       final children = <Widget>[
         const WhereToCard(),
@@ -34,10 +35,10 @@ class _PassengerHomeState extends State<PassengerHome> {
 
       if (items.isNotEmpty) {
         children.addAll([
-          const Text(
+          Text(
             "RECENT SEARCHES",
             style: TextStyle(
-              color: AppColors.lightMuted,
+              color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
               fontWeight: FontWeight.w800,
               letterSpacing: 1,
             ),

@@ -18,14 +18,16 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
   @override
   Widget build(BuildContext context) {
     final primary = AppColors.driverPrimary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: AppColors.lightBg,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        foregroundColor: AppColors.lightText,
+        foregroundColor: isDark ? AppColors.darkText : AppColors.lightText,
         title: const Text(
           'Become a Driver',
           style: TextStyle(fontWeight: FontWeight.w900),
@@ -74,51 +76,65 @@ class _DriverCta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
-        const Text(
+        Text(
           "Start earning by offering rides",
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: textPrimary,
+          ),
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           "Add your vehicle details. Takes less than a minute.",
-          style: TextStyle(color: AppColors.lightMuted, height: 1.4),
+          style: TextStyle(color: muted, height: 1.4),
         ),
         const SizedBox(height: 18),
 
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? AppColors.darkSurface : Colors.white,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFE6EAF2)),
-            boxShadow: const [
-              BoxShadow(
-                blurRadius: 22,
-                offset: Offset(0, 14),
-                color: Color(0x12000000),
-              ),
-            ],
+            border: Border.all(
+              color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
+            ),
+            boxShadow: isDark
+                ? []
+                : const [
+                    BoxShadow(
+                      blurRadius: 22,
+                      offset: Offset(0, 14),
+                      color: Color(0x12000000),
+                    ),
+                  ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
+            children: [
               _BenefitRow(
                 icon: Icons.verified_user_outlined,
                 text: "Verified driver profile",
+                isDark: isDark,
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               _BenefitRow(
                 icon: Icons.payments_outlined,
                 text: "Track earnings & requests",
+                isDark: isDark,
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               _BenefitRow(
                 icon: Icons.route_outlined,
                 text: "Post rides in seconds",
+                isDark: isDark,
               ),
             ],
           ),
@@ -163,20 +179,32 @@ class _DriverCta extends StatelessWidget {
 }
 
 class _BenefitRow extends StatelessWidget {
-  const _BenefitRow({required this.icon, required this.text});
+  const _BenefitRow({
+    required this.icon,
+    required this.text,
+    required this.isDark,
+  });
   final IconData icon;
   final String text;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: AppColors.lightMuted),
+        Icon(
+          icon,
+          size: 20,
+          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+        ),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.darkText : AppColors.lightText,
+            ),
           ),
         ),
       ],
@@ -200,10 +228,17 @@ class ExoField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: isDark ? AppColors.darkText : AppColors.lightText,
+          ),
+        ),
         const SizedBox(height: 8),
         TextField(
           keyboardType: keyboardType,
@@ -211,7 +246,7 @@ class ExoField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: const Color(0xFFF3F5F8),
+            fillColor: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 16,

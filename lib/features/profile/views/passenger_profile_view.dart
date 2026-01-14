@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/theme_controller.dart';
 import '../../../shared/controllers/session_controller.dart';
 import '../../../shared/models/user.dart';
 import '../controllers/profile_controller.dart';
@@ -28,9 +29,11 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
   @override
   Widget build(BuildContext context) {
     final session = Get.find<SessionController>();
+    final theme = Get.find<ThemeController>();
 
     return Obx(() {
       final status = session.status.value;
+      final isDark = theme.isDark.value;
 
       if (status == SessionStatus.unknown) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -52,17 +55,17 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
           user.emailVerified || user.driverProfile?.isVerified == true;
 
       return Scaffold(
-        backgroundColor: AppColors.lightBg,
+        backgroundColor: _surfaceBg(isDark),
         body: SafeArea(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
             children: [
-              const Text(
+              Text(
                 'Profile',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.lightText,
+                  color: _textPrimary(isDark),
                 ),
               ),
               const SizedBox(height: 14),
@@ -73,12 +76,14 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                     ? AppColors.driverPrimary
                     : AppColors.passengerPrimary,
                 isVerified: isVerified,
+                isDark: isDark,
               ),
               const SizedBox(height: 16),
               if (isDriver || _controller.driverProfile.value != null) ...[
                 _DriverProfileCard(
                   profile: _controller.driverProfile.value,
                   loading: _controller.driverLoading.value,
+                  isDark: isDark,
                   onEdit: () => _openDriverEditSheet(
                     context,
                     _controller.driverProfile.value,
@@ -86,7 +91,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                 ),
                 const SizedBox(height: 20),
               ],
-              const _SectionLabel(label: 'ACCOUNT'),
+              _SectionLabel(label: 'ACCOUNT', isDark: isDark),
               const SizedBox(height: 8),
               _ActionGroup(
                 items: [
@@ -108,9 +113,10 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                     label: 'Verification',
                   ),
                 ],
+                isDark: isDark,
               ),
               const SizedBox(height: 16),
-              const _SectionLabel(label: 'PREFERENCES'),
+              _SectionLabel(label: 'PREFERENCES', isDark: isDark),
               const SizedBox(height: 8),
               _ActionGroup(
                 items: const [
@@ -123,9 +129,10 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                     label: 'Notifications',
                   ),
                 ],
+                isDark: isDark,
               ),
               const SizedBox(height: 16),
-              const _SectionLabel(label: 'SUPPORT'),
+              _SectionLabel(label: 'SUPPORT', isDark: isDark),
               const SizedBox(height: 8),
               _ActionGroup(
                 items: const [
@@ -138,6 +145,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                     label: 'Terms & Privacy',
                   ),
                 ],
+                isDark: isDark,
               ),
               const SizedBox(height: 16),
               _LogoutCard(
@@ -145,13 +153,14 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                   await session.logout();
                   Get.offAllNamed(AppRoutes.login);
                 },
+                isDark: isDark,
               ),
               const SizedBox(height: 20),
-              const Center(
+              Center(
                 child: Text(
                   'Version 1.0.0',
                   style: TextStyle(
-                    color: AppColors.lightMuted,
+                    color: _mutedText(isDark),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -274,10 +283,11 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
     required Future<bool> Function() onSave,
     required RxBool isSaving,
   }) {
+    final isDark = Get.find<ThemeController>().isDark.value;
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: _surfaceCard(isDark),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -306,9 +316,10 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                   Expanded(
                     child: Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
+                        color: _textPrimary(isDark),
                       ),
                     ),
                   ),
@@ -319,6 +330,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                       }
                     },
                     icon: const Icon(Icons.close),
+                    color: _mutedText(isDark),
                   ),
                 ],
               ),
@@ -384,12 +396,14 @@ class _UserCard extends StatelessWidget {
     required this.roleLabel,
     required this.roleColor,
     required this.isVerified,
+    required this.isDark,
   });
 
   final User user;
   final String roleLabel;
   final Color roleColor;
   final bool isVerified;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -399,15 +413,16 @@ class _UserCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _surfaceCard(isDark),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE6EAF2)),
+        border: Border.all(color: _cardBorder(isDark)),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: const Color(0xFFE9EEF6),
+            backgroundColor:
+                isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
             backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
             child: avatarUrl.isEmpty
                 ? Text(
@@ -426,16 +441,17 @@ class _UserCard extends StatelessWidget {
               children: [
                 Text(
                   user.name.isNotEmpty ? user.name : 'User',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
+                    color: _textPrimary(isDark),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   user.email,
-                  style: const TextStyle(
-                    color: AppColors.lightMuted,
+                  style: TextStyle(
+                    color: _mutedText(isDark),
                     fontSize: 13,
                   ),
                 ),
@@ -444,8 +460,8 @@ class _UserCard extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       user.phone!,
-                      style: const TextStyle(
-                        color: AppColors.lightMuted,
+                      style: TextStyle(
+                        color: _mutedText(isDark),
                         fontSize: 13,
                       ),
                     ),
@@ -456,15 +472,16 @@ class _UserCard extends StatelessWidget {
                     _TagChip(
                       label: roleLabel,
                       textColor: roleColor,
-                      background: roleColor.withOpacity(0.12),
+                      background:
+                          roleColor.withOpacity(isDark ? 0.22 : 0.12),
                     ),
                     if (isVerified)
-                      const Padding(
-                        padding: EdgeInsets.only(left: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
                         child: _TagChip(
                           label: 'Verified',
-                          textColor: AppColors.lightText,
-                          background: Color(0xFFF1F3F7),
+                          textColor: _textPrimary(isDark),
+                          background: _chipNeutralBg(isDark),
                           icon: Icons.verified_outlined,
                         ),
                       ),
@@ -493,11 +510,13 @@ class _DriverProfileCard extends StatelessWidget {
   const _DriverProfileCard({
     required this.profile,
     required this.loading,
+    required this.isDark,
     required this.onEdit,
   });
 
   final DriverProfile? profile;
   final bool loading;
+  final bool isDark;
   final VoidCallback onEdit;
 
   @override
@@ -512,26 +531,30 @@ class _DriverProfileCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
+        color: _driverCardBg(isDark),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFD8E6FF)),
+        border: Border.all(color: _driverCardBorder(isDark)),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              const Icon(Icons.directions_car, color: Color(0xFF2B7FFF)),
+              const Icon(Icons.directions_car, color: AppColors.driverPrimary),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Driver Profile',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: _textPrimary(isDark),
+                  ),
                 ),
               ),
               IconButton(
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined),
-                color: const Color(0xFF2B7FFF),
+                color: AppColors.driverPrimary,
               ),
             ],
           ),
@@ -539,27 +562,37 @@ class _DriverProfileCard extends StatelessWidget {
           _DriverInfoRow(
             label: 'Vehicle',
             value: _joinParts(profile?.carMake, profile?.carModel),
+            isDark: isDark,
           ),
-          _DriverInfoRow(label: 'Year', value: profile?.carYear),
-          _DriverInfoRow(label: 'Color', value: profile?.carColor),
-          _DriverInfoRow(label: 'License Plate', value: profile?.plateNumber),
+          _DriverInfoRow(label: 'Year', value: profile?.carYear, isDark: isDark),
+          _DriverInfoRow(label: 'Color', value: profile?.carColor, isDark: isDark),
+          _DriverInfoRow(
+            label: 'License Plate',
+            value: profile?.plateNumber,
+            isDark: isDark,
+          ),
           _DriverInfoRow(
             label: 'License No.',
             value: profile?.licenseNumber,
+            isDark: isDark,
           ),
           _DriverInfoRow(
             label: 'Insurance',
             value: profile?.insuranceInfo,
+            isDark: isDark,
           ),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Status',
-                style: TextStyle(color: AppColors.lightMuted, fontSize: 13),
+                style: TextStyle(color: _mutedText(isDark), fontSize: 13),
               ),
-              _StatusPill(isActive: profile?.isVerified == true),
+              _StatusPill(
+                isActive: profile?.isVerified == true,
+                isDark: isDark,
+              ),
             ],
           ),
         ],
@@ -574,10 +607,15 @@ class _DriverProfileCard extends StatelessWidget {
 }
 
 class _DriverInfoRow extends StatelessWidget {
-  const _DriverInfoRow({required this.label, required this.value});
+  const _DriverInfoRow({
+    required this.label,
+    required this.value,
+    required this.isDark,
+  });
 
   final String label;
   final String? value;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -588,8 +626,8 @@ class _DriverInfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
-                color: AppColors.lightMuted,
+              style: TextStyle(
+                color: _mutedText(isDark),
                 fontSize: 13,
               ),
             ),
@@ -598,7 +636,11 @@ class _DriverInfoRow extends StatelessWidget {
             child: Text(
               (value == null || value!.trim().isEmpty) ? '—' : value!,
               textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: _textPrimary(isDark),
+              ),
             ),
           ),
         ],
@@ -608,14 +650,17 @@ class _DriverInfoRow extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.isActive});
+  const _StatusPill({required this.isActive, required this.isDark});
 
   final bool isActive;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final bg = isActive ? const Color(0xFFE8FAF3) : const Color(0xFFF1F3F7);
-    final color = isActive ? AppColors.passengerPrimary : AppColors.lightMuted;
+    final bg = isActive
+        ? (isDark ? const Color(0xFF14382B) : const Color(0xFFE8FAF3))
+        : _chipNeutralBg(isDark);
+    final color = isActive ? AppColors.passengerPrimary : _mutedText(isDark);
     final label = isActive ? 'Active' : 'Pending';
 
     return Container(
@@ -672,16 +717,17 @@ class _TagChip extends StatelessWidget {
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label});
+  const _SectionLabel({required this.label, required this.isDark});
 
   final String label;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: const TextStyle(
-        color: AppColors.lightMuted,
+      style: TextStyle(
+        color: _mutedText(isDark),
         fontWeight: FontWeight.w800,
         letterSpacing: 1,
       ),
@@ -690,24 +736,25 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _ActionGroup extends StatelessWidget {
-  const _ActionGroup({required this.items});
+  const _ActionGroup({required this.items, required this.isDark});
 
   final List<_ActionItem> items;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _surfaceCard(isDark),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE6EAF2)),
+        border: Border.all(color: _cardBorder(isDark)),
       ),
       child: Column(
         children: [
           for (int i = 0; i < items.length; i++) ...[
-            _ProfileActionTile(item: items[i]),
+            _ProfileActionTile(item: items[i], isDark: isDark),
             if (i != items.length - 1)
-              const Divider(height: 1, color: Color(0xFFF1F3F7)),
+              Divider(height: 1, color: _cardDivider(isDark)),
           ],
         ],
       ),
@@ -728,20 +775,24 @@ class _ActionItem {
 }
 
 class _ProfileActionTile extends StatelessWidget {
-  const _ProfileActionTile({required this.item});
+  const _ProfileActionTile({required this.item, required this.isDark});
 
   final _ActionItem item;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       onTap: item.onTap,
-      leading: Icon(item.icon, color: AppColors.lightMuted),
+      leading: Icon(item.icon, color: _mutedText(isDark)),
       title: Text(
         item.label,
-        style: const TextStyle(fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: _textPrimary(isDark),
+        ),
       ),
-      trailing: const Icon(Icons.chevron_right, color: AppColors.lightMuted),
+      trailing: Icon(Icons.chevron_right, color: _mutedText(isDark)),
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14),
     );
@@ -749,17 +800,18 @@ class _ProfileActionTile extends StatelessWidget {
 }
 
 class _LogoutCard extends StatelessWidget {
-  const _LogoutCard({required this.onLogout});
+  const _LogoutCard({required this.onLogout, required this.isDark});
 
   final VoidCallback onLogout;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _surfaceCard(isDark),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE6EAF2)),
+        border: Border.all(color: _cardBorder(isDark)),
       ),
       child: ListTile(
         onTap: onLogout,
@@ -799,8 +851,9 @@ class _EditField extends StatelessWidget {
       inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: TextStyle(color: _mutedText(Get.find<ThemeController>().isDark.value)),
         filled: true,
-        fillColor: const Color(0xFFF3F5F8),
+        fillColor: _fieldFill(Get.find<ThemeController>().isDark.value),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
@@ -809,3 +862,32 @@ class _EditField extends StatelessWidget {
     );
   }
 }
+
+Color _surfaceBg(bool isDark) => isDark ? AppColors.darkBg : AppColors.lightBg;
+
+Color _surfaceCard(bool isDark) =>
+    isDark ? AppColors.darkSurface : Colors.white;
+
+Color _cardBorder(bool isDark) =>
+    isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2);
+
+Color _cardDivider(bool isDark) =>
+    isDark ? const Color(0xFF1C202B) : const Color(0xFFF1F3F7);
+
+Color _mutedText(bool isDark) =>
+    isDark ? AppColors.darkMuted : AppColors.lightMuted;
+
+Color _textPrimary(bool isDark) =>
+    isDark ? AppColors.darkText : AppColors.lightText;
+
+Color _chipNeutralBg(bool isDark) =>
+    isDark ? const Color(0xFF1E222D) : const Color(0xFFF1F3F7);
+
+Color _driverCardBg(bool isDark) =>
+    isDark ? const Color(0xFF122033) : const Color(0xFFEFF6FF);
+
+Color _driverCardBorder(bool isDark) =>
+    isDark ? const Color(0xFF1B2C44) : const Color(0xFFD8E6FF);
+
+Color _fieldFill(bool isDark) =>
+    isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8);

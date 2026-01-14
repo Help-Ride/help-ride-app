@@ -23,6 +23,7 @@ class LocationSearchSheet extends StatefulWidget {
     required PlacesService places,
     String? countryCode = "ca",
   }) {
+    final isDark = Get.isDarkMode;
     return Get.bottomSheet<PlaceResult>(
       LocationSearchSheet(
         title: title,
@@ -30,7 +31,7 @@ class LocationSearchSheet extends StatefulWidget {
         countryCode: countryCode,
       ),
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -99,6 +100,7 @@ class _LocationSearchSheetState extends State<LocationSearchSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
@@ -111,7 +113,7 @@ class _LocationSearchSheetState extends State<LocationSearchSheet> {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
+                color: isDark ? const Color(0xFF232836) : const Color(0xFFE5E7EB),
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
@@ -123,15 +125,17 @@ class _LocationSearchSheetState extends State<LocationSearchSheet> {
                   Expanded(
                     child: Text(
                       widget.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
+                        color: isDark ? AppColors.darkText : AppColors.lightText,
                       ),
                     ),
                   ),
                   IconButton(
                     onPressed: () => Get.back(),
                     icon: const Icon(Icons.close),
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
                   ),
                 ],
               ),
@@ -144,9 +148,13 @@ class _LocationSearchSheetState extends State<LocationSearchSheet> {
                 onChanged: _onQueryChanged,
                 decoration: InputDecoration(
                   hintText: "Search a place...",
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
                   filled: true,
-                  fillColor: const Color(0xFFF3F5F8),
+                  fillColor:
+                      isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide.none,
@@ -173,7 +181,10 @@ class _LocationSearchSheetState extends State<LocationSearchSheet> {
             Expanded(
               child: ListView.separated(
                 itemCount: _results.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, __) => Divider(
+                  height: 1,
+                  color: isDark ? const Color(0xFF232836) : const Color(0xFFE5E7EB),
+                ),
                 itemBuilder: (_, i) => PlaceTile(
                   place: _results[i],
                   onTap: () => _pick(_results[i]),

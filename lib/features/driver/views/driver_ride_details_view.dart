@@ -14,12 +14,14 @@ class DriverRideDetailsView extends GetView<DriverRideDetailsController> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.lightBg,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        foregroundColor: AppColors.lightText,
+        foregroundColor: isDark ? AppColors.darkText : AppColors.lightText,
         title: const Text(
           'Ride Details',
           style: TextStyle(fontWeight: FontWeight.w900),
@@ -85,7 +87,7 @@ class DriverRideDetailsView extends GetView<DriverRideDetailsController> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     count == 1 ? '1 new request' : '$count new requests',
-                    style: const TextStyle(color: AppColors.lightMuted),
+                    style: TextStyle(color: muted),
                   ),
                 );
               }),
@@ -126,12 +128,12 @@ class DriverRideDetailsView extends GetView<DriverRideDetailsController> {
 
                 final list = controller.filteredRequests;
                 if (list.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Center(
                       child: Text(
                         'No booking requests yet.',
-                        style: TextStyle(color: AppColors.lightMuted),
+                        style: TextStyle(color: muted),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -168,6 +170,9 @@ class _DriverRideSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = ride.status.toLowerCase();
     final booked = (ride.seatsTotal - ride.seatsAvailable).clamp(0, ride.seatsTotal);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
 
     return AppCard(
       child: Column(
@@ -179,27 +184,27 @@ class _DriverRideSummaryCard extends StatelessWidget {
               const Spacer(),
               Text(
                 '\$${ride.pricePerSeat.toStringAsFixed(0)}/seat',
-                style: const TextStyle(fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: textPrimary,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(
-                Icons.place_outlined,
-                size: 18,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.place_outlined, size: 18, color: muted),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${ride.fromCity}  →  ${ride.toCity}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
+                    color: textPrimary,
                   ),
                 ),
               ),
@@ -208,26 +213,18 @@ class _DriverRideSummaryCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(
-                Icons.calendar_today_outlined,
-                size: 16,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.calendar_today_outlined, size: 16, color: muted),
               const SizedBox(width: 6),
               Text(
                 fmtDateTime(ride.startTime),
-                style: const TextStyle(color: AppColors.lightMuted),
+                style: TextStyle(color: muted),
               ),
               const SizedBox(width: 14),
-              const Icon(
-                Icons.people_outline,
-                size: 18,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.people_outline, size: 18, color: muted),
               const SizedBox(width: 6),
               Text(
                 '$booked/${ride.seatsTotal} booked',
-                style: const TextStyle(color: AppColors.lightMuted),
+                style: TextStyle(color: muted),
               ),
             ],
           ),

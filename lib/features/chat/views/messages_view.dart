@@ -35,9 +35,10 @@ class _MessagesViewState extends State<MessagesView> {
   @override
   Widget build(BuildContext context) {
     final theme = Get.find<ThemeController>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
@@ -46,25 +47,28 @@ class _MessagesViewState extends State<MessagesView> {
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Messages',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.lightText,
+                        color: isDark ? AppColors.darkText : AppColors.lightText,
                       ),
                     ),
                   ),
                   IconButton(
                     onPressed: _controller.fetch,
                     icon: const Icon(Icons.refresh_rounded),
-                    color: AppColors.lightMuted,
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              _SearchField(onChanged: _controller.setQuery),
+              _SearchField(
+                onChanged: _controller.setQuery,
+                isDark: isDark,
+              ),
               const SizedBox(height: 12),
               Expanded(
                 child: Obx(() {
@@ -108,7 +112,7 @@ class _MessagesViewState extends State<MessagesView> {
                         return ChatConversationTile(
                           conversation: conversation,
                           accentColor: roleColor,
-                          isDark: theme.isDark.value,
+                          isDark: isDark,
                           roleLabel: label,
                           onTap: () => _openThread(conversation),
                         );
@@ -140,9 +144,10 @@ class _MessagesViewState extends State<MessagesView> {
 }
 
 class _SearchField extends StatelessWidget {
-  const _SearchField({required this.onChanged});
+  const _SearchField({required this.onChanged, required this.isDark});
 
   final ValueChanged<String> onChanged;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -150,17 +155,24 @@ class _SearchField extends StatelessWidget {
       onChanged: onChanged,
       decoration: InputDecoration(
         hintText: 'Search conversations...',
-        prefixIcon: const Icon(Icons.search_rounded),
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+        ),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: isDark ? AppColors.darkSurface : Colors.white,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: Color(0xFFE3E8F2)),
+          borderSide: BorderSide(
+            color: isDark ? const Color(0xFF232836) : const Color(0xFFE3E8F2),
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: Color(0xFFE3E8F2)),
+          borderSide: BorderSide(
+            color: isDark ? const Color(0xFF232836) : const Color(0xFFE3E8F2),
+          ),
         ),
       ),
     );
@@ -186,21 +198,33 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.chat_bubble_outline, size: 42, color: AppColors.lightMuted),
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 42,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.darkMuted
+                  : AppColors.lightMuted,
+            ),
             const SizedBox(height: 12),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.lightText,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.darkText
+                    : AppColors.lightText,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
               subtitle,
-              style: const TextStyle(color: AppColors.lightMuted),
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.darkMuted
+                    : AppColors.lightMuted,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),

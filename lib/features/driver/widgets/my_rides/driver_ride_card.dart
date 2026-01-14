@@ -11,20 +11,27 @@ class DriverRideCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = ride.status.toLowerCase();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE6EAF2)),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 18,
-            offset: Offset(0, 10),
-            color: Color(0x0A000000),
-          ),
-        ],
+        border: Border.all(
+          color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
+        ),
+        boxShadow: isDark
+            ? []
+            : const [
+                BoxShadow(
+                  blurRadius: 18,
+                  offset: Offset(0, 10),
+                  color: Color(0x0A000000),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,7 +42,10 @@ class DriverRideCard extends StatelessWidget {
               const Spacer(),
               Text(
                 '\$${ride.pricePerSeat.toStringAsFixed(0)}/seat',
-                style: const TextStyle(fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: textPrimary,
+                ),
               ),
             ],
           ),
@@ -43,20 +53,17 @@ class DriverRideCard extends StatelessWidget {
 
           Row(
             children: [
-              const Icon(
-                Icons.place_outlined,
-                size: 18,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.place_outlined, size: 18, color: muted),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${ride.from}  →  ${ride.to}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
+                    color: textPrimary,
                   ),
                 ),
               ),
@@ -67,32 +74,27 @@ class DriverRideCard extends StatelessWidget {
 
           Row(
             children: [
-              const Icon(
-                Icons.calendar_today_outlined,
-                size: 16,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.calendar_today_outlined, size: 16, color: muted),
               const SizedBox(width: 6),
               Text(
                 fmtDateTime(ride.startTime),
-                style: const TextStyle(color: AppColors.lightMuted),
+                style: TextStyle(color: muted),
               ),
               const SizedBox(width: 14),
-              const Icon(
-                Icons.people_outline,
-                size: 18,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.people_outline, size: 18, color: muted),
               const SizedBox(width: 6),
               Text(
                 '${ride.booked}/${ride.seatsTotal} booked',
-                style: const TextStyle(color: AppColors.lightMuted),
+                style: TextStyle(color: muted),
               ),
             ],
           ),
 
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFE9EEF6)),
+          Divider(
+            height: 1,
+            color: isDark ? const Color(0xFF232836) : const Color(0xFFE9EEF6),
+          ),
           const SizedBox(height: 12),
 
           Row(
@@ -136,7 +138,8 @@ class DriverRideCard extends StatelessWidget {
                             Dialog(
                               insetPadding:
                                   const EdgeInsets.symmetric(horizontal: 22),
-                              backgroundColor: const Color(0xFFF2F2F6),
+                              backgroundColor:
+                                  isDark ? AppColors.darkSurface : const Color(0xFFF2F2F6),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(28),
                               ),
@@ -159,10 +162,10 @@ class DriverRideCard extends StatelessWidget {
                                       ),
                                     ),
                                     const SizedBox(height: 12),
-                                    const Text(
+                                    Text(
                                       'This will remove the ride for passengers.',
                                       style: TextStyle(
-                                        color: AppColors.lightMuted,
+                                        color: muted,
                                       ),
                                     ),
                                     const SizedBox(height: 22),

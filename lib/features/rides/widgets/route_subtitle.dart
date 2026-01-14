@@ -13,10 +13,11 @@ class RouteSubtitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Text(
       '$fromCity  →  $toCity',
-      style: const TextStyle(
-        color: AppColors.lightMuted,
+      style: TextStyle(
+        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
         fontWeight: FontWeight.w600,
       ),
     );

@@ -7,12 +7,13 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         text,
-        style: const TextStyle(
-          color: AppColors.lightMuted,
+        style: TextStyle(
+          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
           fontWeight: FontWeight.w900,
           letterSpacing: 1,
         ),

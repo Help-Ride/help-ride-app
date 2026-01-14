@@ -16,13 +16,15 @@ class EditRideView extends GetView<EditRideController> {
   @override
   Widget build(BuildContext context) {
     final primary = AppColors.driverPrimary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.lightBg,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        foregroundColor: AppColors.lightText,
+        foregroundColor: isDark ? AppColors.darkText : AppColors.lightText,
         title: const Text(
           'Edit Ride',
           style: TextStyle(fontWeight: FontWeight.w900),
@@ -61,9 +63,9 @@ class EditRideView extends GetView<EditRideController> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 90),
             children: [
-              const Text(
+              Text(
                 'Update your ride details',
-                style: TextStyle(color: AppColors.lightMuted),
+                style: TextStyle(color: muted),
               ),
               const SizedBox(height: 18),
 
@@ -91,9 +93,9 @@ class EditRideView extends GetView<EditRideController> {
                 controller: controller.stopsCtrl,
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Separate multiple stops with commas',
-                style: TextStyle(color: AppColors.lightMuted, fontSize: 12),
+                style: TextStyle(color: muted, fontSize: 12),
               ),
 
               const SizedBox(height: 18),

@@ -41,20 +41,27 @@ class DriverRequestCard extends StatelessWidget {
     final name = passenger?.name ?? 'Passenger';
     final created = booking.updatedAt ?? booking.createdAt;
     final note = (booking.note ?? '').trim();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFD9E6FF)),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 16,
-            offset: Offset(0, 8),
-            color: Color(0x10000000),
-          ),
-        ],
+        border: Border.all(
+          color: isDark ? const Color(0xFF232836) : const Color(0xFFD9E6FF),
+        ),
+        boxShadow: isDark
+            ? []
+            : const [
+                BoxShadow(
+                  blurRadius: 16,
+                  offset: Offset(0, 8),
+                  color: Color(0x10000000),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,14 +72,14 @@ class DriverRequestCard extends StatelessWidget {
               const Spacer(),
               Text(
                 timeAgo(created),
-                style: const TextStyle(color: AppColors.lightMuted),
+                style: TextStyle(color: muted),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _Avatar(initials: initials(name)),
+              _Avatar(initials: initials(name), isDark: isDark),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -82,35 +89,38 @@ class DriverRequestCard extends StatelessWidget {
                       name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
+                        color: textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    _RatingTrips(passenger: passenger),
+                    _RatingTrips(passenger: passenger, isDark: isDark),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFE9EEF6)),
+          Divider(
+            height: 1,
+            color: isDark ? const Color(0xFF232836) : const Color(0xFFE9EEF6),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(
-                Icons.place_outlined,
-                size: 18,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.place_outlined, size: 18, color: muted),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${booking.ride.fromCity}  →  ${booking.ride.toCity}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: textPrimary,
+                  ),
                 ),
               ),
             ],
@@ -118,42 +128,30 @@ class DriverRequestCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(
-                Icons.calendar_today_outlined,
-                size: 16,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.calendar_today_outlined, size: 16, color: muted),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   formatDateTime(booking.ride.startTime),
-                  style: const TextStyle(color: AppColors.lightMuted),
+                  style: TextStyle(color: muted),
                 ),
               ),
-              const Icon(
-                Icons.person_outline,
-                size: 18,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.person_outline, size: 18, color: muted),
               const SizedBox(width: 6),
               Text(
                 '${booking.seatsBooked} seat${booking.seatsBooked == 1 ? '' : 's'}',
-                style: const TextStyle(color: AppColors.lightMuted),
+                style: TextStyle(color: muted),
               ),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(
-                Icons.attach_money,
-                size: 18,
-                color: AppColors.lightMuted,
-              ),
+              Icon(Icons.attach_money, size: 18, color: muted),
               const SizedBox(width: 6),
               Text(
                 'Max \$${booking.ride.pricePerSeat.toStringAsFixed(0)}/seat',
-                style: const TextStyle(color: AppColors.lightMuted),
+                style: TextStyle(color: muted),
               ),
             ],
           ),
@@ -163,12 +161,12 @@ class DriverRequestCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF3F5F8),
+                color: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 note,
-                style: const TextStyle(color: AppColors.lightText),
+                style: TextStyle(color: textPrimary),
               ),
             ),
           ],
@@ -322,40 +320,45 @@ class _StatusPill extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initials});
+  const _Avatar({required this.initials, required this.isDark});
   final String initials;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 44,
       width: 44,
-      decoration: const BoxDecoration(
-        color: Color(0xFFE9EEF6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
       child: Text(
         initials,
-        style: const TextStyle(fontWeight: FontWeight.w900),
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+          color: isDark ? AppColors.darkText : AppColors.lightText,
+        ),
       ),
     );
   }
 }
 
 class _RatingTrips extends StatelessWidget {
-  const _RatingTrips({required this.passenger});
+  const _RatingTrips({required this.passenger, required this.isDark});
   final BookingPassenger? passenger;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     final rating = passenger?.rating;
     final trips = passenger?.trips;
     if (rating == null && trips == null) {
-      return const Text(
+      return Text(
         '⭐ 4.8 • 45 trips',
         style: TextStyle(
-          color: AppColors.lightMuted,
+          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
           fontWeight: FontWeight.w600,
         ),
       );
@@ -366,8 +369,8 @@ class _RatingTrips extends StatelessWidget {
 
     return Text(
       '⭐ $ratingText • $tripsText',
-      style: const TextStyle(
-        color: AppColors.lightMuted,
+      style: TextStyle(
+        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
         fontWeight: FontWeight.w600,
       ),
     );

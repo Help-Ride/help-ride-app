@@ -10,20 +10,25 @@ class BookingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = b.status.toLowerCase();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE6EAF2)),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 18,
-            offset: Offset(0, 10),
-            color: Color(0x0A000000),
-          ),
-        ],
+        border: Border.all(
+          color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
+        ),
+        boxShadow: isDark
+            ? []
+            : const [
+                BoxShadow(
+                  blurRadius: 18,
+                  offset: Offset(0, 10),
+                  color: Color(0x0A000000),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -34,7 +39,10 @@ class BookingCard extends StatelessWidget {
               const Spacer(),
               Text(
                 '\$${b.totalPrice.toStringAsFixed(0)}',
-                style: const TextStyle(fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: isDark ? AppColors.darkText : AppColors.lightText,
+                ),
               ),
             ],
           ),
@@ -42,10 +50,10 @@ class BookingCard extends StatelessWidget {
 
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.place_outlined,
                 size: 18,
-                color: AppColors.lightMuted,
+                color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -53,38 +61,48 @@ class BookingCard extends StatelessWidget {
                   '${b.ride.fromCity}  →  ${b.ride.toCity}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? AppColors.darkText : AppColors.lightText,
+                  ),
                 ),
               ),
             ],
           ),
 
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFE9EEF6)),
+          Divider(
+            height: 1,
+            color: isDark ? const Color(0xFF232836) : const Color(0xFFE9EEF6),
+          ),
           const SizedBox(height: 12),
 
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.calendar_today_outlined,
                 size: 16,
-                color: AppColors.lightMuted,
+                color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
               ),
               const SizedBox(width: 6),
               Text(
                 formatDateTime(b.ride.startTime),
-                style: const TextStyle(color: AppColors.lightMuted),
+                style: TextStyle(
+                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                ),
               ),
               const SizedBox(width: 14),
-              const Icon(
+              Icon(
                 Icons.person_outline,
                 size: 18,
-                color: AppColors.lightMuted,
+                color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
               ),
               const SizedBox(width: 6),
               Text(
                 shortId(b.ride.driverId),
-                style: const TextStyle(color: AppColors.lightMuted),
+                style: TextStyle(
+                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                ),
               ),
             ],
           ),

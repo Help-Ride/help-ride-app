@@ -11,6 +11,7 @@ class RideSeatsCard extends GetView<RideDetailsController> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppCard(
       child: Obx(() {
         final max = ride.seatsAvailable <= 0 ? 1 : ride.seatsAvailable;
@@ -35,8 +36,8 @@ class RideSeatsCard extends GetView<RideDetailsController> {
             ),
             Text(
               '${ride.seatsAvailable} available',
-              style: const TextStyle(
-                color: AppColors.lightMuted,
+              style: TextStyle(
+                color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
                 fontWeight: FontWeight.w700,
               ),
             ),

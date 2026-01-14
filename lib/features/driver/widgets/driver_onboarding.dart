@@ -11,23 +11,25 @@ class DriverOnboarding extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Get.put(DriverOnboardingController(), permanent: false);
     final primary = AppColors.driverPrimary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Become a Driver',
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Add your vehicle info to start posting rides.',
-                style: TextStyle(color: AppColors.lightMuted),
+                style: TextStyle(color: muted),
               ),
 
               const SizedBox(height: 18),
@@ -111,8 +113,10 @@ class DriverOnboarding extends StatelessWidget {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primary,
                             foregroundColor: Colors.white,
-                            disabledBackgroundColor: const Color(0xFFE9EEF6),
-                            disabledForegroundColor: const Color(0xFF9AA3B2),
+                            disabledBackgroundColor:
+                                isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
+                            disabledForegroundColor:
+                                isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
@@ -135,10 +139,10 @@ class DriverOnboarding extends StatelessWidget {
                     }),
 
                     const SizedBox(height: 10),
-                    const Text(
+                    Text(
                       'Note: Verification may be required later.',
                       style: TextStyle(
-                        color: AppColors.lightMuted,
+                        color: muted,
                         fontSize: 12,
                       ),
                     ),
@@ -168,10 +172,17 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: isDark ? AppColors.darkText : AppColors.lightText,
+          ),
+        ),
         const SizedBox(height: 8),
         TextField(
           keyboardType: keyboardType,
@@ -179,7 +190,7 @@ class _Field extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: const Color(0xFFF3F5F8),
+            fillColor: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide.none,
