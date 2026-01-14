@@ -100,6 +100,12 @@ class DriverRideCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () => Get.toNamed('/driver/rides/${ride.id}'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
                   child: const Text('Details'),
                 ),
               ),
@@ -110,6 +116,12 @@ class DriverRideCard extends StatelessWidget {
                       (status == 'completed' || status.contains('cancel'))
                       ? null
                       : () => Get.toNamed('/driver/rides/${ride.id}/edit'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
                   child: const Text('Edit'),
                 ),
               ),
@@ -119,11 +131,91 @@ class DriverRideCard extends StatelessWidget {
                   onPressed:
                       (status == 'completed' || status.contains('cancel'))
                       ? null
-                      : () => Get.snackbar('Cancel', 'Cancel: ${ride.id}'),
+                      : () async {
+                          final confirm = await Get.dialog<bool>(
+                            Dialog(
+                              insetPadding:
+                                  const EdgeInsets.symmetric(horizontal: 22),
+                              backgroundColor: const Color(0xFFF2F2F6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  22,
+                                  22,
+                                  22,
+                                  18,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Cancel ride?',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'This will remove the ride for passengers.',
+                                      style: TextStyle(
+                                        color: AppColors.lightMuted,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 22),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Get.back(result: false),
+                                          child: const Text('Keep'),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        ElevatedButton(
+                                          onPressed: () =>
+                                              Get.back(result: true),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                const Color(0xFFE53935),
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 18,
+                                              vertical: 12,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(18),
+                                            ),
+                                          ),
+                                          child: const Text('Cancel Ride'),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            barrierDismissible: true,
+                          );
+
+                          if (confirm == true) {
+                            Get.find<DriverMyRidesController>()
+                                .cancelRide(ride.id);
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.driverPrimary,
+                    backgroundColor: const Color(0xFFE53935),
                     foregroundColor: Colors.white,
                     elevation: 0,
+                    minimumSize: const Size.fromHeight(44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
                   child: const Text('Cancel'),
                 ),

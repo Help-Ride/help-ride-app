@@ -70,4 +70,12 @@ class DriverRidesApi {
     );
     return res.data ?? {};
   }
+
+  Future<void> deleteRide(String rideId) async {
+    final id = rideId.trim();
+    if (id.isEmpty) {
+      throw ArgumentError('ride id can not be empty');
+    }
+    await _client.delete<void>('/rides/$id');
+  }
 }

@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import '../../../shared/services/api_client.dart';
+import '../services/driver_rides_api.dart';
 
 enum DriverRidesTab { upcoming, past }
 
@@ -35,11 +36,13 @@ class DriverMyRidesController extends GetxController {
   final rides = <DriverRideItem>[].obs;
 
   late final ApiClient _client;
+  late final DriverRidesApi _driverApi;
 
   @override
   Future<void> onInit() async {
     super.onInit();
     _client = await ApiClient.create();
+    _driverApi = DriverRidesApi(_client);
     await refreshAll();
   }
 
@@ -78,6 +81,22 @@ class DriverMyRidesController extends GetxController {
       rides.assignAll(parsed);
     } catch (e) {
       error.value = e.toString();
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  Future<void> cancelRide(String rideId) async {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      await _driverApi.deleteRide(rideId);
+      await refreshAll();
+      Get.snackbar('Cancelled', 'Ride cancelled successfully');
+    } catch (e) {
+      error.value = e.toString();
+      Get.snackbar('Cancel failed', error.value ?? 'Failed');
     } finally {
       loading.value = false;
     }
