@@ -28,6 +28,19 @@ jobs:
         with:
           channel: stable
 
+      - name: Prepare .env
+        run: |
+          if [ -n "${{ secrets.ENV_FILE }}" ]; then
+            echo "${{ secrets.ENV_FILE }}" > .env
+          else
+            cat > .env << 'EOF'
+API_BASE_URL=
+GMS_API_KEY=
+PUSHER_KEY=
+PUSHER_CLUSTER=
+EOF
+          fi
+
       - name: Install Dependencies
         run: flutter pub get
 
@@ -56,6 +69,19 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+
+      - name: Prepare .env
+        run: |
+          if [ -n "${{ secrets.ENV_FILE }}" ]; then
+            echo "${{ secrets.ENV_FILE }}" > .env
+          else
+            cat > .env << 'EOF'
+API_BASE_URL=
+GMS_API_KEY=
+PUSHER_KEY=
+PUSHER_CLUSTER=
+EOF
+          fi
 
       - name: Install Dependencies
         run: flutter pub get
