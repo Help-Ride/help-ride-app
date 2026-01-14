@@ -6,7 +6,7 @@ import 'package:help_ride/features/driver/controllers/driver_gate_controller.dar
 import 'package:help_ride/features/driver/controllers/driver_onboarding_controller.dart';
 import '../../core/theme/theme_controller.dart';
 import '../controllers/session_controller.dart';
-import '../../core/theme/app_colors.dart';
+import '../../core/constants/app_constants.dart';
 
 // pages
 import '../../features/home/views/home_view.dart';
@@ -21,6 +21,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int index = 0;
+  late final Worker _roleWorker;
 
   @override
   void initState() {
@@ -35,6 +36,18 @@ class _AppShellState extends State<AppShell> {
       () => DriverOnboardingController(),
       fenix: true,
     );
+
+    final theme = Get.find<ThemeController>();
+    _roleWorker = ever<AppRole>(theme.role, (_) {
+      if (!mounted) return;
+      setState(() => index = 0);
+    });
+  }
+
+  @override
+  void dispose() {
+    _roleWorker.dispose();
+    super.dispose();
   }
 
   @override
@@ -47,11 +60,10 @@ class _AppShellState extends State<AppShell> {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
 
-      final role = (session.user.value?.roleDefault ?? 'passenger')
-          .toString()
-          .toLowerCase();
-
-      final config = role == 'driver' ? _driverConfig() : _passengerConfig();
+      final uiRole = theme.role.value;
+      final config = uiRole == AppRole.driver
+          ? _driverConfig()
+          : _passengerConfig();
 
       if (index >= config.items.length) index = 0;
 
@@ -118,8 +130,6 @@ _NavConfig _driverConfig() {
     PassengerProfileView(),
   ];
 
-  // Keep same bottom nav labels if you want the exact Figma bar.
-  // Driver-specific tabs can come later.
   final items = const [
     _NavItemData(
       label: 'Home',
@@ -127,14 +137,14 @@ _NavConfig _driverConfig() {
       selectedIcon: Icons.home_rounded,
     ),
     _NavItemData(
-      label: 'My Rides',
-      icon: Icons.location_on_outlined,
-      selectedIcon: Icons.location_on,
+      label: 'Create',
+      icon: Icons.add_circle_outline,
+      selectedIcon: Icons.add_circle,
     ),
     _NavItemData(
-      label: 'Messages',
-      icon: Icons.chat_bubble_outline_rounded,
-      selectedIcon: Icons.chat_bubble_rounded,
+      label: 'Requests',
+      icon: Icons.list_alt_outlined,
+      selectedIcon: Icons.list_alt,
     ),
     _NavItemData(
       label: 'Profile',
