@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/theme_controller.dart';
+import '../../../core/constants/app_constants.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/auth_text_field.dart';
 
@@ -9,50 +11,55 @@ class LoginView extends GetView<AuthController> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Get.find<ThemeController>();
     final bg = AppColors.lightBg;
     final surface = AppColors.lightSurface;
-    final primary = AppColors.passengerPrimary;
 
-    return Scaffold(
-      backgroundColor: bg,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: surface,
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: const [
-                    BoxShadow(
-                      blurRadius: 30,
-                      offset: Offset(0, 18),
-                      color: Color(0x14000000),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Welcome",
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
+    return Obx(() {
+      final primary = theme.role.value == AppRole.driver
+          ? AppColors.driverPrimary
+          : AppColors.passengerPrimary;
+
+      return Scaffold(
+        backgroundColor: bg,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: surface,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: const [
+                      BoxShadow(
+                        blurRadius: 30,
+                        offset: Offset(0, 18),
+                        color: Color(0x14000000),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      "Sign in to continue",
-                      style: TextStyle(
-                        color: AppColors.lightMuted,
-                        fontSize: 14,
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Welcome",
+                        style: TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 22),
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Sign in to continue",
+                        style: TextStyle(
+                          color: AppColors.lightMuted,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 22),
 
                     AuthTextField(
                       label: 'Email Address',
@@ -207,22 +214,23 @@ class LoginView extends GetView<AuthController> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => Get.toNamed('/register'),
-                        child: Text(
-                          "Don’t have an account? Create one",
-                          style: TextStyle(color: primary),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => Get.toNamed('/register'),
+                          child: Text(
+                            "Don’t have an account? Create one",
+                            style: TextStyle(color: primary),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
