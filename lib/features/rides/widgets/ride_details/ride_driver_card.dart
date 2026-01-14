@@ -3,6 +3,10 @@ import 'package:get/get.dart';
 import 'package:help_ride/features/rides/models/ride.dart';
 import 'package:help_ride/features/rides/widgets/ride_formatters.dart';
 import 'package:help_ride/features/rides/widgets/ride_details/ride_ui.dart';
+import 'package:help_ride/features/chat/services/chat_api.dart';
+import 'package:help_ride/features/chat/views/chat_thread_view.dart';
+import 'package:help_ride/shared/controllers/session_controller.dart';
+import 'package:help_ride/shared/services/api_client.dart';
 import '../../../../../core/theme/app_colors.dart';
 
 class RideDriverCard extends StatelessWidget {
@@ -60,7 +64,36 @@ class RideDriverCard extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => Get.snackbar('Message', 'Later'),
+                        onPressed: () async {
+                          final session = Get.isRegistered<SessionController>()
+                              ? Get.find<SessionController>()
+                              : null;
+                          final userId = session?.user.value?.id ?? '';
+                          if (userId.isEmpty) {
+                            Get.snackbar('Message', 'Please sign in to chat.');
+                            return;
+                          }
+
+                          try {
+                            final client = await ApiClient.create();
+                            final api = ChatApi(client);
+                            final conversation =
+                                await api.createOrGetConversation(
+                              rideId: ride.id,
+                              passengerId: userId,
+                              currentUserId: userId,
+                              currentRole: session?.user.value?.roleDefault,
+                            );
+                            Get.to(
+                              () => ChatThreadView(conversation: conversation),
+                            );
+                          } catch (e) {
+                            Get.snackbar(
+                              'Message',
+                              'Unable to start chat right now.',
+                            );
+                          }
+                        },
                         icon: const Icon(Icons.chat_bubble_outline, size: 18),
                         label: const Text('Message'),
                       ),

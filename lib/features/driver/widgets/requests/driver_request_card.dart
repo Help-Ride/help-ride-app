@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/features/bookings/models/booking.dart';
 import 'package:help_ride/features/bookings/utils/booking_formatters.dart';
+import 'package:help_ride/features/chat/services/chat_api.dart';
+import 'package:help_ride/features/chat/views/chat_thread_view.dart';
+import 'package:help_ride/shared/controllers/session_controller.dart';
+import 'package:help_ride/shared/services/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'request_formatters.dart';
 
@@ -174,10 +178,51 @@ class DriverRequestCard extends StatelessWidget {
                 ? OutlinedButton.icon(
                     onPressed: busy
                         ? null
-                        : () => Get.snackbar(
-                              'Message',
-                              'Message passenger coming soon.',
-                            ),
+                        : () async {
+                            final passengerId = booking.passenger?.id ?? '';
+                            if (passengerId.isEmpty) {
+                              Get.snackbar(
+                                'Message',
+                                'Passenger details not available.',
+                              );
+                              return;
+                            }
+                            final session =
+                                Get.isRegistered<SessionController>()
+                                    ? Get.find<SessionController>()
+                                    : null;
+                            final currentUserId =
+                                session?.user.value?.id ?? '';
+                            if (currentUserId.isEmpty) {
+                              Get.snackbar(
+                                'Message',
+                                'Please sign in to chat.',
+                              );
+                              return;
+                            }
+                            try {
+                              final client = await ApiClient.create();
+                              final api = ChatApi(client);
+                              final conversation =
+                                  await api.createOrGetConversation(
+                                rideId: booking.ride.id,
+                                passengerId: passengerId,
+                                currentUserId: currentUserId,
+                                currentRole:
+                                    session?.user.value?.roleDefault,
+                              );
+                              Get.to(
+                                () => ChatThreadView(
+                                  conversation: conversation,
+                                ),
+                              );
+                            } catch (_) {
+                              Get.snackbar(
+                                'Message',
+                                'Unable to start chat right now.',
+                              );
+                            }
+                          },
                     icon: const Icon(Icons.chat_bubble_outline, size: 18),
                     label: const Text('Message Passenger'),
                     style: OutlinedButton.styleFrom(

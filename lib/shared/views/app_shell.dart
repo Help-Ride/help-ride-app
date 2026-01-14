@@ -13,6 +13,7 @@ import '../../features/auth/routes/auth_routes.dart';
 
 // pages
 import '../../features/home/views/home_view.dart';
+import '../../features/chat/views/messages_view.dart';
 import '../../features/profile/views/passenger_profile_view.dart';
 
 class AppShell extends StatefulWidget {
@@ -103,7 +104,7 @@ _NavConfig _passengerConfig() {
   final pages = const [
     HomeView(),
     MyRidesView(),
-    _Placeholder(title: 'Messages'),
+    MessagesView(),
     PassengerProfileView(),
   ];
 
@@ -137,7 +138,7 @@ _NavConfig _driverConfig() {
   final pages = const [
     HomeView(),
     DriverMyRidesView(),
-    _Placeholder(title: 'Requests'),
+    MessagesView(),
     PassengerProfileView(),
   ];
 
@@ -153,9 +154,9 @@ _NavConfig _driverConfig() {
       selectedIcon: Icons.add_circle,
     ),
     _NavItemData(
-      label: 'Requests',
-      icon: Icons.list_alt_outlined,
-      selectedIcon: Icons.list_alt,
+      label: 'Messages',
+      icon: Icons.chat_bubble_outline_rounded,
+      selectedIcon: Icons.chat_bubble_rounded,
     ),
     _NavItemData(
       label: 'Profile',
@@ -254,17 +255,5 @@ class _FigmaBottomNavBar extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-/* -------------------- PLACEHOLDER -------------------- */
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder({required this.title});
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(body: Center(child: Text('$title (coming soon)')));
   }
 }
