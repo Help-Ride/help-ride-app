@@ -2,6 +2,8 @@ class User {
   final String id;
   final String name;
   final String email;
+  final bool emailVerified;
+  final String? authProvider;
   final String roleDefault;
   final String? avatarUrl;
   final DriverProfile? driverProfile;
@@ -10,6 +12,8 @@ class User {
     required this.id,
     required this.name,
     required this.email,
+    required this.emailVerified,
+    this.authProvider,
     required this.roleDefault,
     this.avatarUrl,
     this.driverProfile,
@@ -23,6 +27,13 @@ class User {
       id: json['id'],
       name: json['name'],
       email: json['email'],
+      emailVerified: _parseBool(
+        json['emailVerified'] ??
+            json['isEmailVerified'] ??
+            json['email_verified'],
+      ),
+      authProvider:
+          (json['authProvider'] ?? json['provider'])?.toString().trim(),
       roleDefault: json['roleDefault'],
       avatarUrl: json['providerAvatarUrl'],
       driverProfile: json['driverProfile'] != null
@@ -30,6 +41,16 @@ class User {
           : null,
     );
   }
+}
+
+bool _parseBool(dynamic value) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final v = value.toLowerCase();
+    return v == 'true' || v == '1';
+  }
+  return false;
 }
 
 class DriverProfile {

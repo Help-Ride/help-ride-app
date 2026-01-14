@@ -9,6 +9,7 @@ import 'package:help_ride/features/driver/views/driver_my_rides_view.dart';
 import '../../core/theme/theme_controller.dart';
 import '../controllers/session_controller.dart';
 import '../../core/constants/app_constants.dart';
+import '../../features/auth/routes/auth_routes.dart';
 
 // pages
 import '../../features/home/views/home_view.dart';
@@ -62,6 +63,11 @@ class _AppShellState extends State<AppShell> {
 
     return Obx(() {
       if (session.status.value != SessionStatus.authenticated) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+
+      if (session.requiresEmailVerification) {
+        Future.microtask(() => Get.offAllNamed(AuthRoutes.verifyEmail));
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
 
@@ -183,7 +189,6 @@ class _FigmaBottomNavBar extends StatelessWidget {
     required this.isDark,
     required this.items,
   });
-
   final int index;
   final ValueChanged<int> onChanged;
   final bool isDark;
