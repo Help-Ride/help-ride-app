@@ -34,4 +34,41 @@ class BookingsApi {
         .map((m) => Booking.fromJson(m.cast<String, dynamic>()))
         .toList();
   }
+
+  Future<List<Booking>> driverBookings() async {
+    final res = await _client.get<dynamic>('/bookings/me/list');
+    final raw = res.data;
+    if (raw is! List) return [];
+
+    return raw
+        .whereType<Map>()
+        .map((m) => Booking.fromJson(m.cast<String, dynamic>()))
+        .toList();
+  }
+
+  Future<List<Booking>> bookingsForRide(String rideId) async {
+    final id = rideId.trim();
+    if (id.isEmpty) throw Exception('Missing rideId');
+
+    final res = await _client.get<dynamic>('/bookings/ride/$id');
+    final raw = res.data;
+    if (raw is! List) return [];
+
+    return raw
+        .whereType<Map>()
+        .map((m) => Booking.fromJson(m.cast<String, dynamic>()))
+        .toList();
+  }
+
+  Future<void> confirmBooking(String bookingId) async {
+    final id = bookingId.trim();
+    if (id.isEmpty) throw Exception('Missing bookingId');
+    await _client.put<void>('/bookings/$id/confirm');
+  }
+
+  Future<void> rejectBooking(String bookingId) async {
+    final id = bookingId.trim();
+    if (id.isEmpty) throw Exception('Missing bookingId');
+    await _client.put<void>('/bookings/$id/reject');
+  }
 }

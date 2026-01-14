@@ -1,57 +1,28 @@
 import 'package:get/get.dart';
 import 'package:help_ride/features/bookings/models/booking.dart';
 import 'package:help_ride/features/bookings/services/bookings_api.dart';
-import 'package:help_ride/features/rides/models/ride.dart';
-import 'package:help_ride/features/rides/services/rides_api.dart';
 import 'package:help_ride/shared/services/api_client.dart';
 
-enum DriverRideRequestsTab { all, newRequests, offered }
+enum DriverRequestsTab { all, newRequests, offered }
 
-class DriverRideDetailsController extends GetxController {
+class DriverRequestsController extends GetxController {
+  late final BookingsApi _api;
+
+  final tab = DriverRequestsTab.all.obs;
   final loading = false.obs;
   final error = RxnString();
-  final ride = Rxn<Ride>();
-
-  final requestsLoading = false.obs;
-  final requestsError = RxnString();
-  final requests = <Booking>[].obs;
-  final requestsTab = DriverRideRequestsTab.all.obs;
+  final bookings = <Booking>[].obs;
   final actionIds = <String>{}.obs;
-
-  late final RidesApi _ridesApi;
-  late final BookingsApi _bookingsApi;
-
-  String get rideId => Get.parameters['id'] ?? '';
 
   @override
   Future<void> onInit() async {
     super.onInit();
     final client = await ApiClient.create();
-    _ridesApi = RidesApi(client);
-    _bookingsApi = BookingsApi(client);
-
-    if (rideId.trim().isEmpty) {
-      error.value = 'Missing ride id.';
-      return;
-    }
-
+    _api = BookingsApi(client);
     await fetch();
-    await fetchRequests();
   }
 
-  Future<void> fetch() async {
-    loading.value = true;
-    error.value = null;
-    try {
-      ride.value = await _ridesApi.getRideById(rideId);
-    } catch (e) {
-      error.value = e.toString();
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  void setRequestsTab(DriverRideRequestsTab t) => requestsTab.value = t;
+  void setTab(DriverRequestsTab t) => tab.value = t;
 
   bool isActing(String id) => actionIds.contains(id);
 
@@ -70,28 +41,28 @@ class DriverRideDetailsController extends GetxController {
         s.contains('offer');
   }
 
-  List<Booking> get filteredRequests {
-    if (requestsTab.value == DriverRideRequestsTab.all) return requests;
-    if (requestsTab.value == DriverRideRequestsTab.newRequests) {
-      return requests.where(_isNew).toList();
+  List<Booking> get filtered {
+    if (tab.value == DriverRequestsTab.all) return bookings;
+    if (tab.value == DriverRequestsTab.newRequests) {
+      return bookings.where(_isNew).toList();
     }
-    return requests.where(_isOffered).toList();
+    return bookings.where(_isOffered).toList();
   }
 
-  int get newCount => requests.where(_isNew).length;
-  int get offeredCount => requests.where(_isOffered).length;
+  int get newCount => bookings.where(_isNew).length;
+  int get offeredCount => bookings.where(_isOffered).length;
 
-  Future<void> fetchRequests() async {
-    requestsLoading.value = true;
-    requestsError.value = null;
+  Future<void> fetch() async {
+    loading.value = true;
+    error.value = null;
     try {
-      final list = await _bookingsApi.bookingsForRide(rideId);
+      final list = await _api.driverBookings();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      requests.assignAll(list);
+      bookings.assignAll(list);
     } catch (e) {
-      requestsError.value = e.toString();
+      error.value = e.toString();
     } finally {
-      requestsLoading.value = false;
+      loading.value = false;
     }
   }
 
@@ -112,17 +83,17 @@ class DriverRideDetailsController extends GetxController {
   }
 
   void _updateStatus(String bookingId, String status) {
-    final idx = requests.indexWhere((b) => b.id == bookingId);
+    final idx = bookings.indexWhere((b) => b.id == bookingId);
     if (idx == -1) return;
-    requests[idx] = _withStatus(requests[idx], status);
+    bookings[idx] = _withStatus(bookings[idx], status);
   }
 
-  Future<void> confirmBooking(String bookingId) async {
+  Future<void> confirm(String bookingId) async {
     if (isActing(bookingId)) return;
     actionIds.add(bookingId);
     actionIds.refresh();
     try {
-      await _bookingsApi.confirmBooking(bookingId);
+      await _api.confirmBooking(bookingId);
       _updateStatus(bookingId, 'confirmed');
       Get.snackbar('Offer sent', 'Booking confirmed.');
     } catch (e) {
@@ -133,12 +104,12 @@ class DriverRideDetailsController extends GetxController {
     }
   }
 
-  Future<void> rejectBooking(String bookingId) async {
+  Future<void> reject(String bookingId) async {
     if (isActing(bookingId)) return;
     actionIds.add(bookingId);
     actionIds.refresh();
     try {
-      await _bookingsApi.rejectBooking(bookingId);
+      await _api.rejectBooking(bookingId);
       _updateStatus(bookingId, 'rejected');
       Get.snackbar('Declined', 'Booking rejected.');
     } catch (e) {

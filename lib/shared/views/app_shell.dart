@@ -131,7 +131,7 @@ _NavConfig _driverConfig() {
   final pages = const [
     HomeView(),
     DriverMyRidesView(),
-    _Placeholder(title: 'My Requests'),
+    _Placeholder(title: 'Requests'),
     PassengerProfileView(),
   ];
 

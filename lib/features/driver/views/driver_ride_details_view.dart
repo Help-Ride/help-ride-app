@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/features/driver/controllers/driver_ride_details_controller.dart';
 import 'package:help_ride/features/driver/widgets/my_rides/ride_formatters.dart';
+import 'package:help_ride/features/driver/widgets/requests/driver_request_card.dart';
+import 'package:help_ride/features/driver/widgets/requests/driver_ride_requests_tabs.dart';
 import 'package:help_ride/features/rides/models/ride.dart';
 import 'package:help_ride/features/rides/widgets/ride_details/ride_trip_details_card.dart';
 import 'package:help_ride/features/rides/widgets/ride_details/ride_ui.dart';
@@ -74,6 +76,82 @@ class DriverRideDetailsView extends GetView<DriverRideDetailsController> {
 
               const SectionTitle('Timing'),
               _DriverTimingCard(ride: ride),
+              const SizedBox(height: 18),
+
+              const SectionTitle('Booking Requests'),
+              Obx(() {
+                final count = controller.newCount;
+                return Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    count == 1 ? '1 new request' : '$count new requests',
+                    style: const TextStyle(color: AppColors.lightMuted),
+                  ),
+                );
+              }),
+              const SizedBox(height: 12),
+              Obx(
+                () => DriverRideRequestsTabs(
+                  active: controller.requestsTab.value,
+                  onChange: controller.setRequestsTab,
+                  newCount: controller.newCount,
+                  offeredCount: controller.offeredCount,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Obx(() {
+                if (controller.requestsLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final err = controller.requestsError.value;
+                if (err != null) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          err,
+                          style: const TextStyle(color: AppColors.error),
+                        ),
+                        const SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: controller.fetchRequests,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                final list = controller.filteredRequests;
+                if (list.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                      child: Text(
+                        'No booking requests yet.',
+                        style: TextStyle(color: AppColors.lightMuted),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: [
+                    for (int i = 0; i < list.length; i++) ...[
+                      DriverRequestCard(
+                        booking: list[i],
+                        busy: controller.isActing(list[i].id),
+                        onConfirm: () => controller.confirmBooking(list[i].id),
+                        onReject: () => controller.rejectBooking(list[i].id),
+                      ),
+                      if (i != list.length - 1) const SizedBox(height: 14),
+                    ],
+                  ],
+                );
+              }),
             ],
           );
         }),
