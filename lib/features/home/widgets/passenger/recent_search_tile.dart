@@ -34,7 +34,7 @@ class RecentSearchTile extends StatelessWidget {
                   children: [
                     Text(
                       "$from  →  $to",
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontWeight: FontWeight.w800,color: Colors.black),
                     ),
                     const SizedBox(height: 4),
                     Text(

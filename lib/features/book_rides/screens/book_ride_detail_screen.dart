@@ -7,7 +7,6 @@ import '../Models/ride_model.dart';
 import '../bottom_sheets/confirm_booking_bottomsheet.dart';
 import '../widgets/passenger/detail_card.dart';
 import '../widgets/passenger/trip_location.dart';
-import 'confirm_booking_screen.dart';
 
 class BookRideDetailScreen extends StatefulWidget {
   final Ride? ride;
@@ -356,7 +355,7 @@ class _BookRideDetailScreenState extends State<BookRideDetailScreen> {
                           location:
                               widget.ride!.pickupLocation ?? 'Downtown Toronto',
                           subtitle:
-                              widget.ride!.pickupSubtitle ?? 'Union Station',
+                              widget.ride!.destinationLocation ?? 'Union Station',
                         ),
                         Container(
                           margin: const EdgeInsets.only(left: 8),

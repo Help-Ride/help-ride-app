@@ -1,9 +1,14 @@
 // book_ride_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_instance/src/extension_instance.dart';
 import 'package:get/get_navigation/src/extension_navigation.dart';
+import 'package:get/get_state_manager/src/rx_flutter/rx_obx_widget.dart';
 
+import '../../home/Models/passenger_search_ride_model.dart';
+import '../Models/book_rides_data.dart';
 import '../Models/ride_model.dart';
+import '../controllers/book_rides_controller.dart';
 import '../widgets/passenger/ride_card.dart';
 import 'book_ride_detail_screen.dart';
 
@@ -12,67 +17,22 @@ import 'book_ride_detail_screen.dart';
 // import 'book_ride_details_screen.dart';
 
 class BookRidesScreen extends StatefulWidget {
-  const BookRidesScreen({Key? key}) : super(key: key);
+  final SearchParams? params;
+  final List<PassengerSearchRidesModel>? rides;
+
+  BookRidesScreen({Key? key, this.params, this.rides}) : super(key: key);
 
   @override
   State<BookRidesScreen> createState() => _BookRideScreenState();
 }
 
 class _BookRideScreenState extends State<BookRidesScreen> {
-  final List<Ride> rides = [
-    Ride(
-      driverName: 'Sarah Johnson',
-      driverInitials: 'SJ',
-      rating: 4.9,
-      totalRides: 127,
-      departureTime: 'Today, 2:30 PM',
-      duration: 45,
-      availableSeats: 2,
-      pricePerSeat: 25,
-      isVerified: true,
-      vehicleModel: 'Toyota Camry',
-      vehicleYear: 2022,
-      vehicleColor: 'Silver',
-      licensePlate: 'ABC 1234',
-      amenities: ['AC', 'Music', 'Pet-friendly'],
-      pickupInstructions: 'Will wait near the main entrance',
-      pickupLocation: 'Downtown Toronto',
-      pickupSubtitle: 'Union Station',
-      destinationLocation: 'Pearson Airport',
-      destinationSubtitle: 'Terminal 1',
-    ),
-    Ride(
-      driverName: 'Mike Chen',
-      driverInitials: 'MC',
-      rating: 4.8,
-      totalRides: 93,
-      departureTime: 'Today, 3:00 PM',
-      duration: 50,
-      availableSeats: 3,
-      pricePerSeat: 22,
-      isVerified: true,
-    ),
-    Ride(
-      driverName: 'Mike Chen',
-      driverInitials: 'MC',
-      rating: 4.8,
-      totalRides: 93,
-      departureTime: 'Today, 3:00 PM',
-      duration: 50,
-      availableSeats: 3,
-      pricePerSeat: 22,
-      isVerified: true,
-    ),
-  ];
-
-  final Map<int, int> selectedSeats = {};
+  final controller = Get.put(BookRidesController());
 
   @override
   void initState() {
     super.initState();
-    for (int i = 0; i < rides.length; i++) {
-      selectedSeats[i] = 1;
-    }
+    controller.setRides(widget.rides); // ✅ THIS IS CORRECT
   }
 
   @override
@@ -88,7 +48,7 @@ class _BookRideScreenState extends State<BookRidesScreen> {
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
               'Available Rides',
               style: TextStyle(
@@ -98,7 +58,7 @@ class _BookRideScreenState extends State<BookRidesScreen> {
               ),
             ),
             Text(
-              'Downtown Toronto → Pearson Airport',
+              '${widget.params?.fromCity} → ${widget.params?.toCity}',
               style: TextStyle(
                 color: Colors.grey,
                 fontSize: 14,
@@ -108,6 +68,84 @@ class _BookRideScreenState extends State<BookRidesScreen> {
           ],
         ),
       ),
+      // body: Column(
+      //   crossAxisAlignment: CrossAxisAlignment.start,
+      //   children: [
+      //     Container(
+      //       width: double.infinity,
+      //       color: Colors.white,
+      //       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      //       child: const Text(
+      //         '3 rides found • Sorted by departure time',
+      //         style: TextStyle(color: Colors.black87, fontSize: 14),
+      //       ),
+      //     ),
+      //     const SizedBox(height: 8),
+      //
+      //     Obx(() {
+      //       if (controller.availableRides.isEmpty) {
+      //         return const Center(
+      //           child: Text('No rides available'),
+      //         );
+      //       }
+      //
+      //       return ListView.builder(
+      //         padding: const EdgeInsets.symmetric(horizontal: 16),
+      //         itemCount: controller.availableRides.length,
+      //         itemBuilder: (context, index) {
+      //           final ride = controller.availableRides[index];
+      //
+      //           return RideCard(
+      //             ride: ride,
+      //             selectedSeats: controller.selectedSeats[index] ?? 1,
+      //             onSeatsChanged: (seats) {
+      //               controller.updateSeats(index, seats);
+      //             },
+      //             onDetailsPressed: () {
+      //               Get.to(BookRideDetailScreen(ride: ride));
+      //             },
+      //             onBookPressed: () {
+      //               Get.snackbar(
+      //                 'Booking',
+      //                 'Booking ${controller.selectedSeats[index]} seat(s)',
+      //               );
+      //             },
+      //           );
+      //         },
+      //       );
+      //     }),
+      //     // Expanded(
+      //     //   child: ListView.builder(
+      //     //     padding: const EdgeInsets.symmetric(horizontal: 16),
+      //     //     itemCount: rides.length,
+      //     //     itemBuilder: (context, index) {
+      //     //       return RideCard(
+      //     //         ride: rides[index],
+      //     //         selectedSeats: selectedSeats[index]!,
+      //     //         onSeatsChanged: (seats) {
+      //     //           setState(() {
+      //     //             selectedSeats[index] = seats;
+      //     //           });
+      //     //         },
+      //     //         onDetailsPressed: () {
+      //     //           Get.to(BookRideDetailScreen(ride: rides[index]));
+      //     //         },
+      //     //         onBookPressed: () {
+      //     //           // Handle booking
+      //     //           ScaffoldMessenger.of(context).showSnackBar(
+      //     //             SnackBar(
+      //     //               content: Text(
+      //     //                 'Booking ${selectedSeats[index]} seat(s)',
+      //     //               ),
+      //     //             ),
+      //     //           );
+      //     //         },
+      //     //       );
+      //     //     },
+      //     //   ),
+      //     // ),
+      //   ],
+      // ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -115,41 +153,47 @@ class _BookRideScreenState extends State<BookRidesScreen> {
             width: double.infinity,
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            child: const Text(
-              '3 rides found • Sorted by departure time',
+            child: Text(
+              '${controller.availableRides.length} rides found • Sorted by departure time',
               style: TextStyle(color: Colors.black87, fontSize: 14),
             ),
           ),
           const SizedBox(height: 8),
+
+          // ✅ FIX IS HERE
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: rides.length,
-              itemBuilder: (context, index) {
-                return RideCard(
-                  ride: rides[index],
-                  selectedSeats: selectedSeats[index]!,
-                  onSeatsChanged: (seats) {
-                    setState(() {
-                      selectedSeats[index] = seats;
-                    });
-                  },
-                  onDetailsPressed: () {
-                    Get.to(BookRideDetailScreen(ride: rides[index]));
-                  },
-                  onBookPressed: () {
-                    // Handle booking
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Booking ${selectedSeats[index]} seat(s)',
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+            child: Obx(() {
+              if (controller.availableRides.isEmpty) {
+                return const Center(child: Text('No rides available'));
+              }
+
+              print("rides length ${controller.availableRides.length}");
+
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: controller.availableRides.length,
+                itemBuilder: (context, index) {
+                  final ride = controller.availableRides[index];
+
+                  return RideCard(
+                    ride: ride,
+                    selectedSeats: controller.selectedSeats[index] ?? 1,
+                    onSeatsChanged: (seats) {
+                      controller.updateSeats(index, seats);
+                    },
+                    onDetailsPressed: () {
+                      Get.to(BookRideDetailScreen(ride: ride));
+                    },
+                    onBookPressed: () {
+                      Get.snackbar(
+                        'Booking',
+                        'Booking ${controller.selectedSeats[index]} seat(s)',
+                      );
+                    },
+                  );
+                },
+              );
+            }),
           ),
         ],
       ),
