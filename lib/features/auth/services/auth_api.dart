@@ -1,5 +1,3 @@
-import 'package:flutter/cupertino.dart';
-
 import '../../../shared/services/api_client.dart';
 
 class AuthApi {
@@ -16,9 +14,6 @@ class AuthApi {
       data: {'email': email, 'password': password},
       skipAuthLogout: true,
     );
-
-    debugPrint('Login API status: ${res.statusCode}');
-    debugPrint('Login API response: ${res.data}');
 
     final data = res.data ?? {};
     final tokens = data['tokens'] as Map<String, dynamic>?;

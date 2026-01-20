@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
-import '../../features/profile/Models/user.dart';
-import '../models/user.dart';
+import 'package:help_ride/shared/models/user.dart';
 import '../services/token_storage.dart';
 import '../../features/auth/services/auth_api.dart';
 import '../services/api_client.dart';
@@ -8,19 +7,15 @@ import '../services/api_client.dart';
 enum SessionStatus { unknown, authenticated, unauthenticated }
 
 class SessionController extends GetxController {
-  final Rx<SessionStatus> status = SessionStatus.unknown.obs;
-  final Rxn<EditUser> user = Rxn<EditUser>();
+  final status = SessionStatus.unknown.obs;
+  final user = Rxn<User>();
 
   late final TokenStorage _tokenStorage;
   late final AuthApi _authApi;
 
   @override
-  void onInit() {
+  Future<void> onInit() async {
     super.onInit();
-    _init();
-  }
-
-  Future<void> _init() async {
     _tokenStorage = TokenStorage();
 
     final client = await ApiClient.create();
@@ -29,72 +24,36 @@ class SessionController extends GetxController {
     await bootstrap();
   }
 
-  // ---------------- BOOTSTRAP ----------------
-
   Future<void> bootstrap() async {
     status.value = SessionStatus.unknown;
 
     final token = await _tokenStorage.getAccessToken();
     if (token == null || token.isEmpty) {
-      _unauthenticated();
+      user.value = null;
+      status.value = SessionStatus.unauthenticated;
       return;
     }
 
     try {
-      final meJson = await _authApi.me();
-      user.value = EditUser.fromJson(meJson);
+      final meJson = await _authApi.me(); // Map<String, dynamic>
+      user.value = User.fromJson(meJson); // ✅ parse
       status.value = SessionStatus.authenticated;
-    } catch (e) {
+    } catch (_) {
       await _tokenStorage.clear();
-      _unauthenticated();
+      user.value = null;
+      status.value = SessionStatus.unauthenticated;
     }
   }
 
-  // ---------------- UPDATE USER ----------------
-
-  void updateUser({
-    String? name,
-    String? email,
-    String? phone,
-    String? avatarUrl,
-  }) {
-    final currentUser = user.value;
-    if (currentUser == null) return;
-
-    user.value = currentUser.copyWith(
-      name: name,
-      email: email,
-      phone: phone,
-      avatarUrl: avatarUrl,
-    );
-  }
-
-  // ---------------- LOGOUT ----------------
-
   Future<void> logout() async {
     await _tokenStorage.clear();
-    _unauthenticated();
-  }
-
-  void _unauthenticated() {
     user.value = null;
     status.value = SessionStatus.unauthenticated;
   }
 
-  // ---------------- GETTERS ----------------
-
-  bool get isAuthenticated =>
-      status.value == SessionStatus.authenticated;
-
+  // Handy getters
   bool get isDriver => user.value?.driverProfile != null;
-
   String get roleDefault => user.value?.roleDefault ?? 'passenger';
-
   String get name => user.value?.name ?? '—';
-
   String get email => user.value?.email ?? '—';
-
-  String get phone => user.value?.name ?? '—';
-
-  String? get avatarUrl => user.value?.avatarUrl;
 }

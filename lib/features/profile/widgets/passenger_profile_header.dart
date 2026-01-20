@@ -1,8 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import '../../../core/routes/app_routes.dart';
-import '../controllers/passenger_profile_controller.dart';
-import '../views/passenger_edit_profile.dart';
 import 'passenger_profile_avatar.dart';
 
 class PassengerProfileHeader extends StatelessWidget {
@@ -23,16 +19,6 @@ class PassengerProfileHeader extends StatelessWidget {
   final bool isVerified;
   final String? avatarUrl;
 
-  Future<void> _openEditProfile() async {
-    Get.bottomSheet(
-      const EditProfileView(),
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      enableDrag: true,
-    );
-  }
-
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -51,13 +37,10 @@ class PassengerProfileHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: _openEditProfile,
-            child: PassengerProfileAvatar(
-              initials: initials,
-              avatarUrl: avatarUrl,
-              size: 56,
-            ),
+          PassengerProfileAvatar(
+            initials: initials,
+            avatarUrl: avatarUrl,
+            size: 56,
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -70,6 +53,7 @@ class PassengerProfileHeader extends StatelessWidget {
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF1A1A1A),
+                    height: 1.3,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -77,7 +61,9 @@ class PassengerProfileHeader extends StatelessWidget {
                   email,
                   style: const TextStyle(
                     fontSize: 13,
+                    fontWeight: FontWeight.w400,
                     color: Color(0xFF666666),
+                    height: 1.3,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -93,33 +79,40 @@ class PassengerProfileHeader extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        role.capitalizeFirst ?? role,
+                        role.capitalize(),
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF10B981),
+                          height: 1.2,
                         ),
                       ),
                     ),
                     if (isVerified) ...[
                       const SizedBox(width: 12),
                       Row(
-                        children: const [
-                          CircleAvatar(
-                            radius: 8,
-                            backgroundColor: Color(0xFF10B981),
-                            child: Icon(
+                        children: [
+                          Container(
+                            width: 16,
+                            height: 16,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFF10B981),
+                            ),
+                            child: const Icon(
                               Icons.check,
                               size: 10,
                               color: Colors.white,
                             ),
                           ),
-                          SizedBox(width: 4),
-                          Text(
+                          const SizedBox(width: 4),
+                          const Text(
                             'Verified',
                             style: TextStyle(
                               fontSize: 11,
+                              fontWeight: FontWeight.w500,
                               color: Color(0xFF666666),
+                              height: 1.2,
                             ),
                           ),
                         ],
@@ -136,7 +129,7 @@ class PassengerProfileHeader extends StatelessWidget {
   }
 }
 
-extension StringCapitalizeExtension on String {
+extension StringExtension on String {
   String capitalize() {
     if (isEmpty) return this;
     return '${this[0].toUpperCase()}${substring(1).toLowerCase()}';

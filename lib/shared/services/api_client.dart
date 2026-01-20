@@ -108,18 +108,6 @@ class ApiClient {
     );
   }
 
-  Future<Response<T>> put<T>(
-      String path, {
-        Object? data,
-        bool skipAuthLogout = false,
-      }) {
-    return _dio.put<T>(
-      path,
-      data: data,
-      options: Options(extra: {_skipAuthLogoutKey: skipAuthLogout}),
-    );
-  }
-
   Future<Response<T>> patch<T>(
     String path, {
     Object? data,

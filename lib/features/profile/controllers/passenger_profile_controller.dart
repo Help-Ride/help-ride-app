@@ -1,92 +1,100 @@
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
 import '../../../shared/controllers/session_controller.dart';
 import '../../../core/routes/app_routes.dart';
-import '../Models/passenger_edit_profile_model.dart';
-import '../Models/passenger_edit_profile_request.dart';
-import '../Services/passenger_edit_profile_service.dart';
 
 class PassengerProfileController extends GetxController {
-  final SessionController _sessionController;
-  final PassengerProfileApi _passengerProfileApi;
+  final SessionController _sessionController = Get.find<SessionController>();
 
-  PassengerProfileController(
-      this._sessionController,
-      this._passengerProfileApi,
-      );
+  // User info getters
+  String get userName {
+    final user = _sessionController.user.value;
+    if (user == null) return 'Passenger';
+    return user.name.isNotEmpty ? user.name : 'Passenger';
+  }
 
-  final RxString _phoneNumber = ''.obs;
-  final RxBool isUpdating = false.obs;
+  String get userEmail {
+    final user = _sessionController.user.value;
+    return user?.email ?? '—';
+  }
 
-  /* ───────────────── USER GETTERS ───────────────── */
+  String get userRole {
+    final user = _sessionController.user.value;
+    if (user == null) return 'passenger';
+    return user.driverProfile != null ? 'driver' : user.roleDefault;
+  }
 
-  String get userId => _sessionController.user.value?.id ?? '';
+  String? get avatarUrl {
+    final user = _sessionController.user.value;
+    return user?.avatarUrl;
+  }
 
-  String get userName =>
-      _sessionController.user.value?.name.isNotEmpty == true
-          ? _sessionController.user.value!.name
-          : 'Passenger';
+  String get userId {
+    final user = _sessionController.user.value;
+    return user?.id ?? '—';
+  }
 
-  String get userEmail => _sessionController.user.value?.email ?? '—';
-
-  String get userPhone => _phoneNumber.value;
-
-  String? get avatarUrl => _sessionController.user.value?.avatarUrl;
-
-  String get userRole =>
-      _sessionController.user.value?.roleDefault ?? 'passenger';
-
-  bool get isVerified => true;
+  bool get isVerified {
+    // You can add verification logic here
+    return true;
+  }
 
   SessionStatus get sessionStatus => _sessionController.status.value;
 
+  // Get user initials for avatar
   String get userInitials {
-    final name = userName.trim();
-    if (name.isEmpty) return 'P';
+    final name = userName;
+    if (name.isEmpty || name == 'Passenger') return 'P';
 
     final parts = name.split(' ');
-    return parts.length >= 2
-        ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
-        : name[0].toUpperCase();
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name[0].toUpperCase();
   }
 
-  @override
-  void onInit() {
-    super.onInit();
-    _phoneNumber.value = _sessionController.user.value?.phone ?? '';
-  }
-
-  /* ───────────────── ACTIONS ───────────────── */
-
+  // Actions
   Future<void> logout() async {
     await _sessionController.logout();
     Get.offAllNamed(AppRoutes.login);
   }
 
-  /* ───────────────── NAVIGATION HELPERS ───────────────── */
+  void navigateToPersonalInfo() {
+    // Add navigation logic
+    Get.snackbar('Navigation', 'Personal Information');
+  }
 
-  void navigateToPersonalInfo() =>
-      Get.snackbar('Navigation', 'Personal Info');
+  void navigateToEmailPassword() {
+    // Add navigation logic
+    Get.snackbar('Navigation', 'Email & Password');
+  }
 
-  void navigateToEmailPassword() =>
-      Get.snackbar('Navigation', 'Email & Password');
+  void navigateToPhoneNumber() {
+    // Add navigation logic
+    Get.snackbar('Navigation', 'Phone Number');
+  }
 
-  void navigateToPhoneNumber() =>
-      Get.snackbar('Navigation', 'Phone Number');
+  void navigateToVerification() {
+    // Add navigation logic
+    Get.snackbar('Navigation', 'Verification');
+  }
 
-  void navigateToVerification() =>
-      Get.snackbar('Navigation', 'Verification');
+  void navigateToSettings() {
+    // Add navigation logic
+    Get.snackbar('Navigation', 'Settings');
+  }
 
-  void navigateToSettings() =>
-      Get.snackbar('Navigation', 'Settings');
+  void navigateToNotifications() {
+    // Add navigation logic
+    Get.snackbar('Navigation', 'Notifications');
+  }
 
-  void navigateToNotifications() =>
-      Get.snackbar('Navigation', 'Notifications');
+  void navigateToHelpCenter() {
+    // Add navigation logic
+    Get.snackbar('Navigation', 'Help Center');
+  }
 
-  void navigateToHelpCenter() =>
-      Get.snackbar('Navigation', 'Help Center');
-
-  void navigateToTermsPrivacy() =>
-      Get.snackbar('Navigation', 'Terms & Privacy');
+  void navigateToTermsPrivacy() {
+    // Add navigation logic
+    Get.snackbar('Navigation', 'Terms & Privacy');
+  }
 }
