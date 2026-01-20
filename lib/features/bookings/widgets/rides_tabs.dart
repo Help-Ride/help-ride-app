@@ -38,6 +38,14 @@ class RidesTabs extends StatelessWidget {
               isDark: isDark,
             ),
           ),
+          Expanded(
+            child: _TabPill(
+              text: 'Requests',
+              active: active == MyRidesTab.requests,
+              onTap: () => onChange(MyRidesTab.requests),
+              isDark: isDark,
+            ),
+          ),
         ],
       ),
     );

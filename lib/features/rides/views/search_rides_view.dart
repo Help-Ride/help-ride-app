@@ -70,10 +70,113 @@ class SearchRidesView extends GetView<SearchRidesController> {
                 if (rides.isEmpty) {
                   return Expanded(
                     child: Center(
-                      child: Text(
-                        'No rides found.',
-                        style: TextStyle(
-                          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      child: Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                        decoration: BoxDecoration(
+                          color:
+                              isDark ? const Color(0xFF1C2331) : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF232836)
+                                : const Color(0xFFE6EAF2),
+                          ),
+                          boxShadow: isDark
+                              ? []
+                              : const [
+                                  BoxShadow(
+                                    blurRadius: 18,
+                                    offset: Offset(0, 10),
+                                    color: Color(0x0A000000),
+                                  ),
+                                ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: AppColors.passengerPrimary
+                                    .withOpacity(isDark ? 0.25 : 0.12),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(
+                                Icons.add_road,
+                                color: AppColors.passengerPrimary,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              'No rides found',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                                color: isDark
+                                    ? AppColors.darkText
+                                    : AppColors.lightText,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Request a ride for this route and get matched fast.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: isDark
+                                    ? AppColors.darkMuted
+                                    : AppColors.lightMuted,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton(
+                                onPressed: () => Get.toNamed(
+                                  '/ride-requests/create',
+                                  arguments: {
+                                    'fromCity': controller.fromCity.value,
+                                    'toCity': controller.toCity.value,
+                                    'seats': controller.seatsRequired.value,
+                                    if (controller.fromLat.value != null)
+                                      'fromLat': controller.fromLat.value,
+                                    if (controller.fromLng.value != null)
+                                      'fromLng': controller.fromLng.value,
+                                    if (controller.toLat.value != null)
+                                      'toLat': controller.toLat.value,
+                                    if (controller.toLng.value != null)
+                                      'toLng': controller.toLng.value,
+                                  },
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.passengerPrimary,
+                                  foregroundColor: Colors.white,
+                                  shape: const StadiumBorder(),
+                                  elevation: 0,
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 18),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.add_road, size: 18),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Request Ride',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

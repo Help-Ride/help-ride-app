@@ -31,6 +31,26 @@ class _PassengerHomeState extends State<PassengerHome> {
       final children = <Widget>[
         const WhereToCard(),
         const SizedBox(height: 18),
+        SizedBox(
+          height: 46,
+          child: ElevatedButton.icon(
+            onPressed: () => Get.toNamed('/ride-requests/create'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.passengerPrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 0,
+            ),
+            icon: const Icon(Icons.add_road, size: 18),
+            label: const Text(
+              'Request Ride',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
       ];
 
       if (items.isNotEmpty) {
