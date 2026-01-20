@@ -70,10 +70,7 @@ class DriverRequestCard extends StatelessWidget {
             children: [
               _StatusPill(status: booking.status),
               const Spacer(),
-              Text(
-                timeAgo(created),
-                style: TextStyle(color: muted),
-              ),
+              Text(timeAgo(created), style: TextStyle(color: muted)),
             ],
           ),
           const SizedBox(height: 12),
@@ -161,13 +158,12 @@ class DriverRequestCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
+                color: isDark
+                    ? const Color(0xFF1C2331)
+                    : const Color(0xFFF3F5F8),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
-                note,
-                style: TextStyle(color: textPrimary),
-              ),
+              child: Text(note, style: TextStyle(color: textPrimary)),
             ),
           ],
           if (!_isRejected) ...[
@@ -187,10 +183,9 @@ class DriverRequestCard extends StatelessWidget {
                             }
                             final session =
                                 Get.isRegistered<SessionController>()
-                                    ? Get.find<SessionController>()
-                                    : null;
-                            final currentUserId =
-                                session?.user.value?.id ?? '';
+                                ? Get.find<SessionController>()
+                                : null;
+                            final currentUserId = session?.user.value?.id ?? '';
                             if (currentUserId.isEmpty) {
                               Get.snackbar(
                                 'Message',
@@ -201,18 +196,17 @@ class DriverRequestCard extends StatelessWidget {
                             try {
                               final client = await ApiClient.create();
                               final api = ChatApi(client);
-                              final conversation =
-                                  await api.createOrGetConversation(
-                                rideId: booking.ride.id,
-                                passengerId: passengerId,
-                                currentUserId: currentUserId,
-                                currentRole:
-                                    session?.user.value?.roleDefault,
-                              );
+                              final conversation = await api
+                                  .createOrGetConversation(
+                                    rideId: booking.ride.id,
+                                    passengerId: passengerId,
+                                    currentUserId: currentUserId,
+                                    currentRole:
+                                        session?.user.value?.roleDefault,
+                                  );
                               Get.to(
-                                () => ChatThreadView(
-                                  conversation: conversation,
-                                ),
+                                () =>
+                                    ChatThreadView(conversation: conversation),
                               );
                             } catch (_) {
                               Get.snackbar(
@@ -295,25 +289,13 @@ class _StatusPill extends StatelessWidget {
     if (status.contains('pending') ||
         status.contains('new') ||
         status.contains('request')) {
-      return (
-        const Color(0xFFE8F0FF),
-        const Color(0xFF2F6BFF),
-        'New Request'
-      );
+      return (const Color(0xFFE8F0FF), const Color(0xFF2F6BFF), 'New Request');
     }
     if (status.contains('confirm') || status.contains('offer')) {
-      return (
-        const Color(0xFFE7F8EF),
-        const Color(0xFF179C5E),
-        'Offer Sent'
-      );
+      return (const Color(0xFFE7F8EF), const Color(0xFF179C5E), 'Offer Sent');
     }
     if (status.contains('reject') || status.contains('cancel')) {
-      return (
-        const Color(0xFFFFE2E2),
-        const Color(0xFFD64545),
-        'Declined'
-      );
+      return (const Color(0xFFFFE2E2), const Color(0xFFD64545), 'Declined');
     }
     return (const Color(0xFFEFF2F6), const Color(0xFF6B7280), s);
   }
