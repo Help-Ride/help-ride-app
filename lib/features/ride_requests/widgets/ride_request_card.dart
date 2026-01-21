@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import '../../bookings/utils/booking_formatters.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/services/api_client.dart';
 import '../models/ride_request.dart';
+import '../models/ride_request_offer.dart';
+import '../services/ride_requests_api.dart';
 
 class RideRequestCard extends StatelessWidget {
   const RideRequestCard({
@@ -125,7 +129,22 @@ class RideRequestCard extends StatelessWidget {
             ],
           ),
           if (!_isCanceled) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: () => _openOffersSheet(context, request),
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                icon: const Icon(Icons.local_offer_outlined, size: 18),
+                label: const Text('View Offers'),
+              ),
+            ),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
@@ -163,6 +182,243 @@ class RideRequestCard extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _openOffersSheet(BuildContext context, RideRequest request) async {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  var loading = true;
+  String? error;
+  List<RideRequestOffer> offers = [];
+
+  Future<void> loadOffers(StateSetter setState) async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final client = await ApiClient.create();
+      final api = RideRequestsApi(client);
+      final list = await api.listOffers(request.id);
+      setState(() {
+        offers = list;
+      });
+    } catch (e) {
+      setState(() => error = e.toString());
+    } finally {
+      setState(() => loading = false);
+    }
+  }
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          if (loading && offers.isEmpty && error == null) {
+            Future.microtask(() => loadOffers(setState));
+          }
+
+          return Container(
+            padding: EdgeInsets.fromLTRB(
+              18,
+              18,
+              18,
+              18 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF121826) : Colors.white,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Offers',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    color: isDark ? AppColors.darkText : AppColors.lightText,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${request.fromCity} → ${request.toCity}',
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (loading)
+                  const Center(child: CircularProgressIndicator())
+                else if (error != null)
+                  Column(
+                    children: [
+                      Text(
+                        error!,
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: () => loadOffers(setState),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  )
+                else if (offers.isEmpty)
+                  Text(
+                    'No offers yet.',
+                    style: TextStyle(
+                      color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                    ),
+                  )
+                else
+                  Column(
+                    children: offers
+                        .map((o) => _OfferTile(
+                              offer: o,
+                              onAccept: () =>
+                                  _handleOfferAction(context, request, o, true, setState, loadOffers),
+                              onReject: () =>
+                                  _handleOfferAction(context, request, o, false, setState, loadOffers),
+                            ))
+                        .toList(),
+                  ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+Future<void> _handleOfferAction(
+  BuildContext context,
+  RideRequest request,
+  RideRequestOffer offer,
+  bool accept,
+  StateSetter setState,
+  Future<void> Function(StateSetter) reload,
+) async {
+  final client = await ApiClient.create();
+  final api = RideRequestsApi(client);
+  try {
+    if (accept) {
+      await api.acceptOffer(rideRequestId: request.id, offerId: offer.id);
+      Get.snackbar('Accepted', 'Offer accepted.');
+    } else {
+      await api.rejectOffer(rideRequestId: request.id, offerId: offer.id);
+      Get.snackbar('Rejected', 'Offer rejected.');
+    }
+    await reload(setState);
+  } catch (e) {
+    Get.snackbar('Failed', e.toString());
+  }
+}
+
+class _OfferTile extends StatelessWidget {
+  const _OfferTile({
+    required this.offer,
+    required this.onAccept,
+    required this.onReject,
+  });
+
+  final RideRequestOffer offer;
+  final VoidCallback onAccept;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
+    final ride = offer.ride;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _prettyStatus(offer.status),
+            style: TextStyle(
+              color: muted,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 6),
+          if (ride != null)
+            Text(
+              '${ride.fromCity} → ${ride.toCity}',
+              style: TextStyle(
+                color: textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          if (ride != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${formatDateTime(ride.startTime)} • \$${ride.pricePerSeat.toStringAsFixed(0)}/seat',
+              style: TextStyle(color: muted),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onReject,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Reject'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onAccept,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    backgroundColor: AppColors.passengerPrimary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                  ),
+                  child: const Text('Accept'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _prettyStatus(String raw) {
+  final v = raw.trim().toLowerCase();
+  if (v.contains('accepted') || v.contains('confirm')) return 'Accepted';
+  if (v.contains('rejected')) return 'Rejected';
+  if (v.contains('cancel')) return 'Cancelled';
+  return 'Pending';
 }
 
 class _StatusPill extends StatelessWidget {

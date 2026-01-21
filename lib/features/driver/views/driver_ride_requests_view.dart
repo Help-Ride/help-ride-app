@@ -1,0 +1,513 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../bookings/utils/booking_formatters.dart';
+import '../../ride_requests/models/ride_request.dart';
+import '../controllers/driver_ride_requests_controller.dart';
+import '../widgets/requests/driver_ride_request_card.dart';
+import '../widgets/requests/driver_offer_card.dart';
+import '../../../shared/widgets/place_picker_field.dart';
+
+class DriverRideRequestsView extends GetView<DriverRideRequestsController> {
+  const DriverRideRequestsView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
+        foregroundColor: isDark ? AppColors.darkText : AppColors.lightText,
+        title: const Text(
+          'Ride Requests',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+          child: Column(
+            children: [
+              Obx(
+                () => _Tabs(
+                  active: controller.tab.value,
+                  onChange: controller.setTab,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: Obx(() {
+                  return controller.tab.value == DriverRideRequestsTab.requests
+                      ? _RequestsTab(controller: controller)
+                      : _OffersTab(controller: controller);
+                }),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Tabs extends StatelessWidget {
+  const _Tabs({required this.active, required this.onChange});
+  final DriverRideRequestsTab active;
+  final ValueChanged<DriverRideRequestsTab> onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C2331) : const Color(0xFFEFF2F6),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF232836) : const Color(0xFFE3E8F2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _TabPill(
+              text: 'Requests',
+              active: active == DriverRideRequestsTab.requests,
+              onTap: () => onChange(DriverRideRequestsTab.requests),
+              isDark: isDark,
+            ),
+          ),
+          Expanded(
+            child: _TabPill(
+              text: 'My Offers',
+              active: active == DriverRideRequestsTab.offers,
+              onTap: () => onChange(DriverRideRequestsTab.offers),
+              isDark: isDark,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabPill extends StatelessWidget {
+  const _TabPill({
+    required this.text,
+    required this.active,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  final String text;
+  final bool active;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: active
+              ? (isDark ? const Color(0xFF111827) : Colors.white)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                    color: isDark
+                        ? Colors.black.withOpacity(0.4)
+                        : const Color(0x12000000),
+                  ),
+                ]
+              : const [],
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: active
+                ? (isDark ? AppColors.darkText : AppColors.lightText)
+                : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RequestsTab extends StatelessWidget {
+  const _RequestsTab({required this.controller});
+  final DriverRideRequestsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      children: [
+        PlacePickerField(
+          label: 'From City',
+          hintText: 'e.g. Waterloo',
+          icon: Icons.place_outlined,
+          controller: controller.fromCtrl,
+          onPicked: (p) => controller.fromPick.value = p,
+        ),
+        const SizedBox(height: 12),
+        PlacePickerField(
+          label: 'To City',
+          hintText: 'e.g. Toronto',
+          icon: Icons.place,
+          controller: controller.toCtrl,
+          onPicked: (p) => controller.toPick.value = p,
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 46,
+          child: ElevatedButton(
+            onPressed: controller.searchRequests,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.driverPrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              'Search Requests',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Expanded(
+          child: Obx(() {
+            if (controller.requestsLoading.value) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final err = controller.requestsError.value;
+            if (err != null) {
+              return Center(
+                child: Text(
+                  err,
+                  style: const TextStyle(color: AppColors.error),
+                ),
+              );
+            }
+
+            final list = controller.requests;
+            if (list.isEmpty) {
+              return Center(
+                child: Text(
+                  'No ride requests yet.',
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
+                ),
+              );
+            }
+
+            return ListView.separated(
+              padding: const EdgeInsets.only(bottom: 18),
+              itemCount: list.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 14),
+              itemBuilder: (_, i) {
+                final r = list[i];
+                return DriverRideRequestCard(
+                  request: r,
+                  onOffer: () => _openOfferSheet(context, controller, r),
+                );
+              },
+            );
+          }),
+        ),
+      ],
+    );
+  }
+}
+
+class _OffersTab extends StatelessWidget {
+  const _OffersTab({required this.controller});
+  final DriverRideRequestsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Obx(() {
+      if (controller.offersLoading.value) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      final err = controller.offersError.value;
+      if (err != null) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(err, style: const TextStyle(color: AppColors.error)),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: controller.fetchOffers,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        );
+      }
+
+      final list = controller.offers;
+      if (list.isEmpty) {
+        return Center(
+          child: Text(
+            'No offers yet.',
+            style: TextStyle(
+              color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+            ),
+          ),
+        );
+      }
+
+      return ListView.separated(
+        padding: const EdgeInsets.only(bottom: 18),
+        itemCount: list.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 14),
+        itemBuilder: (_, i) {
+          final o = list[i];
+          final canceling = controller.cancelingOfferIds.contains(o.id);
+          return DriverOfferCard(
+            offer: o,
+            canceling: canceling,
+            onCancel: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text('Cancel offer?'),
+                  content: const Text('This offer will be withdrawn.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Get.back(result: false),
+                      child: const Text('Keep'),
+                    ),
+                    TextButton(
+                      onPressed: () => Get.back(result: true),
+                      child: const Text('Cancel Offer'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await controller.cancelOffer(
+                  rideRequestId: o.rideRequestId,
+                  offerId: o.id,
+                );
+              }
+            },
+          );
+        },
+      );
+    });
+  }
+}
+
+Future<void> _openOfferSheet(
+  BuildContext context,
+  DriverRideRequestsController controller,
+  RideRequest request,
+) async {
+  await controller.loadDriverRides();
+  if (!context.mounted) return;
+  if (controller.driverRides.isEmpty) {
+    Get.snackbar('No rides', 'Create a ride before making offers.');
+    return;
+  }
+
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final rides = controller.driverRides;
+  String selectedRideId = rides.first.id;
+  int seatsOffered = 1;
+  String? error;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          final ride =
+              rides.firstWhere((r) => r.id == selectedRideId, orElse: () => rides.first);
+          final maxSeats = ride.seatsAvailable <= 0 ? 1 : ride.seatsAvailable;
+          if (seatsOffered > maxSeats) {
+            seatsOffered = maxSeats;
+          }
+
+          return Container(
+            padding: EdgeInsets.fromLTRB(
+              18,
+              18,
+              18,
+              18 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF121826) : Colors.white,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Create Offer',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    color: isDark ? AppColors.darkText : AppColors.lightText,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${request.fromCity} → ${request.toCity}',
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Select Ride',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.darkText : AppColors.lightText,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                InputDecorator(
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: isDark
+                        ? const Color(0xFF1C2331)
+                        : const Color(0xFFF3F5F8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: selectedRideId,
+                      isExpanded: true,
+                      items: rides.map((r) {
+                        return DropdownMenuItem(
+                          value: r.id,
+                          child: Text(
+                            '${r.from} → ${r.to} (${formatDateTime(r.startTime)})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setState(() => selectedRideId = v);
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Seats Offered (max $maxSeats)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.darkText : AppColors.lightText,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: seatsOffered <= 1
+                          ? null
+                          : () => setState(() => seatsOffered -= 1),
+                      icon: const Icon(Icons.remove_circle_outline),
+                    ),
+                    Text(
+                      seatsOffered.toString(),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color:
+                            isDark ? AppColors.darkText : AppColors.lightText,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: seatsOffered >= maxSeats
+                          ? null
+                          : () => setState(() => seatsOffered += 1),
+                      icon: const Icon(Icons.add_circle_outline),
+                    ),
+                  ],
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(error!, style: const TextStyle(color: AppColors.error)),
+                ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (selectedRideId.isEmpty) {
+                        setState(() => error = 'Select a ride.');
+                        return;
+                      }
+                      if (seatsOffered <= 0) {
+                        setState(() => error = 'Pick seats offered.');
+                        return;
+                      }
+                      try {
+                        await controller.createOffer(
+                          rideRequestId: request.id,
+                          rideId: selectedRideId,
+                          seatsOffered: seatsOffered,
+                        );
+                        Get.back();
+                        Get.snackbar('Offer sent', 'Offer submitted.');
+                      } catch (e) {
+                        setState(() => error = e.toString());
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.driverPrimary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Send Offer',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}

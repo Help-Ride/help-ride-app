@@ -68,86 +68,106 @@ class MyRidesView extends GetView<MyRidesController> {
                 final list = controller.filtered;
                 if (controller.tab.value == MyRidesTab.requests) {
                   final requests = controller.filteredRequests;
-                  if (requests.isEmpty) {
-                    return Expanded(
-                      child: Center(
-                        child: Text(
-                          'No ride requests yet.',
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.darkMuted
-                                : AppColors.lightMuted,
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
                   return Expanded(
-                    child: ListView.separated(
-                      padding: const EdgeInsets.only(bottom: 18),
-                      itemCount: requests.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 14),
-                      itemBuilder: (_, i) {
-                        final r = requests[i];
-                        final canceling =
-                            controller.cancelingRequestIds.contains(r.id);
-                        return RideRequestCard(
-                          request: r,
-                          canceling: canceling,
-                          onEdit: () => Get.toNamed(
-                            '/ride-requests/edit',
-                            arguments: {'request': r},
-                          ),
-                          onCancel: () async {
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                title: const Text('Cancel request?'),
-                                content: const Text(
-                                  'This will remove your ride request.',
+                    child: RefreshIndicator(
+                      onRefresh: controller.fetch,
+                      child: requests.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                const SizedBox(height: 120),
+                                Center(
+                                  child: Text(
+                                    'No ride requests yet.',
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? AppColors.darkMuted
+                                          : AppColors.lightMuted,
+                                    ),
+                                  ),
                                 ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Get.back(result: false),
-                                    child: const Text('Keep'),
+                              ],
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.only(bottom: 18),
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              itemCount: requests.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 14),
+                              itemBuilder: (_, i) {
+                                final r = requests[i];
+                                final canceling = controller
+                                    .cancelingRequestIds
+                                    .contains(r.id);
+                                return RideRequestCard(
+                                  request: r,
+                                  canceling: canceling,
+                                  onEdit: () => Get.toNamed(
+                                    '/ride-requests/edit',
+                                    arguments: {'request': r},
                                   ),
-                                  TextButton(
-                                    onPressed: () => Get.back(result: true),
-                                    child: const Text('Cancel Request'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true) {
-                              await controller.cancelRequest(r.id);
-                            }
-                          },
-                        );
-                      },
-                    ),
-                  );
-                }
-
-                if (list.isEmpty) {
-                  return Expanded(
-                    child: Center(
-                      child: Text(
-                        'No rides yet.',
-                        style: TextStyle(
-                          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                        ),
-                      ),
+                                  onCancel: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (_) => AlertDialog(
+                                        title: const Text('Cancel request?'),
+                                        content: const Text(
+                                          'This will remove your ride request.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Get.back(result: false),
+                                            child: const Text('Keep'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () =>
+                                                Get.back(result: true),
+                                            child:
+                                                const Text('Cancel Request'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      await controller.cancelRequest(r.id);
+                                    }
+                                  },
+                                );
+                              },
+                            ),
                     ),
                   );
                 }
 
                 return Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.only(bottom: 18),
-                    itemCount: list.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 14),
-                    itemBuilder: (_, i) => BookingCard(b: list[i]),
+                  child: RefreshIndicator(
+                    onRefresh: controller.fetch,
+                    child: list.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              const SizedBox(height: 120),
+                              Center(
+                                child: Text(
+                                  'No rides yet.',
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? AppColors.darkMuted
+                                        : AppColors.lightMuted,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.only(bottom: 18),
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            itemCount: list.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 14),
+                            itemBuilder: (_, i) => BookingCard(b: list[i]),
+                          ),
                   ),
                 );
               }),

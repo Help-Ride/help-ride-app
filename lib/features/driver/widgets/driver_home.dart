@@ -33,18 +33,22 @@ class DriverHomeView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        const Row(
+        Row(
           children: [
             Expanded(
-              child: MiniStatCard(
-                title: "Ride Requests",
-                subtitle: "View passenger requests",
-                badge: "3 New",
-                accent: AppColors.driverPrimary,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Get.toNamed('/driver/ride-requests'),
+                child: const MiniStatCard(
+                  title: "Ride Requests",
+                  subtitle: "View passenger requests",
+                  badge: "3 New",
+                  accent: AppColors.driverPrimary,
+                ),
               ),
             ),
-            SizedBox(width: 12),
-            Expanded(
+            const SizedBox(width: 12),
+            const Expanded(
               child: MiniStatCard(
                 title: "Earnings",
                 subtitle: "\$280 this week",
