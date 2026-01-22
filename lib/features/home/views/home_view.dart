@@ -27,7 +27,7 @@ class HomeView extends GetView<HomeController> {
               Expanded(
                 child: Obx(() {
                   return c.role.value == HomeRole.passenger
-                      ? const PassengerHome()
+                      ?  PassengerHome()
                       : const DriverHome();
                 }),
               ),

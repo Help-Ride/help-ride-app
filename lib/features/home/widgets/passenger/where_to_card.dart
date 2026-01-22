@@ -4,10 +4,13 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_instance/src/extension_instance.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../controllers/home_controller.dart';
 import '../common/app_card.dart';
 
 class WhereToCard extends StatefulWidget {
@@ -119,10 +122,22 @@ class _WhereToCardState extends State<WhereToCard> {
             height: 52,
             width: double.infinity,
             child: ElevatedButton.icon(
+              // onPressed: () {
+              //   debugPrint('Pickup: ${_pickupCtrl.text}');
+              //   debugPrint('Destination: ${_destCtrl.text}');
+              // },
               onPressed: () {
-                debugPrint('Pickup: ${_pickupCtrl.text}');
-                debugPrint('Destination: ${_destCtrl.text}');
+                   debugPrint('Pickup: ${_pickupCtrl.text}');
+                   debugPrint('Destination: ${_destCtrl.text}');
+                if (_pickupCtrl.text.isEmpty || _destCtrl.text.isEmpty) return;
+
+                Get.find<HomeController>().searchRides(
+                  fromCity: _pickupCtrl.text,
+                  toCity: _destCtrl.text,
+                  seats: 1,
+                );
               },
+
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.passengerPrimary,
                 foregroundColor: Colors.white,
