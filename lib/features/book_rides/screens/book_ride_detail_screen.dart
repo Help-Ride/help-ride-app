@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_instance/src/extension_instance.dart';
 import 'package:get/get_navigation/src/extension_navigation.dart';
 
 import '../../../core/routes/app_routes.dart';
+import '../Models/passenger_ride_request_model.dart';
 import '../Models/ride_model.dart';
 import '../bottom_sheets/confirm_booking_bottomsheet.dart';
+import '../controllers/book_ride_detail_controller.dart';
 import '../widgets/passenger/detail_card.dart';
 import '../widgets/passenger/trip_location.dart';
 
@@ -649,13 +652,30 @@ class _BookRideDetailScreenState extends State<BookRideDetailScreen> {
                         ride: widget.ride!,
                         selectedSeats: selectedSeats,
                         onConfirm: () {
-                          Get.offNamed(
-                            AppRoutes.bookingConfirmed,
-                            // arguments: {
-                            //   'route': '${widget.ride!.from} → ${widget.ride!.to}',
-                            //   'departureTime': widget.ride!.departureTime,
-                            //   'totalPrice': widget.ride!.price * selectedSeats.length,
-                            // },
+                          final controller = Get.put(BookRideDetailController());
+
+                          // final controller = Get.find<BookRideDetailController>();
+
+                          final request = PassengerRideRequestModel(
+                            fromCity: 'Waterloo',
+                            fromLat: 43.4643,
+                            fromLng: -80.5204,
+                            toCity: 'Toronto',
+                            toLat: 43.6532,
+                            toLng: -79.3832,
+                            preferredDate: '2025-12-20T08:00:00.000Z',
+                            seatsNeeded: selectedSeats,
+                            rideType: 'one-time',
+                            tripType: 'one-way',
+                          );
+
+
+
+                          controller.requestRide(
+                            request: request,
+                            onSuccess: () {
+                              Get.offNamed(AppRoutes.bookingConfirmed);
+                            },
                           );
                         },
                       );
