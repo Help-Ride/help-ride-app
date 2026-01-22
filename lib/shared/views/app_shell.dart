@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/theme_controller.dart';
+import '../../features/my-rides/views/screens/my_rides_screen.dart';
 import '../controllers/session_controller.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -54,15 +55,16 @@ class _AppShellState extends State<AppShell> {
 class _NavConfig {
   final List<_NavItemData> items;
   final List<Widget> pages;
+
   _NavConfig(this.items, this.pages);
 }
 
 _NavConfig _passengerConfig() {
-  final pages = const [
-    HomeView(),
-    _Placeholder(title: 'My Rides'),
-    _Placeholder(title: 'Messages'),
-    PassengerProfileView(),
+  final pages = [
+    const HomeView(),
+    MyRidesView(),
+    const _Placeholder(title: 'Messages'),
+    const PassengerProfileView(),
   ];
 
   final items = const [
@@ -133,6 +135,7 @@ class _NavItemData {
   final String label;
   final IconData icon;
   final IconData selectedIcon;
+
   const _NavItemData({
     required this.label,
     required this.icon,
@@ -222,6 +225,7 @@ class _FigmaBottomNavBar extends StatelessWidget {
 
 class _Placeholder extends StatelessWidget {
   const _Placeholder({required this.title});
+
   final String title;
 
   @override

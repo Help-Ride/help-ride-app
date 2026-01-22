@@ -138,6 +138,36 @@ class _WhereToCardState extends State<WhereToCard> {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+
+          SizedBox(
+            height: 52,
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // Navigate to Create Ride Request screen
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: const BorderSide(
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+
+              label: const Text(
+                "Create ride request",
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
