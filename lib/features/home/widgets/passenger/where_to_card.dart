@@ -4,9 +4,12 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_navigation/src/extension_navigation.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../common/app_card.dart';
 
@@ -138,6 +141,37 @@ class _WhereToCardState extends State<WhereToCard> {
               ),
             ),
           ),
+          const SizedBox(height: 14),
+
+          SizedBox(
+            height: 52,
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Get.toNamed(AppRoutes.createRideRequest);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: const BorderSide(
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+
+              label: const Text(
+                "Create ride request",
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+
         ],
       ),
     );
@@ -451,12 +485,14 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
 class _PlacePick {
   final String fullText;
   final _LatLng? latLng;
+
   const _PlacePick({required this.fullText, required this.latLng});
 }
 
 class _LatLng {
   final double lat;
   final double lng;
+
   const _LatLng(this.lat, this.lng);
 
   @override
