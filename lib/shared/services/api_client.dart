@@ -10,12 +10,17 @@ import 'token_storage.dart';
 import 'api_exception.dart';
 
 class ApiClient {
-  ApiClient._(this._dio);
+  ApiClient._(this._dio, this._tokenStorage);
   final Dio _dio;
+  final TokenStorage _tokenStorage;
 
   Dio get dio => _dio;
 
   static const _skipAuthLogoutKey = 'skipAuthLogout';
+  static const _skipAuthRefreshKey = 'skipAuthRefresh';
+  static const _authRetryKey = 'authRetry';
+
+  Future<bool>? _refreshFuture;
 
   static Future<ApiClient> create() async {
     final baseUrl = dotenv.env['API_BASE_URL'];
@@ -35,10 +40,16 @@ class ApiClient {
       ),
     );
 
-    dio.interceptors.add(
+    final client = ApiClient._(dio, tokenStorage);
+    client._configureInterceptors();
+    return client;
+  }
+
+  void _configureInterceptors() {
+    _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await tokenStorage.getAccessToken();
+          final token = await _tokenStorage.getAccessToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -55,10 +66,20 @@ class ApiClient {
             );
           }
 
-          // ✅ Only auto-logout on 401 when it's NOT an auth call
           final skipLogout = e.requestOptions.extra[_skipAuthLogoutKey] == true;
-          if (status == 401 && !skipLogout) {
-            await tokenStorage.clear();
+          final skipRefresh =
+              e.requestOptions.extra[_skipAuthRefreshKey] == true;
+          final alreadyRetried =
+              e.requestOptions.extra[_authRetryKey] == true;
+
+          if (status == 401 && !skipLogout && !skipRefresh && !alreadyRetried) {
+            final refreshed = await _refreshAccessToken();
+            if (refreshed) {
+              final retryResponse = await _retryRequest(e.requestOptions);
+              return handler.resolve(retryResponse);
+            }
+
+            await _tokenStorage.clear();
             if (Get.isRegistered<SessionController>()) {
               await Get.find<SessionController>().logout();
             }
@@ -78,8 +99,76 @@ class ApiClient {
         },
       ),
     );
+  }
 
-    return ApiClient._(dio);
+  Future<bool> _refreshAccessToken() async {
+    if (_refreshFuture != null) {
+      return _refreshFuture!;
+    }
+    _refreshFuture = _doRefresh();
+    final result = await _refreshFuture!;
+    _refreshFuture = null;
+    return result;
+  }
+
+  Future<bool> _doRefresh() async {
+    final refreshToken = await _tokenStorage.getRefreshToken();
+    if (refreshToken == null || refreshToken.trim().isEmpty) {
+      return false;
+    }
+
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/auth/refresh',
+        data: {'refreshToken': refreshToken.trim()},
+        options: Options(
+          extra: {
+            _skipAuthLogoutKey: true,
+            _skipAuthRefreshKey: true,
+          },
+        ),
+      );
+      final data = res.data ?? {};
+      final tokens = _parseTokens(data);
+      if (tokens == null || tokens.accessToken.trim().isEmpty) {
+        return false;
+      }
+      await _tokenStorage.saveAccessToken(tokens.accessToken.trim());
+      if (tokens.refreshToken != null &&
+          tokens.refreshToken!.trim().isNotEmpty) {
+        await _tokenStorage.saveRefreshToken(tokens.refreshToken!.trim());
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<Response<T>> _retryRequest<T>(RequestOptions requestOptions) async {
+    final headers = Map<String, dynamic>.from(requestOptions.headers);
+    final token = await _tokenStorage.getAccessToken();
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return _dio.request<T>(
+      requestOptions.path,
+      data: requestOptions.data,
+      queryParameters: requestOptions.queryParameters,
+      options: Options(
+        method: requestOptions.method,
+        headers: headers,
+        extra: {...requestOptions.extra, _authRetryKey: true},
+        contentType: requestOptions.contentType,
+        responseType: requestOptions.responseType,
+        followRedirects: requestOptions.followRedirects,
+        receiveDataWhenStatusError: requestOptions.receiveDataWhenStatusError,
+        sendTimeout: requestOptions.sendTimeout,
+        receiveTimeout: requestOptions.receiveTimeout,
+      ),
+      cancelToken: requestOptions.cancelToken,
+      onReceiveProgress: requestOptions.onReceiveProgress,
+      onSendProgress: requestOptions.onSendProgress,
+    );
   }
 
   // --- Public methods ---
@@ -88,11 +177,17 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? query,
     bool skipAuthLogout = false,
+    bool skipAuthRefresh = false,
   }) {
     return _dio.get<T>(
       path,
       queryParameters: query,
-      options: Options(extra: {_skipAuthLogoutKey: skipAuthLogout}),
+      options: Options(
+        extra: {
+          _skipAuthLogoutKey: skipAuthLogout,
+          _skipAuthRefreshKey: skipAuthRefresh,
+        },
+      ),
     );
   }
 
@@ -100,11 +195,17 @@ class ApiClient {
     String path, {
     Object? data,
     bool skipAuthLogout = false,
+    bool skipAuthRefresh = false,
   }) {
     return _dio.post<T>(
       path,
       data: data,
-      options: Options(extra: {_skipAuthLogoutKey: skipAuthLogout}),
+      options: Options(
+        extra: {
+          _skipAuthLogoutKey: skipAuthLogout,
+          _skipAuthRefreshKey: skipAuthRefresh,
+        },
+      ),
     );
   }
 
@@ -112,11 +213,17 @@ class ApiClient {
     String path, {
     Object? data,
     bool skipAuthLogout = false,
+    bool skipAuthRefresh = false,
   }) {
     return _dio.patch<T>(
       path,
       data: data,
-      options: Options(extra: {_skipAuthLogoutKey: skipAuthLogout}),
+      options: Options(
+        extra: {
+          _skipAuthLogoutKey: skipAuthLogout,
+          _skipAuthRefreshKey: skipAuthRefresh,
+        },
+      ),
     );
   }
 
@@ -124,22 +231,63 @@ class ApiClient {
     String path, {
     Object? data,
     bool skipAuthLogout = false,
+    bool skipAuthRefresh = false,
   }) {
     return _dio.put<T>(
       path,
       data: data,
-      options: Options(extra: {_skipAuthLogoutKey: skipAuthLogout}),
+      options: Options(
+        extra: {
+          _skipAuthLogoutKey: skipAuthLogout,
+          _skipAuthRefreshKey: skipAuthRefresh,
+        },
+      ),
     );
   }
 
-  Future<Response<T>> delete<T>(String path, {bool skipAuthLogout = false}) {
+  Future<Response<T>> delete<T>(
+    String path, {
+    bool skipAuthLogout = false,
+    bool skipAuthRefresh = false,
+  }) {
     return _dio.delete<T>(
       path,
-      options: Options(extra: {_skipAuthLogoutKey: skipAuthLogout}),
+      options: Options(
+        extra: {
+          _skipAuthLogoutKey: skipAuthLogout,
+          _skipAuthRefreshKey: skipAuthRefresh,
+        },
+      ),
     );
   }
 
   // --- Error normalization ---
+
+  static _Tokens? _parseTokens(Map<String, dynamic> data) {
+    final access = data['accessToken'];
+    final refresh = data['refreshToken'];
+    if (access is String && access.isNotEmpty) {
+      return _Tokens(
+        accessToken: access,
+        refreshToken:
+            refresh is String && refresh.isNotEmpty ? refresh : null,
+      );
+    }
+
+    final tokens = data['tokens'];
+    if (tokens is Map && tokens['accessToken'] is String) {
+      final t = tokens['accessToken'] as String;
+      if (t.isNotEmpty) {
+        final r = tokens['refreshToken'];
+        return _Tokens(
+          accessToken: t,
+          refreshToken: r is String && r.isNotEmpty ? r : null,
+        );
+      }
+    }
+
+    return null;
+  }
 
   static ApiException _toApiException(DioException e) {
     final status = e.response?.statusCode;
@@ -228,4 +376,11 @@ class ApiClient {
         );
     }
   }
+}
+
+class _Tokens {
+  final String accessToken;
+  final String? refreshToken;
+
+  _Tokens({required this.accessToken, this.refreshToken});
 }

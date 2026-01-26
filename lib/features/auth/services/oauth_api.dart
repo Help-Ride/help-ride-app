@@ -14,6 +14,7 @@ class OAuthApi {
     final res = await _client.post<Map<String, dynamic>>(
       '/auth/oauth',
       skipAuthLogout: true,
+      skipAuthRefresh: true,
       data: {
         'provider': provider,
         'providerUserId': providerUserId,

@@ -63,5 +63,9 @@
 	<string>AIzaSyDO-kwH3nnMJTj0e0VeqL4EgQjabSKEgBE</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We use your location to suggest nearby pickup points.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

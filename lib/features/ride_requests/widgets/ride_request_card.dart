@@ -189,9 +189,15 @@ Future<void> _openOffersSheet(BuildContext context, RideRequest request) async {
   var loading = true;
   String? error;
   List<RideRequestOffer> offers = [];
+  var sheetOpen = true;
+
+  void safeSetState(StateSetter setState, VoidCallback fn) {
+    if (!sheetOpen) return;
+    setState(fn);
+  }
 
   Future<void> loadOffers(StateSetter setState) async {
-    setState(() {
+    safeSetState(setState, () {
       loading = true;
       error = null;
     });
@@ -199,13 +205,13 @@ Future<void> _openOffersSheet(BuildContext context, RideRequest request) async {
       final client = await ApiClient.create();
       final api = RideRequestsApi(client);
       final list = await api.listOffers(request.id);
-      setState(() {
+      safeSetState(setState, () {
         offers = list;
       });
     } catch (e) {
-      setState(() => error = e.toString());
+      safeSetState(setState, () => error = e.toString());
     } finally {
-      setState(() => loading = false);
+      safeSetState(setState, () => loading = false);
     }
   }
 
@@ -278,7 +284,7 @@ Future<void> _openOffersSheet(BuildContext context, RideRequest request) async {
                   )
                 else
                   Column(
-                    children: offers
+                            children: offers
                         .map((o) => _OfferTile(
                               offer: o,
                               onAccept: () =>
@@ -294,7 +300,9 @@ Future<void> _openOffersSheet(BuildContext context, RideRequest request) async {
         },
       );
     },
-  );
+  ).whenComplete(() {
+    sheetOpen = false;
+  });
 }
 
 Future<void> _handleOfferAction(

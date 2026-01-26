@@ -3,6 +3,7 @@ import 'package:help_ride/shared/models/user.dart';
 import '../services/token_storage.dart';
 import '../../features/auth/services/auth_api.dart';
 import '../services/api_client.dart';
+import '../services/push_notification_service.dart';
 
 enum SessionStatus { unknown, authenticated, unauthenticated }
 
@@ -19,10 +20,15 @@ class SessionController extends GetxController {
     super.onInit();
     _tokenStorage = TokenStorage();
 
-    final client = await ApiClient.create();
-    _authApi = AuthApi(client);
-
-    await bootstrap();
+    try {
+      final client = await ApiClient.create();
+      _authApi = AuthApi(client);
+      await bootstrap();
+    } catch (_) {
+      user.value = null;
+      _authProvider.value = null;
+      status.value = SessionStatus.unauthenticated;
+    }
   }
 
   Future<void> bootstrap() async {
@@ -46,6 +52,11 @@ class SessionController extends GetxController {
         _authProvider.value = user.value!.authProvider!.trim();
       }
       status.value = SessionStatus.authenticated;
+      try {
+        await PushNotificationService.instance.registerDeviceTokenIfNeeded();
+      } catch (_) {
+        // Best-effort token registration.
+      }
     } catch (_) {
       await _tokenStorage.clear();
       user.value = null;
@@ -55,6 +66,15 @@ class SessionController extends GetxController {
   }
 
   Future<void> logout() async {
+    final refreshToken = await _tokenStorage.getRefreshToken();
+    if (refreshToken != null && refreshToken.trim().isNotEmpty) {
+      try {
+        await _authApi.logout(refreshToken: refreshToken.trim());
+      } catch (_) {
+        // Best-effort revoke; proceed to clear local session.
+      }
+    }
+    await PushNotificationService.instance.unregisterDeviceTokenIfNeeded();
     await _tokenStorage.clear();
     user.value = null;
     _authProvider.value = null;

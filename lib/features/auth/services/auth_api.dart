@@ -13,6 +13,7 @@ class AuthApi {
       '/auth/login',
       data: {'email': email, 'password': password},
       skipAuthLogout: true,
+      skipAuthRefresh: true,
     );
 
     final data = res.data ?? {};
@@ -44,6 +45,7 @@ class AuthApi {
     final res = await _client.post<Map<String, dynamic>>(
       '/auth/register', // change if your backend uses /auth/signup
       skipAuthLogout: true,
+      skipAuthRefresh: true,
       data: {
         'email': email,
         'password': password,
@@ -69,6 +71,7 @@ class AuthApi {
     await _client.post<Map<String, dynamic>>(
       '/auth/verify-email/send-otp',
       skipAuthLogout: true,
+      skipAuthRefresh: true,
       data: {'email': email},
     );
   }
@@ -80,6 +83,7 @@ class AuthApi {
     final res = await _client.post<Map<String, dynamic>>(
       '/auth/verify-email/verify-otp',
       skipAuthLogout: true,
+      skipAuthRefresh: true,
       data: {'email': email, 'otp': otp},
     );
     final data = res.data ?? {};
@@ -115,6 +119,30 @@ class AuthApi {
     }
 
     return null;
+  }
+
+  Future<AuthTokens> refreshToken({required String refreshToken}) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/auth/refresh',
+      data: {'refreshToken': refreshToken},
+      skipAuthLogout: true,
+      skipAuthRefresh: true,
+    );
+    final data = res.data ?? {};
+    final tokens = _parseTokens(data);
+    if (tokens == null) {
+      throw Exception('Missing accessToken in refresh response');
+    }
+    return tokens;
+  }
+
+  Future<void> logout({required String refreshToken}) async {
+    await _client.post<Map<String, dynamic>>(
+      '/auth/logout',
+      data: {'refreshToken': refreshToken},
+      skipAuthLogout: true,
+      skipAuthRefresh: true,
+    );
   }
 }
 
