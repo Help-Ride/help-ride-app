@@ -3,6 +3,7 @@ import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_client.dart';
 import '../models/chat_conversation.dart';
 import '../models/chat_message.dart';
+import 'chat_conversations_controller.dart';
 import '../services/chat_api.dart';
 import '../services/chat_pusher_service.dart';
 
@@ -52,7 +53,11 @@ class ChatThreadController extends GetxController {
     try {
       final list = await _api.listMessages(conversation.id);
       list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      messages.assignAll(_dedupe(list));
+      final deduped = _dedupe(list);
+      messages.assignAll(deduped);
+      if (deduped.isNotEmpty) {
+        _updateConversationPreview(deduped.last);
+      }
     } catch (e) {
       error.value = e.toString();
     } finally {
@@ -72,6 +77,7 @@ class ChatThreadController extends GetxController {
       body: body,
     );
     _upsertMessage(pending);
+    _updateConversationPreview(pending);
 
     sending.value = true;
     try {
@@ -80,6 +86,7 @@ class ChatThreadController extends GetxController {
         body: body,
       );
       _replacePending(pending, sent);
+      _updateConversationPreview(sent);
     } catch (e) {
       error.value = e.toString();
     } finally {
@@ -91,6 +98,7 @@ class ChatThreadController extends GetxController {
     if (message.conversationId != conversation.id) return;
     if (_isDuplicate(message)) return;
     _upsertMessage(message);
+    _updateConversationPreview(message);
   }
 
   @override
@@ -117,6 +125,16 @@ class ChatThreadController extends GetxController {
       }
     }
     messages.add(message);
+  }
+
+  void _updateConversationPreview(ChatMessage message) {
+    if (!Get.isRegistered<ChatConversationsController>()) return;
+    final controller = Get.find<ChatConversationsController>();
+    controller.updatePreview(
+      conversationId: conversation.id,
+      lastMessage: message.body,
+      lastMessageAt: message.createdAt,
+    );
   }
 
   bool _isDuplicate(ChatMessage message) {

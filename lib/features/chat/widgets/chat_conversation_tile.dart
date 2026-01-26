@@ -35,6 +35,7 @@ class ChatConversationTile extends StatelessWidget {
         hasUnread ? accentColor.withOpacity(isDark ? 0.14 : 0.06) : Colors.transparent;
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
     final textMuted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final isOnline = conversation.participant.isOnline;
 
     return Material(
       color: Colors.transparent,
@@ -63,7 +64,6 @@ class ChatConversationTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                  if (conversation.participant.isOnline)
                     Positioned(
                       bottom: 0,
                       right: 0,
@@ -71,7 +71,11 @@ class ChatConversationTile extends StatelessWidget {
                         width: 12,
                         height: 12,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1BC47D),
+                          color: isOnline
+                              ? const Color(0xFF1BC47D)
+                              : (isDark
+                                  ? const Color(0xFF4B5563)
+                                  : const Color(0xFFB7C0CF)),
                           shape: BoxShape.circle,
                           border: Border.all(
                             color:
@@ -156,6 +160,8 @@ class ChatConversationTile extends StatelessWidget {
                       Row(
                         children: [
                           _RoleChip(label: roleLabel, color: accentColor),
+                          const SizedBox(width: 8),
+                          _StatusChip(isOnline: isOnline),
                           if (conversation.participant.rating != null)
                             Padding(
                               padding: const EdgeInsets.only(left: 8),
@@ -238,6 +244,57 @@ class _RoleChip extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: color,
         ),
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.isOnline});
+
+  final bool isOnline;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isOnline
+        ? const Color(0xFFE7F8EF)
+        : (isDark ? const Color(0xFF1F2937) : const Color(0xFFEFF2F6));
+    final fg = isOnline
+        ? const Color(0xFF179C5E)
+        : (isDark ? const Color(0xFF9AA3B2) : const Color(0xFF6B7280));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: isOnline
+                  ? const Color(0xFF1BC47D)
+                  : (isDark
+                      ? const Color(0xFF9AA3B2)
+                      : const Color(0xFF6B7280)),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isOnline ? 'Online' : 'Offline',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
+          ),
+        ],
       ),
     );
   }

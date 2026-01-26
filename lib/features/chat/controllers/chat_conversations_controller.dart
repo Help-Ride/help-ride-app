@@ -151,6 +151,7 @@ class ChatConversationsController extends GetxController {
     final incomingId = incoming.id.trim();
     final incomingAvatar = incoming.avatarUrl?.trim() ?? '';
     final useIncomingAvatar = incomingAvatar.isNotEmpty;
+    final useIncomingOnline = incomingId.isNotEmpty || useIncomingName;
 
     return current.copyWith(
       id: incomingId.isNotEmpty ? incoming.id : current.id,
@@ -158,7 +159,7 @@ class ChatConversationsController extends GetxController {
       role: incoming.role.trim().isNotEmpty ? incoming.role : current.role,
       rating: incoming.rating ?? current.rating,
       avatarUrl: useIncomingAvatar ? incoming.avatarUrl : current.avatarUrl,
-      isOnline: useIncomingName ? incoming.isOnline : current.isOnline,
+      isOnline: useIncomingOnline ? incoming.isOnline : current.isOnline,
     );
   }
 
@@ -187,5 +188,23 @@ class ChatConversationsController extends GetxController {
               c.lastMessage.toLowerCase().contains(q),
         )
         .toList();
+  }
+
+  void updatePreview({
+    required String conversationId,
+    required String lastMessage,
+    required DateTime lastMessageAt,
+  }) {
+    final index = conversations.indexWhere((c) => c.id == conversationId);
+    if (index == -1) return;
+    final current = conversations[index];
+    final updated = current.copyWith(
+      lastMessage: lastMessage,
+      lastMessageAt: lastMessageAt,
+      unreadCount: 0,
+    );
+    conversations[index] = updated;
+    final moved = conversations.removeAt(index);
+    conversations.insert(0, moved);
   }
 }

@@ -4,6 +4,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../controllers/chat_thread_controller.dart';
+import '../controllers/chat_conversations_controller.dart';
 import '../models/chat_conversation.dart';
 import '../models/chat_message.dart';
 import '../widgets/chat_bubble.dart';
@@ -22,6 +23,8 @@ class _ChatThreadViewState extends State<ChatThreadView> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Worker? _messageWorker;
+  Worker? _conversationWorker;
+  final _headerConversation = Rxn<ChatConversation>();
 
   @override
   void initState() {
@@ -34,6 +37,19 @@ class _ChatThreadViewState extends State<ChatThreadView> {
       _controller.messages,
       (_) => _scrollToBottom(),
     );
+
+    if (Get.isRegistered<ChatConversationsController>()) {
+      final list = Get.find<ChatConversationsController>().conversations;
+      _headerConversation.value =
+          _findConversation(list, widget.conversation.id);
+      _conversationWorker = ever<List<ChatConversation>>(
+        list,
+        (_) {
+          final updated = _findConversation(list, widget.conversation.id);
+          _headerConversation.value = updated;
+        },
+      );
+    }
   }
 
   @override
@@ -41,6 +57,7 @@ class _ChatThreadViewState extends State<ChatThreadView> {
     _textController.dispose();
     _scrollController.dispose();
     _messageWorker?.dispose();
+    _conversationWorker?.dispose();
     if (Get.isRegistered<ChatThreadController>(tag: widget.conversation.id)) {
       Get.delete<ChatThreadController>(tag: widget.conversation.id);
     }
@@ -55,76 +72,81 @@ class _ChatThreadViewState extends State<ChatThreadView> {
         : AppColors.passengerPrimary;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: _ChatHeader(
-        conversation: widget.conversation,
-        accentColor: roleColor,
-        isDark: isDark,
-      ),
-      body: Column(
-        children: [
-          _TripSummaryCard(
-            conversation: widget.conversation,
-            accentColor: roleColor,
-            isDark: isDark,
-          ),
-          Expanded(
-            child: Obx(() {
-              if (_controller.loading.value) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (_controller.error.value != null && _controller.messages.isEmpty) {
-                return Center(
-                  child: Text(
-                    'Unable to load messages.',
-                    style: TextStyle(
-                      color:
-                          isDark ? AppColors.darkMuted : Colors.black.withOpacity(0.6),
+    return Obx(() {
+      final updated = _headerConversation.value ?? widget.conversation;
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: _ChatHeader(
+          conversation: updated,
+          accentColor: roleColor,
+          isDark: isDark,
+        ),
+        body: Column(
+          children: [
+            _TripSummaryCard(
+              conversation: updated,
+              accentColor: roleColor,
+              isDark: isDark,
+            ),
+            Expanded(
+              child: Obx(() {
+                if (_controller.loading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (_controller.error.value != null &&
+                    _controller.messages.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'Unable to load messages.',
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.darkMuted
+                            : Colors.black.withOpacity(0.6),
+                      ),
                     ),
-                  ),
-                );
-              }
-
-              final messages = _controller.messages;
-              if (messages.isEmpty) {
-                return Center(
-                  child: Text(
-                    'Say hello to start the chat.',
-                    style: TextStyle(
-                      color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                    ),
-                  ),
-                );
-              }
-
-              return ListView.separated(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
-                itemCount: messages.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 14),
-                itemBuilder: (context, index) {
-                  final msg = messages[index];
-                  return ChatBubble(
-                    message: msg,
-                    isMine: _isMine(msg),
-                    accentColor: roleColor,
-                    isDark: isDark,
                   );
-                },
-              );
-            }),
-          ),
-          _Composer(
-            controller: _textController,
-            accentColor: roleColor,
-            isDark: isDark,
-            onChanged: (value) => _controller.draft.value = value,
-            onSend: _handleSend,
-          ),
-        ],
-      ),
-    );
+                }
+
+                final messages = _controller.messages;
+                if (messages.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'Say hello to start the chat.',
+                      style: TextStyle(
+                        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
+                  itemCount: messages.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) {
+                    final msg = messages[index];
+                    return ChatBubble(
+                      message: msg,
+                      isMine: _isMine(msg),
+                      accentColor: roleColor,
+                      isDark: isDark,
+                    );
+                  },
+                );
+              }),
+            ),
+            _Composer(
+              controller: _textController,
+              accentColor: roleColor,
+              isDark: isDark,
+              onChanged: (value) => _controller.draft.value = value,
+              onSend: _handleSend,
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   bool _isMine(ChatMessage msg) {
@@ -150,6 +172,16 @@ class _ChatThreadViewState extends State<ChatThreadView> {
       );
     });
   }
+
+  ChatConversation? _findConversation(
+    List<ChatConversation> list,
+    String id,
+  ) {
+    for (final c in list) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
 }
 
 class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -172,7 +204,7 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         color: isDark ? AppColors.darkText : AppColors.lightText,
-        onPressed: () => Get.back(),
+        onPressed: () => Get.back(result: true),
       ),
       titleSpacing: 0,
       title: Row(
@@ -206,27 +238,9 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: conversation.participant.isOnline
-                            ? const Color(0xFF1BC47D)
-                            : AppColors.lightMuted,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      conversation.participant.isOnline ? 'Online' : 'Offline',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                      ),
-                    ),
-                  ],
+                _StatusPill(
+                  isOnline: conversation.participant.isOnline,
+                  isDark: isDark,
                 ),
               ],
             ),
@@ -335,6 +349,57 @@ class _TripSummaryCard extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.isOnline, required this.isDark});
+
+  final bool isOnline;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isOnline
+        ? const Color(0xFFE7F8EF)
+        : (isDark ? const Color(0xFF1F2937) : const Color(0xFFEFF2F6));
+    final fg = isOnline
+        ? const Color(0xFF179C5E)
+        : (isDark ? const Color(0xFF9AA3B2) : const Color(0xFF6B7280));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: isOnline
+                  ? const Color(0xFF1BC47D)
+                  : (isDark
+                      ? const Color(0xFF9AA3B2)
+                      : const Color(0xFF6B7280)),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isOnline ? 'Online' : 'Offline',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
+          ),
+        ],
       ),
     );
   }
