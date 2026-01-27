@@ -154,81 +154,348 @@ class _RequestsTab extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
-        PlacePickerField(
-          label: 'From City',
-          hintText: 'e.g. Waterloo',
-          icon: Icons.place_outlined,
-          controller: controller.fromCtrl,
-          onPicked: (p) => controller.fromPick.value = p,
-        ),
-        const SizedBox(height: 12),
-        PlacePickerField(
-          label: 'To City',
-          hintText: 'e.g. Toronto',
-          icon: Icons.place,
-          controller: controller.toCtrl,
-          onPicked: (p) => controller.toPick.value = p,
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
+        Container(
           width: double.infinity,
-          height: 46,
-          child: ElevatedButton(
-            onPressed: controller.searchRequests,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.driverPrimary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              elevation: 0,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
             ),
-            child: const Text(
-              'Search Requests',
-              style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Nearby filters',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? AppColors.darkText : AppColors.lightText,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => controller.refreshRequests(force: true),
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'Refresh',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 40,
+                      height: 40,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Obx(() {
+                return Wrap(
+                  spacing: 8,
+                  children:
+                      DriverRideRequestsController.radiusOptionsKm.map((km) {
+                    final active = controller.radiusKm.value == km;
+                    return ChoiceChip(
+                      label: Text('${km.toInt()} km'),
+                      selected: active,
+                      onSelected: (_) => controller.setRadiusKm(km),
+                      selectedColor: AppColors.driverPrimary,
+                      labelStyle: TextStyle(
+                        color: active ? Colors.white : null,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    );
+                  }).toList(),
+                );
+              }),
+              const SizedBox(height: 8),
+              Obx(() {
+                final canSort = controller.locationReady;
+                return Row(
+                  children: [
+                    Text(
+                      'Sort by distance',
+                      style: TextStyle(
+                        color:
+                            isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      ),
+                    ),
+                    const Spacer(),
+                    Switch(
+                      value: controller.sortByDistance.value,
+                      onChanged: canSort
+                          ? (v) => controller.sortByDistance.value = v
+                          : null,
+                      activeThumbColor: AppColors.driverPrimary,
+                    ),
+                  ],
+                );
+              }),
+              const Divider(height: 18),
+              Obx(() {
+                final loading = controller.locationLoading.value;
+                final error = controller.locationError.value;
+                final serviceEnabled = controller.locationServiceEnabled.value;
+                final denied = controller.permissionDenied;
+                final deniedForever = controller.permissionDeniedForever;
+                final position = controller.currentPosition.value;
+
+                String title = 'Location';
+                String message = '';
+                VoidCallback? action;
+                String? actionText;
+
+                if (loading) {
+                  message = 'Checking location...';
+                } else if (error != null && error.isNotEmpty) {
+                  message = 'Location error: $error';
+                  action = () => controller.refreshNearbyRequests(force: true);
+                  actionText = 'Retry';
+                } else if (!serviceEnabled) {
+                  message = 'Location services are disabled.';
+                  action = controller.openLocationSettings;
+                  actionText = 'Enable';
+                } else if (deniedForever) {
+                  message = 'Location permission is permanently denied.';
+                  action = controller.openAppSettings;
+                  actionText = 'Open Settings';
+                } else if (denied) {
+                  message = 'Location permission is denied.';
+                  action = controller.requestLocationPermission;
+                  actionText = 'Allow';
+                } else if (position == null) {
+                  message = 'Unable to fetch current location.';
+                  action = () => controller.refreshNearbyRequests(force: true);
+                  actionText = 'Retry';
+                } else {
+                  final accuracy = position.accuracy;
+                  final timestamp = position.timestamp;
+                  title = 'Current location';
+                  message =
+                      'Lat ${position.latitude.toStringAsFixed(5)}, '
+                      'Lng ${position.longitude.toStringAsFixed(5)}';
+                  if (accuracy > 0) {
+                    message += ' · ±${accuracy.toStringAsFixed(0)}m';
+                  }
+                  message += ' · ${formatDateTime(timestamp.toLocal())}';
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.my_location,
+                      color:
+                          isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: isDark
+                                  ? AppColors.darkText
+                                  : AppColors.lightText,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            message,
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkMuted
+                                  : AppColors.lightMuted,
+                            ),
+                          ),
+                          if (action != null && actionText != null) ...[
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              height: 34,
+                              child: OutlinedButton(
+                                onPressed: action,
+                                child: Text(actionText),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (loading) ...[
+                      const SizedBox(width: 8),
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ],
+                  ],
+                );
+              }),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
+            ),
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+              childrenPadding:
+                  const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              leading: Icon(
+                Icons.alt_route,
+                color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+              ),
+              title: Text(
+                'Search by route',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? AppColors.darkText : AppColors.lightText,
+                ),
+              ),
+              subtitle: Text(
+                'Use a specific pickup and drop-off',
+                style: TextStyle(
+                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                ),
+              ),
+              children: [
+                PlacePickerField(
+                  label: 'From City',
+                  hintText: 'e.g. Waterloo',
+                  icon: Icons.place_outlined,
+                  controller: controller.fromCtrl,
+                  onPicked: (p) => controller.fromPick.value = p,
+                ),
+                const SizedBox(height: 12),
+                PlacePickerField(
+                  label: 'To City',
+                  hintText: 'e.g. Toronto',
+                  icon: Icons.place,
+                  controller: controller.toCtrl,
+                  onPicked: (p) => controller.toPick.value = p,
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: controller.searchRequests,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.driverPrimary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Search Requests',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
         const SizedBox(height: 14),
         Expanded(
           child: Obx(() {
-            if (controller.requestsLoading.value) {
+            final err = controller.requestsError.value;
+            final list = controller.requests.toList();
+            if (controller.sortByDistance.value &&
+                controller.locationReady) {
+              list.sort((a, b) {
+                final da = controller.distanceKmFor(a) ?? double.infinity;
+                final db = controller.distanceKmFor(b) ?? double.infinity;
+                return da.compareTo(db);
+              });
+            }
+
+            Widget buildEmpty(String text) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 18, top: 12),
+                children: [
+                  Center(
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        color:
+                            isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            if (controller.requestsLoading.value && list.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            final err = controller.requestsError.value;
             if (err != null) {
-              return Center(
-                child: Text(
-                  err,
-                  style: const TextStyle(color: AppColors.error),
+              return RefreshIndicator(
+                onRefresh: () => controller.refreshRequests(force: true),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 18, top: 12),
+                  children: [
+                    Center(
+                      child: Text(
+                        err,
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: () =>
+                            controller.refreshRequests(force: true),
+                        child: const Text('Retry'),
+                      ),
+                    ),
+                  ],
                 ),
               );
             }
 
-            final list = controller.requests;
             if (list.isEmpty) {
-              return Center(
-                child: Text(
-                  'No ride requests yet.',
-                  style: TextStyle(
-                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                  ),
-                ),
+              return RefreshIndicator(
+                onRefresh: () => controller.refreshRequests(force: true),
+                child: buildEmpty('No ride requests yet.'),
               );
             }
 
-            return ListView.separated(
-              padding: const EdgeInsets.only(bottom: 18),
-              itemCount: list.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
-              itemBuilder: (_, i) {
-                final r = list[i];
-                return DriverRideRequestCard(
-                  request: r,
-                  onOffer: () => _openOfferSheet(context, controller, r),
-                );
-              },
+            return RefreshIndicator(
+              onRefresh: () => controller.refreshRequests(force: true),
+              child: ListView.separated(
+                padding: const EdgeInsets.only(bottom: 18),
+                itemCount: list.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 14),
+                itemBuilder: (_, i) {
+                  final r = list[i];
+                  return DriverRideRequestCard(
+                    request: r,
+                    onOffer: () => _openOfferSheet(context, controller, r),
+                  );
+                },
+              ),
             );
           }),
         ),

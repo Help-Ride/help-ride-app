@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/widgets/place_picker_field.dart';
@@ -40,12 +41,27 @@ class DriverRideRequestsController extends GetxController {
   late final ApiClient _client;
   late final RideRequestsApi _api;
 
+  static const List<double> radiusOptionsKm = [10, 20, 50];
+  static const double defaultRadiusKm = 20;
+  static const int _defaultLimit = 20;
+  static const double _minMoveMeters = 300;
+  static const Duration _minFetchInterval = Duration(minutes: 5);
+
   final tab = DriverRideRequestsTab.requests.obs;
 
   final fromCtrl = TextEditingController();
   final toCtrl = TextEditingController();
   final fromPick = Rxn<PlacePick>();
   final toPick = Rxn<PlacePick>();
+
+  final radiusKm = defaultRadiusKm.obs;
+  final sortByDistance = false.obs;
+
+  final locationLoading = false.obs;
+  final locationError = RxnString();
+  final locationServiceEnabled = false.obs;
+  final locationPermission = Rxn<LocationPermission>();
+  final currentPosition = Rxn<Position>();
 
   final requestsLoading = false.obs;
   final requestsError = RxnString();
@@ -59,12 +75,16 @@ class DriverRideRequestsController extends GetxController {
   final ridesLoading = false.obs;
   final driverRides = <DriverRideItemLite>[].obs;
 
+  DateTime? _lastFetchAt;
+  Position? _lastFetchPosition;
+
   @override
   Future<void> onInit() async {
     super.onInit();
     _client = await ApiClient.create();
     _api = RideRequestsApi(_client);
     await fetchOffers();
+    await refreshNearbyRequests(force: true);
   }
 
   @override
@@ -75,6 +95,29 @@ class DriverRideRequestsController extends GetxController {
   }
 
   void setTab(DriverRideRequestsTab t) => tab.value = t;
+
+  bool get hasLocationPermission =>
+      locationPermission.value == LocationPermission.always ||
+      locationPermission.value == LocationPermission.whileInUse;
+
+  bool get locationReady =>
+      locationServiceEnabled.value &&
+      hasLocationPermission &&
+      currentPosition.value != null;
+
+  bool get permissionDenied =>
+      locationPermission.value == LocationPermission.denied;
+
+  bool get permissionDeniedForever =>
+      locationPermission.value == LocationPermission.deniedForever;
+
+  void setRadiusKm(double value) {
+    if (radiusKm.value == value) return;
+    radiusKm.value = value;
+    if (locationReady) {
+      refreshNearbyRequests(force: true);
+    }
+  }
 
   Future<void> searchRequests() async {
     final from = (fromPick.value?.fullText ?? fromCtrl.text).trim();
@@ -111,6 +154,131 @@ class DriverRideRequestsController extends GetxController {
       requestsError.value = e.toString();
     } finally {
       requestsLoading.value = false;
+    }
+  }
+
+  Future<void> refreshRequests({bool force = false}) async {
+    if (locationReady) {
+      await refreshNearbyRequests(force: force);
+      return;
+    }
+    await searchRequests();
+  }
+
+  Future<void> refreshNearbyRequests({bool force = false}) async {
+    final position = await _resolvePosition(requestPermission: force);
+    if (position == null) return;
+
+    final now = DateTime.now();
+    if (!force && _lastFetchAt != null) {
+      final elapsed = now.difference(_lastFetchAt!);
+      final lastPos = _lastFetchPosition;
+      double movedMeters = double.infinity;
+      if (lastPos != null) {
+        movedMeters = Geolocator.distanceBetween(
+          lastPos.latitude,
+          lastPos.longitude,
+          position.latitude,
+          position.longitude,
+        );
+      }
+      if (elapsed < _minFetchInterval && movedMeters < _minMoveMeters) {
+        return;
+      }
+    }
+
+    requestsLoading.value = true;
+    requestsError.value = null;
+    try {
+      final list = await _api.listRideRequestsNearby(
+        lat: position.latitude,
+        lng: position.longitude,
+        radiusKm: radiusKm.value,
+        limit: _defaultLimit,
+      );
+      list.sort(
+        (a, b) => _requestSortTime(b).compareTo(_requestSortTime(a)),
+      );
+      requests.assignAll(list);
+      _lastFetchAt = now;
+      _lastFetchPosition = position;
+    } catch (e) {
+      requestsError.value = e.toString();
+    } finally {
+      requestsLoading.value = false;
+    }
+  }
+
+  Future<void> requestLocationPermission() async {
+    await _ensureLocationAccess(requestPermission: true);
+    if (hasLocationPermission) {
+      await refreshNearbyRequests(force: true);
+    }
+  }
+
+  Future<void> openLocationSettings() async {
+    await Geolocator.openLocationSettings();
+    await _ensureLocationAccess(requestPermission: false);
+  }
+
+  Future<void> openAppSettings() async {
+    await Geolocator.openAppSettings();
+    await _ensureLocationAccess(requestPermission: false);
+  }
+
+  double? distanceKmFor(RideRequest request) {
+    final pos = currentPosition.value;
+    final lat = request.fromLat;
+    final lng = request.fromLng;
+    if (pos == null || lat == null || lng == null) return null;
+    final meters = Geolocator.distanceBetween(
+      pos.latitude,
+      pos.longitude,
+      lat,
+      lng,
+    );
+    return meters / 1000.0;
+  }
+
+  Future<void> _ensureLocationAccess({required bool requestPermission}) async {
+    locationLoading.value = true;
+    locationError.value = null;
+    try {
+      final enabled = await Geolocator.isLocationServiceEnabled();
+      locationServiceEnabled.value = enabled;
+      if (!enabled) {
+        locationPermission.value = await Geolocator.checkPermission();
+        return;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied && requestPermission) {
+        permission = await Geolocator.requestPermission();
+      }
+      locationPermission.value = permission;
+    } catch (e) {
+      locationError.value = e.toString();
+    } finally {
+      locationLoading.value = false;
+    }
+  }
+
+  Future<Position?> _resolvePosition({required bool requestPermission}) async {
+    await _ensureLocationAccess(requestPermission: requestPermission);
+    if (!locationServiceEnabled.value || !hasLocationPermission) {
+      return null;
+    }
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      currentPosition.value = position;
+      return position;
+    } catch (e) {
+      locationError.value = e.toString();
+      return null;
     }
   }
 

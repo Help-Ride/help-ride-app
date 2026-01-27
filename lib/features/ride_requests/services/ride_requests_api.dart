@@ -21,6 +21,12 @@ class RideRequestsApi {
           .map((e) => RideRequest.fromJson(e.cast<String, dynamic>()))
           .toList();
     }
+    if (data is Map && data['requests'] is List) {
+      return (data['requests'] as List)
+          .whereType<Map>()
+          .map((e) => RideRequest.fromJson(e.cast<String, dynamic>()))
+          .toList();
+    }
     return [];
   }
 
@@ -108,6 +114,45 @@ class RideRequestsApi {
         'fromLng': fromLng,
         'toLat': toLat,
         'toLng': toLng,
+      },
+    );
+    final data = res.data;
+    if (data is List) {
+      return data
+          .whereType<Map>()
+          .map((e) => RideRequest.fromJson(e.cast<String, dynamic>()))
+          .toList();
+    }
+    if (data is Map && data['data'] is List) {
+      return (data['data'] as List)
+          .whereType<Map>()
+          .map((e) => RideRequest.fromJson(e.cast<String, dynamic>()))
+          .toList();
+    }
+    if (data is Map && data['requests'] is List) {
+      return (data['requests'] as List)
+          .whereType<Map>()
+          .map((e) => RideRequest.fromJson(e.cast<String, dynamic>()))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<RideRequest>> listRideRequestsNearby({
+    required double lat,
+    required double lng,
+    required double radiusKm,
+    int? limit,
+    String? cursor,
+  }) async {
+    final res = await _client.get<dynamic>(
+      '/ride-requests',
+      query: {
+        'lat': lat,
+        'lng': lng,
+        'radiusKm': radiusKm,
+        if (limit != null) 'limit': limit,
+        if (cursor != null && cursor.trim().isNotEmpty) 'cursor': cursor.trim(),
       },
     );
     final data = res.data;
