@@ -18,11 +18,27 @@ class RideDriverCard extends StatelessWidget {
     final driverName = ride.driver?.name ?? 'Driver';
     final driver = ride.driver;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final avatarUrl = driver?.avatarUrl ?? '';
+    final email = (driver?.email ?? '').trim();
 
     return AppCard(
       child: Row(
         children: [
-          Avatar(initials: initials(driverName)),
+          CircleAvatar(
+            radius: 22,
+            backgroundColor:
+                isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
+            backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+            child: avatarUrl.isEmpty
+                ? Text(
+                    initials(driverName),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? AppColors.darkText : AppColors.lightText,
+                    ),
+                  )
+                : null,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -56,6 +72,18 @@ class RideDriverCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                if (email.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 Row(
                   children: [

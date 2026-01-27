@@ -53,6 +53,7 @@ class RideRequestOffer {
   final DateTime? updatedAt;
   final RideRequest? request;
   final RideRequestOfferRide? ride;
+  final RideRequestOfferDriver? driver;
 
   RideRequestOffer({
     required this.id,
@@ -64,6 +65,7 @@ class RideRequestOffer {
     this.updatedAt,
     this.request,
     this.ride,
+    this.driver,
   });
 
   factory RideRequestOffer.fromJson(Map<String, dynamic> json) {
@@ -96,6 +98,11 @@ class RideRequestOffer {
         ? null
         : RideRequestOfferRide.fromJson(rideMap.cast<String, dynamic>());
 
+    final driverMap = json['driver'] is Map ? json['driver'] : null;
+    final driver = driverMap == null
+        ? null
+        : RideRequestOfferDriver.fromJson(driverMap.cast<String, dynamic>());
+
     final requestId = (json['rideRequestId'] ??
             request?.id ??
             json['requestId'] ??
@@ -115,6 +122,30 @@ class RideRequestOffer {
       updatedAt: json['updatedAt'] == null ? null : toDate(json['updatedAt']),
       request: request,
       ride: ride,
+      driver: driver,
+    );
+  }
+}
+
+class RideRequestOfferDriver {
+  final String id;
+  final String name;
+  final String? email;
+  final String? avatarUrl;
+
+  RideRequestOfferDriver({
+    required this.id,
+    required this.name,
+    this.email,
+    this.avatarUrl,
+  });
+
+  factory RideRequestOfferDriver.fromJson(Map<String, dynamic> json) {
+    return RideRequestOfferDriver(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? 'Driver').toString(),
+      email: json['email']?.toString(),
+      avatarUrl: json['providerAvatarUrl']?.toString(),
     );
   }
 }

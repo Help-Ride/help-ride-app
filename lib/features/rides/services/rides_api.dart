@@ -6,24 +6,20 @@ class RidesApi {
   final ApiClient _client;
 
   Future<List<Ride>> searchRides({
-    required String fromCity,
-    required String toCity,
     required int seats,
-    double? fromLat,
-    double? fromLng,
-    double? toLat,
-    double? toLng,
+    required double fromLat,
+    required double fromLng,
+    required double toLat,
+    required double toLng,
     double? radiusKm,
     String? dateYYYYMMDD, // optional
   }) async {
     final q = <String, dynamic>{
-      'fromCity': fromCity,
-      'toCity': toCity,
       'seats': seats,
-      if (fromLat != null) 'fromLat': fromLat,
-      if (fromLng != null) 'fromLng': fromLng,
-      if (toLat != null) 'toLat': toLat,
-      if (toLng != null) 'toLng': toLng,
+      'fromLat': fromLat,
+      'fromLng': fromLng,
+      'toLat': toLat,
+      'toLng': toLng,
       if (radiusKm != null) 'radiusKm': radiusKm,
       if (dateYYYYMMDD != null && dateYYYYMMDD.trim().isNotEmpty)
         'date': dateYYYYMMDD.trim(),

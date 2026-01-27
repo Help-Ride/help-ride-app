@@ -4,8 +4,20 @@ import '../models/booking.dart';
 import '../utils/booking_formatters.dart';
 
 class BookingCard extends StatelessWidget {
-  const BookingCard({super.key, required this.b});
+  const BookingCard({
+    super.key,
+    required this.b,
+    this.showPay = false,
+    this.isPaying = false,
+    this.onPay,
+    this.onDetails,
+  });
+
   final Booking b;
+  final bool showPay;
+  final bool isPaying;
+  final VoidCallback? onPay;
+  final VoidCallback? onDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +118,55 @@ class BookingCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: OutlinedButton(
+              onPressed: onDetails,
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                side: BorderSide(
+                  color: isDark ? const Color(0xFF232836) : const Color(0xFFE2E6EF),
+                ),
+              ),
+              child: const Text('Details'),
+            ),
+          ),
+          if (showPay) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: isPaying ? null : onPay,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.passengerPrimary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor:
+                      isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
+                  disabledForegroundColor:
+                      isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: isPaying
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text(
+                        'Pay to confirm',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+              ),
+            ),
+          ],
         ],
       ),
     );

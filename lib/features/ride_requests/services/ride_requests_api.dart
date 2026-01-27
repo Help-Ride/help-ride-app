@@ -96,14 +96,18 @@ class RideRequestsApi {
   }
 
   Future<List<RideRequest>> listRideRequests({
-    required String fromCity,
-    required String toCity,
+    required double fromLat,
+    required double fromLng,
+    required double toLat,
+    required double toLng,
   }) async {
     final res = await _client.get<dynamic>(
       '/ride-requests',
       query: {
-        'fromCity': fromCity,
-        'toCity': toCity,
+        'fromLat': fromLat,
+        'fromLng': fromLng,
+        'toLat': toLat,
+        'toLng': toLng,
       },
     );
     final data = res.data;

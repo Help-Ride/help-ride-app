@@ -79,4 +79,34 @@ class ProfileApi {
       },
     );
   }
+
+  Future<String> createStripeOnboarding() async {
+    final res = await _client.post<dynamic>('/stripe/connect/onboard');
+    final data = res.data;
+    String? url;
+
+    if (data is Map) {
+      url = _readOnboardingUrl(data.cast<String, dynamic>());
+      final nested = data['data'];
+      if ((url == null || url.isEmpty) && nested is Map) {
+        url = _readOnboardingUrl(nested.cast<String, dynamic>());
+      }
+    } else if (data is String) {
+      url = data;
+    }
+
+    if (url == null || url.trim().isEmpty) {
+      throw Exception('Missing Stripe onboarding URL.');
+    }
+
+    return url.trim();
+  }
+
+  String? _readOnboardingUrl(Map<String, dynamic> data) {
+    final raw = data['url'] ??
+        data['onboardingUrl'] ??
+        data['onboarding_url'] ??
+        data['link'];
+    return raw?.toString();
+  }
 }

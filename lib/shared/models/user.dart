@@ -7,6 +7,8 @@ class User {
   final String? authProvider;
   final String roleDefault;
   final String? avatarUrl;
+  final String? stripeAccountId;
+  final bool stripeOnboarded;
   final DriverProfile? driverProfile;
 
   User({
@@ -18,6 +20,8 @@ class User {
     this.authProvider,
     required this.roleDefault,
     this.avatarUrl,
+    this.stripeAccountId,
+    this.stripeOnboarded = false,
     this.driverProfile,
   });
 
@@ -39,6 +43,14 @@ class User {
           (json['authProvider'] ?? json['provider'])?.toString().trim(),
       roleDefault: json['roleDefault'],
       avatarUrl: json['providerAvatarUrl'],
+      stripeAccountId:
+          (json['stripeAccountId'] ?? json['stripe_account_id'])?.toString(),
+      stripeOnboarded: _parseBool(
+        json['stripeOnboarded'] ??
+            json['stripe_onboarded'] ??
+            json['stripeConnected'] ??
+            json['stripe_connected'],
+      ),
       driverProfile: json['driverProfile'] != null
           ? DriverProfile.fromJson(json['driverProfile'])
           : null,

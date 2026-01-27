@@ -346,6 +346,9 @@ class _OfferTile extends StatelessWidget {
     final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
     final ride = offer.ride;
+    final driver = offer.driver;
+    final status = offer.status.toLowerCase();
+    final canAct = status.contains('pending');
 
     return Container(
       width: double.infinity,
@@ -375,6 +378,10 @@ class _OfferTile extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
+          if (driver != null) ...[
+            const SizedBox(height: 8),
+            _DriverInfoRow(driver: driver, isDark: isDark),
+          ],
           if (ride != null) ...[
             const SizedBox(height: 6),
             Text(
@@ -382,39 +389,41 @@ class _OfferTile extends StatelessWidget {
               style: TextStyle(color: muted),
             ),
           ],
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onReject,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(40),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+          if (canAct) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onReject,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(40),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
+                    child: const Text('Reject'),
                   ),
-                  child: const Text('Reject'),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: onAccept,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(40),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: onAccept,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(40),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: AppColors.passengerPrimary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
                     ),
-                    backgroundColor: AppColors.passengerPrimary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
+                    child: const Text('Accept'),
                   ),
-                  child: const Text('Accept'),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -465,4 +474,73 @@ String _prettyEnum(String raw) {
       .split('-')
       .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
       .join(' ');
+}
+
+class _DriverInfoRow extends StatelessWidget {
+  const _DriverInfoRow({required this.driver, required this.isDark});
+
+  final RideRequestOfferDriver driver;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = driver.name.trim().isEmpty ? 'Driver' : driver.name.trim();
+    final email = (driver.email ?? '').trim();
+    final avatarUrl = (driver.avatarUrl ?? '').trim();
+    final initials = _initialsFor(name);
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 18,
+          backgroundColor:
+              isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
+          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+          child: avatarUrl.isEmpty
+              ? Text(
+                  initials,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? AppColors.darkText : AppColors.lightText,
+                  ),
+                )
+              : null,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? AppColors.darkText : AppColors.lightText,
+                ),
+              ),
+              if (email.isNotEmpty)
+                Text(
+                  email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _initialsFor(String name) {
+  final parts = name.trim().split(RegExp(r'\s+'));
+  if (parts.isEmpty) return 'D';
+  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+  return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
 }

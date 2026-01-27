@@ -1,6 +1,7 @@
 class RideDriver {
   final String id;
   final String name;
+  final String? email;
   final String? avatarUrl;
   final double? rating;
   final int? ridesCount;
@@ -10,6 +11,7 @@ class RideDriver {
   RideDriver({
     required this.id,
     required this.name,
+    this.email,
     this.avatarUrl,
     this.rating,
     this.ridesCount,
@@ -46,6 +48,7 @@ class RideDriver {
     return RideDriver(
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? 'Driver').toString(),
+      email: json['email']?.toString(),
       avatarUrl: json['providerAvatarUrl']?.toString(),
       rating: _readDouble(json['rating'] ?? json['avgRating']),
       ridesCount: _readInt(json['ridesCount'] ?? json['trips'] ?? json['rides']),
@@ -70,6 +73,8 @@ class Ride {
   final int seatsTotal;
   final int seatsAvailable;
   final String status;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
   final List<String> amenities;
   final String? pickupInstructions;
   final String? notes;
@@ -90,6 +95,8 @@ class Ride {
     required this.seatsTotal,
     required this.seatsAvailable,
     required this.status,
+    this.createdAt,
+    this.updatedAt,
     this.amenities = const [],
     this.pickupInstructions,
     this.notes,
@@ -112,6 +119,12 @@ class Ride {
 
     DateTime _toDate(dynamic v) {
       return DateTime.tryParse(v?.toString() ?? '') ?? DateTime.now();
+    }
+
+    DateTime? _readDate(dynamic v) {
+      if (v == null) return null;
+      final dt = DateTime.tryParse(v.toString());
+      return dt?.toLocal();
     }
 
     String? _readString(dynamic v) {
@@ -165,6 +178,8 @@ class Ride {
       seatsTotal: _toInt(json['seatsTotal']),
       seatsAvailable: _toInt(json['seatsAvailable']),
       status: (json['status'] ?? 'open').toString(),
+      createdAt: _readDate(json['createdAt']),
+      updatedAt: _readDate(json['updatedAt']),
       amenities: _readStringList(
         json['amenities'] ?? json['rideAmenities'] ?? json['amenityList'],
       ),

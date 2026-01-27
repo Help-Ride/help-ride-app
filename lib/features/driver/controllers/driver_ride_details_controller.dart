@@ -86,7 +86,7 @@ class DriverRideDetailsController extends GetxController {
     requestsError.value = null;
     try {
       final list = await _bookingsApi.bookingsForRide(rideId);
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      list.sort((a, b) => _bookingSortTime(b).compareTo(_bookingSortTime(a)));
       requests.assignAll(list);
     } catch (e) {
       requestsError.value = e.toString();
@@ -94,6 +94,8 @@ class DriverRideDetailsController extends GetxController {
       requestsLoading.value = false;
     }
   }
+
+  DateTime _bookingSortTime(Booking b) => b.updatedAt ?? b.createdAt;
 
   Booking _withStatus(Booking b, String status) {
     return Booking(

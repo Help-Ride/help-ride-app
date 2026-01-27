@@ -40,6 +40,32 @@ class CreateRideController extends GetxController {
     final client = await ApiClient.create();
     _api = DriverRidesApi(client);
 
+    final args = (Get.arguments as Map?) ?? {};
+    final fromCity = (args['fromCity'] ?? '').toString().trim();
+    final toCity = (args['toCity'] ?? '').toString().trim();
+    final fromLat = _readDouble(args['fromLat']);
+    final fromLng = _readDouble(args['fromLng']);
+    final toLat = _readDouble(args['toLat']);
+    final toLng = _readDouble(args['toLng']);
+    if (fromCity.isNotEmpty) {
+      fromCtrl.text = fromCity;
+    }
+    if (toCity.isNotEmpty) {
+      toCtrl.text = toCity;
+    }
+    if (fromLat != null && fromLng != null) {
+      fromPick.value = PlacePick(
+        fullText: fromCity.isNotEmpty ? fromCity : 'Selected location',
+        latLng: LatLng(fromLat, fromLng),
+      );
+    }
+    if (toLat != null && toLng != null) {
+      toPick.value = PlacePick(
+        fullText: toCity.isNotEmpty ? toCity : 'Selected location',
+        latLng: LatLng(toLat, toLng),
+      );
+    }
+
     fromCtrl.addListener(_recomputeCanPublish);
     toCtrl.addListener(_recomputeCanPublish);
     seatsCtrl.addListener(_recomputeCanPublish);
@@ -102,6 +128,12 @@ class CreateRideController extends GetxController {
     final v = amenities[k] ?? false;
     amenities[k] = !v;
     amenities.refresh();
+  }
+
+  double? _readDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
   }
 
   Future<void> publish() async {

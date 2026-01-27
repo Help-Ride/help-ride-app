@@ -9,6 +9,8 @@ class DriverRideItem {
   final String from;
   final String to;
   final DateTime startTime;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
   final int seatsTotal;
   final int seatsAvailable;
   final double pricePerSeat;
@@ -19,6 +21,8 @@ class DriverRideItem {
     required this.from,
     required this.to,
     required this.startTime,
+    this.createdAt,
+    this.updatedAt,
     required this.seatsTotal,
     required this.seatsAvailable,
     required this.pricePerSeat,
@@ -52,10 +56,10 @@ class DriverMyRidesController extends GetxController {
     final now = DateTime.now();
 
     final upcoming = rides.where((r) => r.startTime.isAfter(now)).toList()
-      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+      ..sort((a, b) => _rideSortTime(b).compareTo(_rideSortTime(a)));
 
     final past = rides.where((r) => !r.startTime.isAfter(now)).toList()
-      ..sort((a, b) => b.startTime.compareTo(a.startTime));
+      ..sort((a, b) => _rideSortTime(b).compareTo(_rideSortTime(a)));
 
     return tab.value == DriverRidesTab.upcoming ? upcoming : past;
   }
@@ -114,15 +118,27 @@ class DriverMyRidesController extends GetxController {
       return (dt ?? DateTime.now()).toLocal();
     }
 
+    DateTime? readDate(dynamic v) {
+      if (v == null) return null;
+      final dt = DateTime.tryParse(v.toString());
+      return dt?.toLocal();
+    }
+
     return DriverRideItem(
       id: (j['id'] ?? '').toString(),
       from: (j['fromCity'] ?? '').toString(),
       to: (j['toCity'] ?? '').toString(),
       startTime: parseDate(j['startTime']),
+      createdAt: readDate(j['createdAt']),
+      updatedAt: readDate(j['updatedAt']),
       seatsTotal: (j['seatsTotal'] as num?)?.toInt() ?? 0,
       seatsAvailable: (j['seatsAvailable'] as num?)?.toInt() ?? 0,
       pricePerSeat: toDouble(j['pricePerSeat']),
       status: (j['status'] ?? 'open').toString(),
     );
+  }
+
+  DateTime _rideSortTime(DriverRideItem ride) {
+    return ride.updatedAt ?? ride.createdAt ?? ride.startTime;
   }
 }

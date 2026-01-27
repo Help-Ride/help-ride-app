@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:get/get.dart' hide Response;
+import 'package:get/get.dart' hide Response, FormData;
 
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'token_storage.dart';
@@ -19,6 +19,7 @@ class ApiClient {
   static const _skipAuthLogoutKey = 'skipAuthLogout';
   static const _skipAuthRefreshKey = 'skipAuthRefresh';
   static const _authRetryKey = 'authRetry';
+  static const _redacted = '[REDACTED]';
 
   Future<bool>? _refreshFuture;
 
@@ -53,18 +54,17 @@ class ApiClient {
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          _logRequest(options);
           return handler.next(options);
+        },
+        onResponse: (response, handler) {
+          _logResponse(response);
+          return handler.next(response);
         },
         onError: (e, handler) async {
           final status = e.response?.statusCode;
 
-          // ✅ Optional logging (don’t spam in release)
-          if (kDebugMode) {
-            debugPrint(
-              'API Error: $status ${e.requestOptions.method} ${e.requestOptions.path}\n'
-              'Data: ${e.response?.data}',
-            );
-          }
+          _logError(e);
 
           final skipLogout = e.requestOptions.extra[_skipAuthLogoutKey] == true;
           final skipRefresh =
@@ -375,6 +375,155 @@ class ApiClient {
           details: data,
         );
     }
+  }
+
+  void _logRequest(RequestOptions options) {
+    final endpoint = _formatEndpoint(options);
+    final query = options.queryParameters.isEmpty
+        ? null
+        : _sanitize(options.queryParameters);
+    final body = _sanitizeBody(options.data);
+
+    final buffer = StringBuffer()
+      ..writeln('API Request: ${options.method} $endpoint');
+    if (query != null) {
+      buffer.writeln('Query: $query');
+    }
+    if (body != null) {
+      buffer.writeln('Body: $body');
+    }
+
+    _safeLog(buffer.toString().trim());
+  }
+
+  void _logResponse(Response<dynamic> response) {
+    final endpoint = _formatEndpoint(response.requestOptions);
+    final status = response.statusCode;
+    final body = _sanitize(response.data);
+
+    final buffer = StringBuffer()
+      ..writeln(
+        'API Response: ${response.requestOptions.method} $endpoint',
+      )
+      ..writeln('Status: $status');
+    if (body != null) {
+      buffer.writeln('Body: $body');
+    }
+
+    _safeLog(buffer.toString().trim());
+  }
+
+  void _logError(DioException error) {
+    final options = error.requestOptions;
+    final endpoint = _formatEndpoint(options);
+    final status = error.response?.statusCode;
+    final body = _sanitize(error.response?.data);
+
+    final buffer = StringBuffer()
+      ..writeln('API Error: ${options.method} $endpoint')
+      ..writeln('Status: $status');
+    if (body != null) {
+      buffer.writeln('Body: $body');
+    }
+    if (error.message != null && error.message!.trim().isNotEmpty) {
+      buffer.writeln('Message: ${_sanitize(error.message)}');
+    }
+
+    _safeLog(buffer.toString().trim());
+  }
+
+  String _formatEndpoint(RequestOptions options) {
+    final base = options.baseUrl;
+    final path = options.path;
+    if (base.isEmpty) return path;
+    if (base.endsWith('/') && path.startsWith('/')) {
+      return '${base.substring(0, base.length - 1)}$path';
+    }
+    return '$base$path';
+  }
+
+  Object? _sanitizeBody(Object? data) {
+    if (data == null) return null;
+    if (data is FormData) {
+      return {
+        'fields': Map.fromEntries(
+          data.fields.map(
+            (entry) => MapEntry(entry.key, _sanitize(entry.value)),
+          ),
+        ),
+        'files': data.files
+            .map((entry) => {
+                  'field': entry.key,
+                  'filename': entry.value.filename,
+                })
+            .toList(),
+      };
+    }
+    return _sanitize(data);
+  }
+
+  Object? _sanitize(Object? value) {
+    if (value == null) return null;
+    if (value is Map) {
+      final out = <String, dynamic>{};
+      value.forEach((key, val) {
+        final k = key.toString();
+        if (_isSensitiveKey(k)) {
+          out[k] = _redacted;
+        } else {
+          out[k] = _sanitize(val);
+        }
+      });
+      return out;
+    }
+    if (value is List) {
+      return value.map(_sanitize).toList();
+    }
+    if (value is String) {
+      if (_looksSensitiveValue(value)) {
+        return _redacted;
+      }
+      return value;
+    }
+    return value;
+  }
+
+  bool _isSensitiveKey(String key) {
+    final k = key.toLowerCase();
+    return k.contains('password') ||
+        k.contains('token') ||
+        k.contains('secret') ||
+        k.contains('authorization') ||
+        k.contains('apikey') ||
+        k.contains('api_key') ||
+        k.contains('clientsecret') ||
+        k == 'key';
+  }
+
+  bool _looksSensitiveValue(String value) {
+    final v = value.trim();
+    if (v.isEmpty) return false;
+    if (v.toLowerCase().startsWith('bearer ')) return true;
+    if (v.contains('_secret_')) return true;
+    if (_looksLikeJwt(v)) return true;
+    final compact = !v.contains(' ') && v.length >= 40;
+    if (compact && RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(v)) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _looksLikeJwt(String value) {
+    final parts = value.split('.');
+    if (parts.length != 3) return false;
+    return parts.every(
+      (part) => part.isNotEmpty && RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(part),
+    );
+  }
+
+  void _safeLog(String message) {
+    if (message.trim().isEmpty) return;
+    debugPrint(message);
   }
 }
 

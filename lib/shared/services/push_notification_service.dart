@@ -22,6 +22,8 @@ class PushNotificationService {
   Timer? _retryTimer;
   bool _initialized = false;
   bool _registering = false;
+  int _retryAttempts = 0;
+  static const int _maxRetryAttempts = 5;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -58,7 +60,6 @@ class PushNotificationService {
     final token = await _resolveToken();
     if (token == null || token.trim().isEmpty) {
       _scheduleRetry();
-      _log('FCM token missing; retry scheduled.');
       return;
     }
 
@@ -69,6 +70,7 @@ class PushNotificationService {
     }
 
     await _registerToken(token.trim());
+    _resetRetryAttempts();
   }
 
   Future<void> unregisterDeviceTokenIfNeeded() async {
@@ -114,6 +116,7 @@ class PushNotificationService {
     if (token.trim().isEmpty) return;
 
     await _tokenStorage.saveCachedDeviceToken(token.trim());
+    _resetRetryAttempts();
 
     final accessToken = await _tokenStorage.getAccessToken();
     if (accessToken == null || accessToken.trim().isEmpty) {
@@ -177,9 +180,20 @@ class PushNotificationService {
 
   void _scheduleRetry() {
     _retryTimer?.cancel();
+    if (_retryAttempts >= _maxRetryAttempts) {
+      _log('FCM token missing; retry limit reached.');
+      return;
+    }
+    _retryAttempts += 1;
+    _log('FCM token missing; retry $_retryAttempts/$_maxRetryAttempts scheduled.');
     _retryTimer = Timer(const Duration(seconds: 5), () {
       registerDeviceTokenIfNeeded();
     });
+  }
+
+  void _resetRetryAttempts() {
+    _retryAttempts = 0;
+    _retryTimer?.cancel();
   }
 
   void _log(String message) {

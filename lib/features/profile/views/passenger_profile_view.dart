@@ -15,15 +15,30 @@ class PassengerProfileView extends StatefulWidget {
   State<PassengerProfileView> createState() => _PassengerProfileViewState();
 }
 
-class _PassengerProfileViewState extends State<PassengerProfileView> {
+class _PassengerProfileViewState extends State<PassengerProfileView>
+    with WidgetsBindingObserver {
   late final ProfileController _controller;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = Get.isRegistered<ProfileController>()
         ? Get.find<ProfileController>()
         : Get.put(ProfileController());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _controller.handleStripeReturn();
+    }
   }
 
   @override
@@ -88,6 +103,9 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                     context,
                     _controller.driverProfile.value,
                   ),
+                  onSetupPayouts: _controller.startStripeOnboarding,
+                  payoutLoading: _controller.stripeLoading.value,
+                  payoutReady: user.stripeOnboarded,
                 ),
                 const SizedBox(height: 20),
               ],
@@ -512,12 +530,18 @@ class _DriverProfileCard extends StatelessWidget {
     required this.loading,
     required this.isDark,
     required this.onEdit,
+    required this.onSetupPayouts,
+    required this.payoutLoading,
+    required this.payoutReady,
   });
 
   final DriverProfile? profile;
   final bool loading;
   final bool isDark;
   final VoidCallback onEdit;
+  final VoidCallback onSetupPayouts;
+  final bool payoutLoading;
+  final bool payoutReady;
 
   @override
   Widget build(BuildContext context) {
@@ -594,6 +618,46 @@ class _DriverProfileCard extends StatelessWidget {
                 isDark: isDark,
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton(
+              onPressed: payoutLoading ? null : onSetupPayouts,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.driverPrimary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor:
+                    isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
+                disabledForegroundColor:
+                    isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: payoutLoading
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (payoutReady)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 6),
+                            child: Icon(Icons.check_circle, size: 16),
+                          ),
+                        const Text(
+                          'Setup Payouts',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+            ),
           ),
         ],
       ),

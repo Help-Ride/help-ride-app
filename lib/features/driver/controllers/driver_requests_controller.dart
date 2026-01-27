@@ -57,7 +57,7 @@ class DriverRequestsController extends GetxController {
     error.value = null;
     try {
       final list = await _api.driverBookings();
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      list.sort((a, b) => _bookingSortTime(b).compareTo(_bookingSortTime(a)));
       bookings.assignAll(list);
     } catch (e) {
       error.value = e.toString();
@@ -65,6 +65,8 @@ class DriverRequestsController extends GetxController {
       loading.value = false;
     }
   }
+
+  DateTime _bookingSortTime(Booking b) => b.updatedAt ?? b.createdAt;
 
   Booking _withStatus(Booking b, String status) {
     return Booking(

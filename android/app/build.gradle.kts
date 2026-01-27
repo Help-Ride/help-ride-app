@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         applicationId = "com.exocodelabs.helpride"
-        minSdk = flutter.minSdkVersion
+        minSdk = 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

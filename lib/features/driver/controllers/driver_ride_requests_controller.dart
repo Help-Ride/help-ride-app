@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../shared/services/api_client.dart';
@@ -12,6 +14,10 @@ class DriverRideItemLite {
   final String id;
   final String from;
   final String to;
+  final double? fromLat;
+  final double? fromLng;
+  final double? toLat;
+  final double? toLng;
   final DateTime startTime;
   final int seatsAvailable;
   final double pricePerSeat;
@@ -20,6 +26,10 @@ class DriverRideItemLite {
     required this.id,
     required this.from,
     required this.to,
+    this.fromLat,
+    this.fromLng,
+    this.toLat,
+    this.toLng,
     required this.startTime,
     required this.seatsAvailable,
     required this.pricePerSeat,
@@ -74,10 +84,28 @@ class DriverRideRequestsController extends GetxController {
       return;
     }
 
+    final fromLat = fromPick.value?.latLng?.lat;
+    final fromLng = fromPick.value?.latLng?.lng;
+    final toLat = toPick.value?.latLng?.lat;
+    final toLng = toPick.value?.latLng?.lng;
+    if (fromLat == null || fromLng == null || toLat == null || toLng == null) {
+      requestsError.value =
+          'Select locations from suggestions to include coordinates.';
+      return;
+    }
+
     requestsLoading.value = true;
     requestsError.value = null;
     try {
-      final list = await _api.listRideRequests(fromCity: from, toCity: to);
+      final list = await _api.listRideRequests(
+        fromLat: fromLat,
+        fromLng: fromLng,
+        toLat: toLat,
+        toLng: toLng,
+      );
+      list.sort(
+        (a, b) => _requestSortTime(b).compareTo(_requestSortTime(a)),
+      );
       requests.assignAll(list);
     } catch (e) {
       requestsError.value = e.toString();
@@ -97,6 +125,10 @@ class DriverRideRequestsController extends GetxController {
     } finally {
       offersLoading.value = false;
     }
+  }
+
+  DateTime _requestSortTime(RideRequest request) {
+    return request.updatedAt ?? request.createdAt;
   }
 
   Future<void> loadDriverRides() async {
@@ -141,11 +173,74 @@ class DriverRideRequestsController extends GetxController {
       id: (j['id'] ?? '').toString(),
       from: (j['fromCity'] ?? '').toString(),
       to: (j['toCity'] ?? '').toString(),
+      fromLat: toDouble(j['fromLat']),
+      fromLng: toDouble(j['fromLng']),
+      toLat: toDouble(j['toLat']),
+      toLng: toDouble(j['toLng']),
       startTime: toDate(j['startTime']),
       seatsAvailable: toInt(j['seatsAvailable']),
       pricePerSeat: toDouble(j['pricePerSeat']),
     );
   }
+
+  List<DriverRideItemLite> matchingRidesFor(RideRequest request) {
+    final reqFromLat = request.fromLat;
+    final reqFromLng = request.fromLng;
+    final reqToLat = request.toLat;
+    final reqToLng = request.toLng;
+    if (reqFromLat == null ||
+        reqFromLng == null ||
+        reqToLat == null ||
+        reqToLng == null) {
+      return [];
+    }
+
+    const maxDistanceKm = 10.0;
+    final now = DateTime.now();
+
+    return driverRides.where((ride) {
+      if (!ride.startTime.isAfter(now)) return false;
+      if (ride.seatsAvailable <= 0) return false;
+      if (ride.fromLat == null ||
+          ride.fromLng == null ||
+          ride.toLat == null ||
+          ride.toLng == null) {
+        return false;
+      }
+      final pickupKm = _distanceKm(
+        reqFromLat,
+        reqFromLng,
+        ride.fromLat!,
+        ride.fromLng!,
+      );
+      final dropoffKm = _distanceKm(
+        reqToLat,
+        reqToLng,
+        ride.toLat!,
+        ride.toLng!,
+      );
+      return pickupKm <= maxDistanceKm && dropoffKm <= maxDistanceKm;
+    }).toList();
+  }
+
+  double _distanceKm(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const earthRadiusKm = 6371.0;
+    final dLat = _degToRad(lat2 - lat1);
+    final dLon = _degToRad(lon2 - lon1);
+    final a = pow(sin(dLat / 2), 2) +
+        cos(_degToRad(lat1)) *
+            cos(_degToRad(lat2)) *
+            pow(sin(dLon / 2), 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
+
+  double _degToRad(double deg) => deg * (pi / 180.0);
 
   Future<void> createOffer({
     required String rideRequestId,

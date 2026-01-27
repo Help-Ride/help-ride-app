@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -20,6 +21,14 @@ Future<void> main() async {
 
   // ✅ Explicit path — no guessing
   await dotenv.load(fileName: ".env");
+
+  final stripeKey = dotenv.env['STRIPE_PUBLISHABLE_KEY']?.trim();
+  if (stripeKey != null && stripeKey.isNotEmpty) {
+    Stripe.publishableKey = stripeKey;
+    await Stripe.instance.applySettings();
+  } else if (kDebugMode) {
+    debugPrint('Missing STRIPE_PUBLISHABLE_KEY in .env');
+  }
 
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);

@@ -47,9 +47,12 @@ class SearchRidesController extends GetxController {
 
     seatsRequired.value = parsedSeats <= 0 ? 1 : parsedSeats;
 
-    // If args missing, fail gracefully (don’t crash)
-    if (fromCity.value.isEmpty || toCity.value.isEmpty) {
-      error.value = 'Missing from/to city. Go back and select locations.';
+    final missingCoords = fromLat.value == null ||
+        fromLng.value == null ||
+        toLat.value == null ||
+        toLng.value == null;
+    if (missingCoords) {
+      error.value = 'Missing location coordinates. Select places from suggestions.';
       return;
     }
 
@@ -71,14 +74,23 @@ class SearchRidesController extends GetxController {
     error.value = null;
 
     try {
+      final fromLatValue = fromLat.value;
+      final fromLngValue = fromLng.value;
+      final toLatValue = toLat.value;
+      final toLngValue = toLng.value;
+      if (fromLatValue == null ||
+          fromLngValue == null ||
+          toLatValue == null ||
+          toLngValue == null) {
+        throw Exception('Missing location coordinates.');
+      }
+
       final list = await _api.searchRides(
-        fromCity: fromCity.value,
-        toCity: toCity.value,
         seats: seatsRequired.value,
-        fromLat: fromLat.value,
-        fromLng: fromLng.value,
-        toLat: toLat.value,
-        toLng: toLng.value,
+        fromLat: fromLatValue,
+        fromLng: fromLngValue,
+        toLat: toLatValue,
+        toLng: toLngValue,
         radiusKm: radiusKm.value,
       );
 

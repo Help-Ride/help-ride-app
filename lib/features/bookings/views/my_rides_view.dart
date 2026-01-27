@@ -166,7 +166,26 @@ class MyRidesView extends GetView<MyRidesController> {
                             itemCount: list.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 14),
-                            itemBuilder: (_, i) => BookingCard(b: list[i]),
+                            itemBuilder: (_, i) {
+                              final booking = list[i];
+                              final canPay = controller.canPay(booking);
+                              return BookingCard(
+                                b: booking,
+                                showPay: canPay,
+                                isPaying: controller.isPaying(booking.id),
+                                onDetails: booking.rideId.trim().isEmpty
+                                    ? null
+                                    : () => Get.toNamed(
+                                          '/rides/${booking.rideId}',
+                                          arguments: {
+                                            'seats': booking.seatsBooked,
+                                          },
+                                        ),
+                                onPay: canPay
+                                    ? () => controller.payToConfirm(booking)
+                                    : null,
+                              );
+                            },
                           ),
                   ),
                 );

@@ -14,6 +14,9 @@ class DriverRideCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
+    final isPast = !ride.startTime.isAfter(DateTime.now());
+    final canManage =
+        !isPast && status != 'completed' && !status.contains('cancel');
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -114,10 +117,9 @@ class DriverRideCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton(
-                  onPressed:
-                      (status == 'completed' || status.contains('cancel'))
-                      ? null
-                      : () => Get.toNamed('/driver/rides/${ride.id}/edit'),
+                  onPressed: canManage
+                      ? () => Get.toNamed('/driver/rides/${ride.id}/edit')
+                      : null,
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                     shape: RoundedRectangleBorder(
@@ -130,10 +132,8 @@ class DriverRideCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton(
-                  onPressed:
-                      (status == 'completed' || status.contains('cancel'))
-                      ? null
-                      : () async {
+                  onPressed: canManage
+                      ? () async {
                           final confirm = await Get.dialog<bool>(
                             Dialog(
                               insetPadding:
@@ -210,7 +210,8 @@ class DriverRideCard extends StatelessWidget {
                             Get.find<DriverMyRidesController>()
                                 .cancelRide(ride.id);
                           }
-                        },
+                        }
+                      : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE53935),
                     foregroundColor: Colors.white,

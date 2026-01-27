@@ -6,6 +6,7 @@ import 'package:help_ride/features/driver/widgets/requests/driver_request_card.d
 import 'package:help_ride/features/driver/widgets/requests/driver_ride_requests_tabs.dart';
 import 'package:help_ride/features/rides/models/ride.dart';
 import 'package:help_ride/features/rides/widgets/ride_details/ride_trip_details_card.dart';
+import 'package:help_ride/features/rides/widgets/ride_details/ride_info_card.dart';
 import 'package:help_ride/features/rides/widgets/ride_details/ride_ui.dart';
 import '../../../core/theme/app_colors.dart';
 
@@ -70,6 +71,10 @@ class DriverRideDetailsView extends GetView<DriverRideDetailsController> {
 
               const SectionTitle('Trip Details'),
               RideTripDetailsCard(ride: ride),
+              const SizedBox(height: 14),
+
+              const SectionTitle('Ride Info'),
+              RideInfoCard(ride: ride),
               const SizedBox(height: 14),
 
               const SectionTitle('Seats'),

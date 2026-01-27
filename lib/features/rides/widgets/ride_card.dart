@@ -19,6 +19,7 @@ class RideCard extends GetView<SearchRidesController> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
+    final isPast = !ride.startTime.isAfter(DateTime.now());
 
     return AppCard(
       child: Column(
@@ -232,17 +233,19 @@ class RideCard extends GetView<SearchRidesController> {
               SizedBox(
                 height: 44,
                 child: ElevatedButton(
-                  onPressed: () {
-                    final max = ride.seatsAvailable <= 0
-                        ? 1
-                        : ride.seatsAvailable;
-                    final seats = controller.getSelectedSeats(ride.id, max);
+                  onPressed: isPast
+                      ? null
+                      : () {
+                      final max = ride.seatsAvailable <= 0
+                          ? 1
+                          : ride.seatsAvailable;
+                      final seats = controller.getSelectedSeats(ride.id, max);
 
-                    Get.snackbar(
-                      'Book',
-                      'Booking $seats seat(s) for ride ${ride.id}',
-                    );
-                  },
+                      Get.snackbar(
+                        'Book',
+                        'Booking $seats seat(s) for ride ${ride.id}',
+                      );
+                    },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.passengerPrimary,
                     foregroundColor: Colors.white,

@@ -15,6 +15,7 @@ class RideDetailsBottomBar extends GetView<RideDetailsController> {
       final total = controller.totalPrice;
       final isDark = Theme.of(context).brightness == Brightness.dark;
       final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+      final isPast = !ride.startTime.isAfter(DateTime.now());
 
       return Container(
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
@@ -55,7 +56,7 @@ class RideDetailsBottomBar extends GetView<RideDetailsController> {
             SizedBox(
               height: 46,
               child: ElevatedButton(
-                onPressed: ride.seatsAvailable <= 0
+                onPressed: (ride.seatsAvailable <= 0 || isPast)
                     ? null
                     : controller.openConfirmSheet,
                 style: ElevatedButton.styleFrom(

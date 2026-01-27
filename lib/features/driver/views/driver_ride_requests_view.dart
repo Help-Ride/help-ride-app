@@ -326,13 +326,45 @@ Future<void> _openOfferSheet(
 ) async {
   await controller.loadDriverRides();
   if (!context.mounted) return;
-  if (controller.driverRides.isEmpty) {
-    Get.snackbar('No rides', 'Create a ride before making offers.');
+  final matches = controller.matchingRidesFor(request);
+  if (matches.isEmpty) {
+    final goCreate = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('No matching rides'),
+        content: const Text(
+          'Create a ride that matches this request before sending an offer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text('Create Ride'),
+          ),
+        ],
+      ),
+    );
+    if (goCreate == true) {
+      Get.toNamed(
+        '/driver/create-ride',
+        arguments: {
+          'fromCity': request.fromCity,
+          'toCity': request.toCity,
+          if (request.fromLat != null) 'fromLat': request.fromLat,
+          if (request.fromLng != null) 'fromLng': request.fromLng,
+          if (request.toLat != null) 'toLat': request.toLat,
+          if (request.toLng != null) 'toLng': request.toLng,
+        },
+      );
+    }
     return;
   }
 
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final rides = controller.driverRides;
+  final rides = matches;
   String selectedRideId = rides.first.id;
   int seatsOffered = 1;
   String? error;

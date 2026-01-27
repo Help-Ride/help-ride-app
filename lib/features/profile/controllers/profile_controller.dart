@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/models/user.dart';
 import '../../../shared/services/api_client.dart';
@@ -11,6 +12,8 @@ class ProfileController extends GetxController {
   final driverProfile = Rxn<DriverProfile>();
   final loading = false.obs;
   final driverLoading = false.obs;
+  final stripeLoading = false.obs;
+  final awaitingStripeReturn = false.obs;
 
   @override
   Future<void> onInit() async {
@@ -100,5 +103,33 @@ class ProfileController extends GetxController {
     } finally {
       driverLoading.value = false;
     }
+  }
+
+  Future<void> startStripeOnboarding() async {
+    if (stripeLoading.value) return;
+    stripeLoading.value = true;
+    try {
+      final url = await _api.createStripeOnboarding();
+      final uri = Uri.parse(url);
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        throw Exception('Could not open Stripe onboarding.');
+      }
+      awaitingStripeReturn.value = true;
+    } catch (e) {
+      Get.snackbar('Setup payouts failed', e.toString());
+    } finally {
+      stripeLoading.value = false;
+    }
+  }
+
+  Future<void> handleStripeReturn() async {
+    if (!awaitingStripeReturn.value) return;
+    awaitingStripeReturn.value = false;
+    await _session.bootstrap();
+    await refreshDriverProfile();
   }
 }
