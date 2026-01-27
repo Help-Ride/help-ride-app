@@ -152,7 +152,7 @@ class _RequestsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Column(
+    final header = Column(
       children: [
         Container(
           width: double.infinity,
@@ -354,8 +354,7 @@ class _RequestsTab extends StatelessWidget {
             child: ExpansionTile(
               tilePadding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-              childrenPadding:
-                  const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
               leading: Icon(
                 Icons.alt_route,
                 color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
@@ -414,93 +413,84 @@ class _RequestsTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        Expanded(
-          child: Obx(() {
-            final err = controller.requestsError.value;
-            final list = controller.requests.toList();
-            if (controller.sortByDistance.value &&
-                controller.locationReady) {
-              list.sort((a, b) {
-                final da = controller.distanceKmFor(a) ?? double.infinity;
-                final db = controller.distanceKmFor(b) ?? double.infinity;
-                return da.compareTo(db);
-              });
-            }
-
-            Widget buildEmpty(String text) {
-              return ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: 18, top: 12),
-                children: [
-                  Center(
-                    child: Text(
-                      text,
-                      style: TextStyle(
-                        color:
-                            isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            }
-
-            if (controller.requestsLoading.value && list.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (err != null) {
-              return RefreshIndicator(
-                onRefresh: () => controller.refreshRequests(force: true),
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: 18, top: 12),
-                  children: [
-                    Center(
-                      child: Text(
-                        err,
-                        style: const TextStyle(color: AppColors.error),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Center(
-                      child: ElevatedButton(
-                        onPressed: () =>
-                            controller.refreshRequests(force: true),
-                        child: const Text('Retry'),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            if (list.isEmpty) {
-              return RefreshIndicator(
-                onRefresh: () => controller.refreshRequests(force: true),
-                child: buildEmpty('No ride requests yet.'),
-              );
-            }
-
-            return RefreshIndicator(
-              onRefresh: () => controller.refreshRequests(force: true),
-              child: ListView.separated(
-                padding: const EdgeInsets.only(bottom: 18),
-                itemCount: list.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 14),
-                itemBuilder: (_, i) {
-                  final r = list[i];
-                  return DriverRideRequestCard(
-                    request: r,
-                    onOffer: () => _openOfferSheet(context, controller, r),
-                  );
-                },
-              ),
-            );
-          }),
-        ),
       ],
     );
+
+    return Obx(() {
+      final err = controller.requestsError.value;
+      final list = controller.requests.toList();
+      if (controller.sortByDistance.value && controller.locationReady) {
+        list.sort((a, b) {
+          final da = controller.distanceKmFor(a) ?? double.infinity;
+          final db = controller.distanceKmFor(b) ?? double.infinity;
+          return da.compareTo(db);
+        });
+      }
+
+      final initialLoading =
+          controller.requestsLoading.value && list.isEmpty;
+
+      Widget body;
+      if (initialLoading) {
+        body = const SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: CircularProgressIndicator()),
+        );
+      } else if (err != null) {
+        body = SliverFillRemaining(
+          hasScrollBody: false,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(err, style: const TextStyle(color: AppColors.error)),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () => controller.refreshRequests(force: true),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        );
+      } else if (list.isEmpty) {
+        body = SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Text(
+              'No ride requests yet.',
+              style: TextStyle(
+                color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+              ),
+            ),
+          ),
+        );
+      } else {
+        body = SliverPadding(
+          padding: const EdgeInsets.only(bottom: 18),
+          sliver: SliverList.separated(
+            itemCount: list.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 14),
+            itemBuilder: (_, i) {
+              final r = list[i];
+              return DriverRideRequestCard(
+                request: r,
+                onOffer: () => _openOfferSheet(context, controller, r),
+              );
+            },
+          ),
+        );
+      }
+
+      return RefreshIndicator(
+        onRefresh: () => controller.refreshRequests(force: true),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: header),
+            body,
+          ],
+        ),
+      );
+    });
   }
 }
 
