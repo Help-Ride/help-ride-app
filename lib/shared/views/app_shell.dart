@@ -31,6 +31,7 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    _applyNavigationArgs(Get.arguments);
     Get.lazyPut<DriverMyRidesController>(
       () => DriverMyRidesController(),
       fenix: true,
@@ -60,6 +61,35 @@ class _AppShellState extends State<AppShell> {
   void dispose() {
     _roleWorker.dispose();
     super.dispose();
+  }
+
+  void _applyNavigationArgs(dynamic argsRaw) {
+    if (argsRaw is! Map) return;
+    final args = argsRaw.cast<dynamic, dynamic>();
+    final parsed = _parseTabIndex(args['tab']);
+    if (parsed == null || parsed < 0) return;
+    index = parsed;
+  }
+
+  int? _parseTabIndex(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    final normalized = value.toString().trim().toLowerCase();
+    switch (normalized) {
+      case 'home':
+        return 0;
+      case 'rides':
+      case 'myrides':
+      case 'my_rides':
+      case 'my-rides':
+        return 1;
+      case 'messages':
+        return 2;
+      case 'profile':
+        return 3;
+      default:
+        return int.tryParse(normalized);
+    }
   }
 
   @override

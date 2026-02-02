@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:help_ride/core/routes/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 
 class BookingSuccessView extends StatelessWidget {
@@ -137,7 +138,10 @@ class BookingSuccessView extends StatelessWidget {
                 height: 52,
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => Get.toNamed('/my-rides'),
+                  onPressed: () => Get.offAllNamed(
+                    AppRoutes.shell,
+                    arguments: const {'tab': 'rides'},
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.passengerPrimary,
                     foregroundColor: Colors.white,
@@ -157,7 +161,10 @@ class BookingSuccessView extends StatelessWidget {
                 height: 52,
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () => Get.offAllNamed('/'),
+                  onPressed: () => Get.offAllNamed(
+                    AppRoutes.shell,
+                    arguments: const {'tab': 'home'},
+                  ),
                   style: OutlinedButton.styleFrom(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),

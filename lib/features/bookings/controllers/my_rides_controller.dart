@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:get/get.dart';
+import 'package:help_ride/core/routes/app_routes.dart';
 import '../../../shared/services/api_client.dart';
 import '../routes/booking_routes.dart';
 import '../models/booking.dart';
@@ -254,8 +255,8 @@ class MyRidesController extends GetxController {
       final parsedPollResult = _parsePollResult(pollResult);
       if (parsedPollResult == PaymentPollResult.paid) {
         Get.snackbar('Payment complete', 'Booking confirmed.');
-        if (Get.currentRoute != '/my-rides') {
-          Get.offAllNamed('/my-rides');
+        if (Get.currentRoute != AppRoutes.shell) {
+          Get.offAllNamed(AppRoutes.shell, arguments: const {'tab': 'rides'});
         }
         return PaymentAttemptResult.confirmed;
       }

@@ -6,6 +6,7 @@ import '../controllers/create_ride_controller.dart';
 import '../widgets/create_ride/chip.dart';
 import '../widgets/create_ride/info_box.dart';
 import '../widgets/create_ride/picker_tile.dart';
+import '../widgets/create_ride/ride_price_preview.dart';
 import '../widgets/create_ride/section_title.dart';
 import '../widgets/create_ride/text_area.dart';
 import '../widgets/create_ride/text_field.dart';
@@ -144,6 +145,10 @@ class CreateRideView extends GetView<CreateRideController> {
                   ),
                 ],
               ),
+              if (controller.pricingPreview.value != null) ...[
+                const SizedBox(height: 10),
+                RidePricePreview(preview: controller.pricingPreview.value!),
+              ],
 
               const SizedBox(height: 18),
               const SectionTitle('AMENITIES'),

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/widgets/place_picker_field.dart';
 import '../services/driver_rides_api.dart';
+import '../utils/ride_price_policy.dart';
 
 class CreateRideController extends GetxController {
   late final DriverRidesApi _api;
@@ -23,6 +24,7 @@ class CreateRideController extends GetxController {
   final date = Rxn<DateTime>();
   final time = Rxn<TimeOfDay>();
   final canPublishFlag = false.obs;
+  final pricingPreview = Rxn<RidePriceResolution>();
   final _workers = <Worker>[];
 
   final amenities = <String, bool>{
@@ -66,25 +68,25 @@ class CreateRideController extends GetxController {
       );
     }
 
-    fromCtrl.addListener(_recomputeCanPublish);
-    toCtrl.addListener(_recomputeCanPublish);
-    seatsCtrl.addListener(_recomputeCanPublish);
-    priceCtrl.addListener(_recomputeCanPublish);
+    fromCtrl.addListener(_refreshComputedState);
+    toCtrl.addListener(_refreshComputedState);
+    seatsCtrl.addListener(_refreshComputedState);
+    priceCtrl.addListener(_refreshComputedState);
     _workers.addAll([
-      ever(fromPick, (_) => _recomputeCanPublish()),
-      ever(toPick, (_) => _recomputeCanPublish()),
-      ever(date, (_) => _recomputeCanPublish()),
-      ever(time, (_) => _recomputeCanPublish()),
+      ever(fromPick, (_) => _refreshComputedState()),
+      ever(toPick, (_) => _refreshComputedState()),
+      ever(date, (_) => _refreshComputedState()),
+      ever(time, (_) => _refreshComputedState()),
     ]);
-    _recomputeCanPublish();
+    _refreshComputedState();
   }
 
   @override
   void onClose() {
-    fromCtrl.removeListener(_recomputeCanPublish);
-    toCtrl.removeListener(_recomputeCanPublish);
-    seatsCtrl.removeListener(_recomputeCanPublish);
-    priceCtrl.removeListener(_recomputeCanPublish);
+    fromCtrl.removeListener(_refreshComputedState);
+    toCtrl.removeListener(_refreshComputedState);
+    seatsCtrl.removeListener(_refreshComputedState);
+    priceCtrl.removeListener(_refreshComputedState);
     for (final w in _workers) {
       w.dispose();
     }
@@ -117,6 +119,48 @@ class CreateRideController extends GetxController {
     canPublishFlag.value = _computeCanPublish();
   }
 
+  void _refreshComputedState() {
+    _recomputeCanPublish();
+    pricingPreview.value = _buildPricingPreview();
+  }
+
+  RidePriceResolution? _buildPricingPreview() {
+    final from = fromPick.value?.latLng;
+    final to = toPick.value?.latLng;
+    final departure = startDateTimeLocal;
+    final seats = int.tryParse(seatsCtrl.text.trim());
+    final basePrice = double.tryParse(priceCtrl.text.trim());
+
+    if (from == null ||
+        to == null ||
+        departure == null ||
+        seats == null ||
+        seats <= 0 ||
+        basePrice == null ||
+        basePrice < 0) {
+      return null;
+    }
+
+    final distanceKm = RidePricePolicy.distanceKm(
+      fromLat: from.lat,
+      fromLng: from.lng,
+      toLat: to.lat,
+      toLng: to.lng,
+    );
+
+    return RidePricePolicy.resolvePerSeatPrice(
+      basePricePerSeat: basePrice,
+      seats: seats,
+      distanceKm: distanceKm,
+      bookingTimeLocal: DateTime.now(),
+      departureTimeLocal: departure,
+      sameDestination: RidePricePolicy.isSameDestination(
+        from: fromCtrl.text,
+        to: toCtrl.text,
+      ),
+    );
+  }
+
   DateTime? get startDateTimeLocal {
     final d = date.value;
     final t = time.value;
@@ -146,12 +190,34 @@ class CreateRideController extends GetxController {
 
     final startLocal = startDateTimeLocal!;
     final seats = int.parse(seatsCtrl.text.trim());
-    final price = double.parse(priceCtrl.text.trim());
+    final basePrice = double.parse(priceCtrl.text.trim());
 
     final from = fromPick.value!;
     final to = toPick.value!;
     final fromLL = from.latLng!;
     final toLL = to.latLng!;
+    final pricing =
+        _buildPricingPreview() ??
+        RidePricePolicy.resolvePerSeatPrice(
+          basePricePerSeat: basePrice,
+          seats: seats,
+          distanceKm: RidePricePolicy.distanceKm(
+            fromLat: fromLL.lat,
+            fromLng: fromLL.lng,
+            toLat: toLL.lat,
+            toLng: toLL.lng,
+          ),
+          bookingTimeLocal: DateTime.now(),
+          departureTimeLocal: startLocal,
+          sameDestination: RidePricePolicy.isSameDestination(
+            from: from.fullText,
+            to: to.fullText,
+          ),
+        );
+    final finalPrice = pricing.finalPricePerSeat;
+    if (pricing.adjusted) {
+      priceCtrl.text = _formatPrice(finalPrice);
+    }
 
     loading.value = true;
     try {
@@ -164,11 +230,16 @@ class CreateRideController extends GetxController {
         toLng: toLL.lng,
         startTimeUtc: startLocal.toUtc(),
         seatsTotal: seats,
-        pricePerSeat: price,
+        pricePerSeat: finalPrice,
       );
 
       Get.back();
-      Get.snackbar('Published', 'Ride created successfully');
+      Get.snackbar(
+        'Published',
+        pricing.adjusted
+            ? 'Ride created. Price adjusted to \$${_formatPrice(finalPrice)}/seat by safety caps.'
+            : 'Ride created successfully',
+      );
     } catch (e) {
       error.value = e.toString();
       Get.snackbar('Failed', error.value ?? 'Failed');
@@ -176,4 +247,11 @@ class CreateRideController extends GetxController {
       loading.value = false;
     }
   }
+}
+
+String _formatPrice(double value) {
+  final fixed = value.toStringAsFixed(2);
+  if (fixed.endsWith('.00')) return value.toStringAsFixed(0);
+  if (fixed.endsWith('0')) return fixed.substring(0, fixed.length - 1);
+  return fixed;
 }

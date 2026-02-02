@@ -28,12 +28,17 @@ class ChatBubble extends StatelessWidget {
     final timeColor = isMine
         ? Colors.white70
         : (isDark ? AppColors.darkMuted : AppColors.lightMuted);
+    final isSeen = isMine && message.readAt != null;
+    final seenColor = isMine
+        ? Colors.white70
+        : (isDark ? AppColors.darkMuted : accentColor);
 
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Column(
-        crossAxisAlignment:
-            isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isMine
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Container(
             constraints: const BoxConstraints(maxWidth: 280),
@@ -43,10 +48,12 @@ class ChatBubble extends StatelessWidget {
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(16),
                 topRight: const Radius.circular(16),
-                bottomLeft:
-                    isMine ? const Radius.circular(16) : const Radius.circular(4),
-                bottomRight:
-                    isMine ? const Radius.circular(4) : const Radius.circular(16),
+                bottomLeft: isMine
+                    ? const Radius.circular(16)
+                    : const Radius.circular(4),
+                bottomRight: isMine
+                    ? const Radius.circular(4)
+                    : const Radius.circular(16),
               ),
               boxShadow: isMine
                   ? null
@@ -62,21 +69,35 @@ class ChatBubble extends StatelessWidget {
             ),
             child: Text(
               message.body,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 14,
-                height: 1.3,
-              ),
+              style: TextStyle(color: textColor, fontSize: 14, height: 1.3),
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            chatTimeOfDay(message.createdAt),
-            style: TextStyle(
-              color: timeColor,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                chatTimeOfDay(message.createdAt),
+                style: TextStyle(
+                  color: timeColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (isSeen) ...[
+                const SizedBox(width: 6),
+                Icon(Icons.done_all_rounded, size: 12, color: seenColor),
+                const SizedBox(width: 4),
+                Text(
+                  'Seen',
+                  style: TextStyle(
+                    color: seenColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),

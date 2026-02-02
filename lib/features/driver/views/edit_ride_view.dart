@@ -6,6 +6,7 @@ import '../controllers/edit_ride_controller.dart';
 import '../widgets/create_ride/chip.dart';
 import '../widgets/create_ride/info_box.dart';
 import '../widgets/create_ride/picker_tile.dart';
+import '../widgets/create_ride/ride_price_preview.dart';
 import '../widgets/create_ride/section_title.dart';
 import '../widgets/create_ride/text_area.dart';
 import '../widgets/create_ride/text_field.dart';
@@ -36,8 +37,7 @@ class EditRideView extends GetView<EditRideController> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (controller.ride.value == null &&
-              controller.error.value != null) {
+          if (controller.ride.value == null && controller.error.value != null) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(18),
@@ -63,10 +63,7 @@ class EditRideView extends GetView<EditRideController> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 90),
             children: [
-              Text(
-                'Update your ride details',
-                style: TextStyle(color: muted),
-              ),
+              Text('Update your ride details', style: TextStyle(color: muted)),
               const SizedBox(height: 18),
 
               const SectionTitle('ROUTE'),
@@ -133,8 +130,7 @@ class EditRideView extends GetView<EditRideController> {
                       onTap: () async {
                         final picked = await showTimePicker(
                           context: context,
-                          initialTime:
-                              controller.time.value ?? TimeOfDay.now(),
+                          initialTime: controller.time.value ?? TimeOfDay.now(),
                         );
                         if (picked != null) controller.time.value = picked;
                       },
@@ -173,6 +169,10 @@ class EditRideView extends GetView<EditRideController> {
                   ),
                 ],
               ),
+              if (controller.pricingPreview.value != null) ...[
+                const SizedBox(height: 10),
+                RidePricePreview(preview: controller.pricingPreview.value!),
+              ],
 
               const SizedBox(height: 18),
               const SectionTitle('AMENITIES'),

@@ -39,7 +39,11 @@ class ChatConversationsController extends GetxController {
         currentUserId: currentUserId,
         currentRole: currentRole,
       );
-      conversations.assignAll(list);
+      final withUnreadCounts = await _withComputedUnreadCounts(
+        list,
+        currentUserId: currentUserId,
+      );
+      conversations.assignAll(withUnreadCounts);
     } catch (e) {
       error.value = e.toString();
     } finally {
@@ -63,6 +67,9 @@ class ChatConversationsController extends GetxController {
 
   void setActiveConversation(String? conversationId) {
     activeConversationId.value = conversationId;
+    if (conversationId != null && conversationId.trim().isNotEmpty) {
+      markConversationReadLocally(conversationId);
+    }
   }
 
   String get currentUserId {
@@ -77,6 +84,16 @@ class ChatConversationsController extends GetxController {
       return Get.find<SessionController>().user.value?.roleDefault;
     }
     return null;
+  }
+
+  void markConversationReadLocally(String conversationId) {
+    final id = conversationId.trim();
+    if (id.isEmpty) return;
+    final index = conversations.indexWhere((c) => c.id == id);
+    if (index == -1) return;
+    final current = conversations[index];
+    if (current.unreadCount == 0) return;
+    conversations[index] = current.copyWith(unreadCount: 0);
   }
 
   void _handleConversationUpdated(ChatConversation conversation) {
@@ -104,12 +121,15 @@ class ChatConversationsController extends GetxController {
       final bumped = existing.unreadCount + 1;
       incoming = conversation.copyWith(unreadCount: bumped);
     }
-    final mergedPassenger =
-        _mergeParticipant(existing.passenger, incoming.passenger);
-    final mergedDriver =
-        _mergeParticipant(existing.driver, incoming.driver);
-    final mergedParticipant =
-        _mergeParticipant(existing.participant, incoming.participant);
+    final mergedPassenger = _mergeParticipant(
+      existing.passenger,
+      incoming.passenger,
+    );
+    final mergedDriver = _mergeParticipant(existing.driver, incoming.driver);
+    final mergedParticipant = _mergeParticipant(
+      existing.participant,
+      incoming.participant,
+    );
 
     final updated = conversations[index].copyWith(
       rideId: incoming.rideId,
@@ -206,5 +226,46 @@ class ChatConversationsController extends GetxController {
     conversations[index] = updated;
     final moved = conversations.removeAt(index);
     conversations.insert(0, moved);
+  }
+
+  Future<List<ChatConversation>> _withComputedUnreadCounts(
+    List<ChatConversation> list, {
+    required String currentUserId,
+  }) async {
+    if (list.isEmpty) return list;
+    final activeId = activeConversationId.value;
+    if (currentUserId.trim().isEmpty) {
+      if (activeId == null || activeId.isEmpty) return list;
+      return list
+          .map((conversation) {
+            if (conversation.id == activeId) {
+              return conversation.copyWith(unreadCount: 0);
+            }
+            return conversation;
+          })
+          .toList(growable: false);
+    }
+
+    final futures = list
+        .map((conversation) async {
+          final isActive = activeId == conversation.id;
+          try {
+            final unreadCount = await _api.countUnreadMessages(
+              conversationId: conversation.id,
+              currentUserId: currentUserId,
+            );
+            return conversation.copyWith(
+              unreadCount: isActive ? 0 : unreadCount,
+            );
+          } catch (_) {
+            if (isActive && conversation.unreadCount != 0) {
+              return conversation.copyWith(unreadCount: 0);
+            }
+            return conversation;
+          }
+        })
+        .toList(growable: false);
+
+    return Future.wait(futures);
   }
 }

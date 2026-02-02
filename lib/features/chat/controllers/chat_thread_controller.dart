@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_client.dart';
@@ -19,6 +21,7 @@ class ChatThreadController extends GetxController {
   final sending = false.obs;
   final error = RxnString();
   final draft = ''.obs;
+  bool _markingRead = false;
 
   String get currentUserId {
     if (Get.isRegistered<SessionController>()) {
@@ -29,7 +32,8 @@ class ChatThreadController extends GetxController {
 
   String get currentRole {
     if (Get.isRegistered<SessionController>()) {
-      return Get.find<SessionController>().user.value?.roleDefault ?? 'passenger';
+      return Get.find<SessionController>().user.value?.roleDefault ??
+          'passenger';
     }
     return 'passenger';
   }
@@ -58,6 +62,7 @@ class ChatThreadController extends GetxController {
       if (deduped.isNotEmpty) {
         _updateConversationPreview(deduped.last);
       }
+      await _markConversationRead();
     } catch (e) {
       error.value = e.toString();
     } finally {
@@ -99,6 +104,9 @@ class ChatThreadController extends GetxController {
     if (_isDuplicate(message)) return;
     _upsertMessage(message);
     _updateConversationPreview(message);
+    if (!_isMineMessage(message)) {
+      unawaited(_markConversationRead());
+    }
   }
 
   @override
@@ -120,11 +128,17 @@ class ChatThreadController extends GetxController {
     if (message.id.isNotEmpty) {
       final index = messages.indexWhere((m) => m.id == message.id);
       if (index != -1) {
-        messages[index] = message;
+        final existing = messages[index];
+        if (message.readAt == null && existing.readAt != null) {
+          messages[index] = message.copyWith(readAt: existing.readAt);
+        } else {
+          messages[index] = message;
+        }
         return;
       }
     }
     messages.add(message);
+    messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
   }
 
   void _updateConversationPreview(ChatMessage message) {
@@ -138,8 +152,7 @@ class ChatThreadController extends GetxController {
   }
 
   bool _isDuplicate(ChatMessage message) {
-    if (message.id.isNotEmpty &&
-        messages.any((m) => m.id == message.id)) {
+    if (message.id.isNotEmpty && messages.any((m) => m.id == message.id)) {
       return true;
     }
     final window = const Duration(seconds: 5);
@@ -149,6 +162,47 @@ class ChatThreadController extends GetxController {
       final diff = m.createdAt.difference(message.createdAt).abs();
       return diff <= window;
     });
+  }
+
+  bool _isMineMessage(ChatMessage message) {
+    final me = currentUserId;
+    if (me.isNotEmpty) return message.senderId == me;
+    return message.senderRole == currentRole;
+  }
+
+  Future<void> _markConversationRead() async {
+    _clearConversationUnreadLocally();
+    final id = conversation.id.trim();
+    if (id.isEmpty || _markingRead) return;
+
+    _markingRead = true;
+    try {
+      final result = await _api.markConversationRead(id);
+      final readAt = result.readAt;
+      if (readAt != null && result.messageIds.isNotEmpty) {
+        _applyReadAtToMessages(result.messageIds.toSet(), readAt);
+      }
+    } catch (_) {
+      // Non-blocking: the thread should remain usable even if this call fails.
+    } finally {
+      _markingRead = false;
+    }
+  }
+
+  void _clearConversationUnreadLocally() {
+    if (!Get.isRegistered<ChatConversationsController>()) return;
+    Get.find<ChatConversationsController>().markConversationReadLocally(
+      conversation.id,
+    );
+  }
+
+  void _applyReadAtToMessages(Set<String> messageIds, DateTime readAt) {
+    for (var i = 0; i < messages.length; i++) {
+      final message = messages[i];
+      if (!messageIds.contains(message.id)) continue;
+      if (message.readAt != null) continue;
+      messages[i] = message.copyWith(readAt: readAt);
+    }
   }
 
   List<ChatMessage> _dedupe(List<ChatMessage> list) {

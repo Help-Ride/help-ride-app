@@ -135,7 +135,7 @@ class BookingsApi {
 
   List<Booking> _parseBookingList(dynamic raw) {
     final list = _extractBookingList(raw);
-    if (list.isEmpty) return const <Booking>[];
+    if (list.isEmpty) return <Booking>[];
 
     return list
         .whereType<Map>()
