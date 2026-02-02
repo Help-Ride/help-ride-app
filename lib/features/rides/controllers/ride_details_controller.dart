@@ -6,7 +6,6 @@ import 'package:help_ride/features/rides/services/rides_api.dart';
 import 'package:help_ride/features/rides/widgets/confirm_booking_sheet.dart';
 import 'package:help_ride/shared/services/api_client.dart';
 
-// ✅ add this import (create file below if not exists)
 import 'package:help_ride/features/bookings/services/bookings_api.dart';
 
 class RideDetailsController extends GetxController {
@@ -18,8 +17,36 @@ class RideDetailsController extends GetxController {
   final ride = Rxn<Ride>();
 
   final selectedSeats = 1.obs;
+  final bookingPickupName = RxnString();
+  final bookingPickupLat = Rxn<double>();
+  final bookingPickupLng = Rxn<double>();
+  final bookingDropoffName = RxnString();
+  final bookingDropoffLat = Rxn<double>();
+  final bookingDropoffLng = Rxn<double>();
 
   String get rideId => Get.parameters['id'] ?? '';
+  bool get hasBookingRouteContext =>
+      _nonEmpty(bookingPickupName.value) != null ||
+      _nonEmpty(bookingDropoffName.value) != null;
+
+  String get tripPickupName =>
+      _nonEmpty(bookingPickupName.value) ??
+      _nonEmpty(ride.value?.fromCity) ??
+      '-';
+
+  String get tripDropoffName =>
+      _nonEmpty(bookingDropoffName.value) ??
+      _nonEmpty(ride.value?.toCity) ??
+      '-';
+
+  double? get tripPickupLat =>
+      hasBookingRouteContext ? bookingPickupLat.value : null;
+  double? get tripPickupLng =>
+      hasBookingRouteContext ? bookingPickupLng.value : null;
+  double? get tripDropoffLat =>
+      hasBookingRouteContext ? bookingDropoffLat.value : null;
+  double? get tripDropoffLng =>
+      hasBookingRouteContext ? bookingDropoffLng.value : null;
 
   @override
   Future<void> onInit() async {
@@ -30,12 +57,13 @@ class RideDetailsController extends GetxController {
     _bookingsApi = BookingsApi(client);
 
     // seats from previous screen
-    final args = (Get.arguments as Map?) ?? {};
+    final args = (Get.arguments as Map?) ?? const <String, dynamic>{};
     final rawSeats = args['seats'];
     final s = rawSeats is int
         ? rawSeats
         : int.tryParse('${rawSeats ?? 1}') ?? 1;
     selectedSeats.value = s <= 0 ? 1 : s;
+    _applyBookingContextArgs(args);
 
     if (rideId.trim().isEmpty) {
       error.value = 'Missing ride id.';
@@ -43,6 +71,27 @@ class RideDetailsController extends GetxController {
     }
 
     await fetch();
+  }
+
+  void _applyBookingContextArgs(Map<dynamic, dynamic> args) {
+    bookingPickupName.value = _nonEmpty(
+      _asString(args['bookingPickupName'] ?? args['passengerPickupName']),
+    );
+    bookingPickupLat.value = _asNullableDouble(
+      args['bookingPickupLat'] ?? args['passengerPickupLat'],
+    );
+    bookingPickupLng.value = _asNullableDouble(
+      args['bookingPickupLng'] ?? args['passengerPickupLng'],
+    );
+    bookingDropoffName.value = _nonEmpty(
+      _asString(args['bookingDropoffName'] ?? args['passengerDropoffName']),
+    );
+    bookingDropoffLat.value = _asNullableDouble(
+      args['bookingDropoffLat'] ?? args['passengerDropoffLat'],
+    );
+    bookingDropoffLng.value = _asNullableDouble(
+      args['bookingDropoffLng'] ?? args['passengerDropoffLng'],
+    );
   }
 
   Future<void> fetch() async {
@@ -93,21 +142,55 @@ class RideDetailsController extends GetxController {
         dateText: _formatDateTime(r.startTime),
         seats: seats,
         total: r.pricePerSeat * seats,
+        initialPickup: r.fromCity,
+        initialDropoff: r.toCity,
+        initialPickupLat: r.fromLat,
+        initialPickupLng: r.fromLng,
+        initialDropoffLat: r.toLat,
+        initialDropoffLng: r.toLng,
         onCancel: () => Get.back(),
-        onConfirm: confirmBooking, // ✅ now uses API
+        onConfirm:
+            ({
+              required pickupName,
+              required dropoffName,
+              required pickupLat,
+              required pickupLng,
+              required dropoffLat,
+              required dropoffLng,
+            }) => confirmBooking(
+              pickupName: pickupName,
+              dropoffName: dropoffName,
+              pickupLat: pickupLat,
+              pickupLng: pickupLng,
+              dropoffLat: dropoffLat,
+              dropoffLng: dropoffLng,
+            ),
       ),
       isScrollControlled: true,
       backgroundColor: const Color(0x00000000),
     );
   }
 
-  Future<void> confirmBooking() async {
+  Future<void> confirmBooking({
+    required String pickupName,
+    required String dropoffName,
+    required double pickupLat,
+    required double pickupLng,
+    required double dropoffLat,
+    required double dropoffLng,
+  }) async {
     final r = ride.value;
     if (r == null) return;
 
     // clamp seats
     final max = r.seatsAvailable <= 0 ? 1 : r.seatsAvailable;
     final seats = selectedSeats.value.clamp(1, max);
+    final pickup = pickupName.trim();
+    final dropoff = dropoffName.trim();
+    if (pickup.isEmpty || dropoff.isEmpty) {
+      Get.snackbar('Missing details', 'Pickup and drop-off are required.');
+      return;
+    }
 
     loading.value = true;
     error.value = null;
@@ -117,14 +200,22 @@ class RideDetailsController extends GetxController {
       final booking = await _bookingsApi.createBooking(
         rideId: r.id,
         seats: seats,
+        passengerPickupName: pickup,
+        passengerDropoffName: dropoff,
+        passengerPickupLat: pickupLat,
+        passengerPickupLng: pickupLng,
+        passengerDropoffLat: dropoffLat,
+        passengerDropoffLng: dropoffLng,
       );
 
       // close sheet (if open)
       if (Get.isBottomSheetOpen ?? false) Get.back();
 
-      final bookingId = (booking['id'] ?? '').toString();
-      final bookingStatus = (booking['status'] ?? 'pending').toString();
-      final total = r.pricePerSeat * seats;
+      final bookingId = booking.id.trim();
+      final bookingStatus = booking.status;
+      final total = booking.totalPrice > 0
+          ? booking.totalPrice
+          : r.pricePerSeat * seats;
 
       Get.snackbar(
         'Requested',
@@ -136,13 +227,14 @@ class RideDetailsController extends GetxController {
       // optional: refresh ride to update seatsAvailable if backend reduces it
       await fetch();
 
-      final status = (booking['status'] ?? 'pending').toString();
+      final status = booking.status;
+      final routeText = '${booking.pickupLabel} → ${booking.dropoffLabel}';
 
       // ✅ Navigate to success screen using real booking data
       Get.toNamed(
         '/booking/success',
         arguments: {
-          'route': '${r.fromCity} → ${r.toCity}',
+          'route': routeText,
           'departure': _formatDateTime(r.startTime),
           'total': total,
           'ref': bookingId.isNotEmpty
@@ -158,6 +250,20 @@ class RideDetailsController extends GetxController {
       loading.value = false;
     }
   }
+}
+
+String _asString(dynamic value) => value?.toString() ?? '';
+
+String? _nonEmpty(String? value) {
+  if (value == null) return null;
+  final cleaned = value.trim();
+  return cleaned.isEmpty ? null : cleaned;
+}
+
+double? _asNullableDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString());
 }
 
 String _formatDateTime(DateTime dt) {

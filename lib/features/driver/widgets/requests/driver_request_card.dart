@@ -23,22 +23,54 @@ class DriverRequestCard extends StatelessWidget {
   final VoidCallback onReject;
   final bool busy;
 
-  bool get _isOffered {
-    final s = booking.status.toLowerCase();
-    return s.contains('confirm') ||
-        s.contains('accepted') ||
-        s.contains('offer');
+  _DriverRequestUiState get _uiState {
+    final status = booking.status.toLowerCase();
+    final isPaid = isPaymentPaidStatus(booking.paymentStatus);
+    final isCancelled = status.contains('reject') || status.contains('cancel');
+    if (isCancelled) return _DriverRequestUiState.cancelled;
+
+    final isAcceptedOrConfirmed =
+        status.contains('accept') ||
+        status.contains('confirm') ||
+        status.contains('offer') ||
+        isPaid;
+    if (isAcceptedOrConfirmed) return _DriverRequestUiState.offered;
+
+    final isPending =
+        status.contains('pending') ||
+        status.contains('new') ||
+        status.contains('requested') ||
+        status.contains('request');
+    if (isPending) return _DriverRequestUiState.pending;
+
+    return _DriverRequestUiState.other;
   }
 
-  bool get _isRejected {
-    final s = booking.status.toLowerCase();
-    return s.contains('reject') || s.contains('cancel');
+  bool get _isAcceptedAwaitingPayment {
+    final status = booking.status.toLowerCase();
+    if (!status.contains('accept')) return false;
+    return !isPaymentPaidStatus(booking.paymentStatus);
   }
 
   @override
   Widget build(BuildContext context) {
     final passenger = booking.passenger;
     final name = passenger?.name ?? 'Passenger';
+    final pickupName = (booking.passengerPickupName ?? '').trim();
+    final dropoffName = (booking.passengerDropoffName ?? '').trim();
+    final pickupCoords = _coordsText(
+      booking.passengerPickupLat,
+      booking.passengerPickupLng,
+    );
+    final dropoffCoords = _coordsText(
+      booking.passengerDropoffLat,
+      booking.passengerDropoffLng,
+    );
+    final hasRequestLocations = pickupName.isNotEmpty || dropoffName.isNotEmpty;
+    final contact = [
+      (passenger?.phone ?? '').trim(),
+      (passenger?.email ?? '').trim(),
+    ].where((v) => v.isNotEmpty).join(' • ');
     final created = booking.updatedAt ?? booking.createdAt;
     final note = (booking.note ?? '').trim();
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -68,7 +100,7 @@ class DriverRequestCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _StatusPill(status: booking.status),
+              _StatusPill(booking: booking),
               const Spacer(),
               Text(timeAgo(created), style: TextStyle(color: muted)),
             ],
@@ -93,7 +125,18 @@ class DriverRequestCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    _RatingTrips(passenger: passenger, isDark: isDark),
+                    if (contact.isNotEmpty)
+                      Text(
+                        contact,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: muted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                    else
+                      _RatingTrips(passenger: passenger, isDark: isDark),
                   ],
                 ),
               ),
@@ -105,23 +148,59 @@ class DriverRequestCard extends StatelessWidget {
             color: isDark ? const Color(0xFF232836) : const Color(0xFFE9EEF6),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.place_outlined, size: 18, color: muted),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '${booking.ride.fromCity}  →  ${booking.ride.toCity}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1C2331) : const Color(0xFFF7F9FC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark
+                    ? const Color(0xFF232836)
+                    : const Color(0xFFE6EAF2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Passenger requested route',
                   style: TextStyle(
+                    color: muted,
                     fontWeight: FontWeight.w800,
-                    color: textPrimary,
+                    fontSize: 12,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                _PassengerLocationRow(
+                  icon: Icons.my_location_outlined,
+                  label: 'Pickup',
+                  value: pickupName.isEmpty ? 'Not provided' : pickupName,
+                  coords: pickupCoords,
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 8),
+                _PassengerLocationRow(
+                  icon: Icons.place_outlined,
+                  label: 'Drop-off',
+                  value: dropoffName.isEmpty ? 'Not provided' : dropoffName,
+                  coords: dropoffCoords,
+                  isDark: isDark,
+                ),
+              ],
+            ),
           ),
+          if (!hasRequestLocations) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Passenger-specific pickup/drop-off was not provided in this request.',
+              style: TextStyle(
+                color: muted,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           Row(
             children: [
@@ -152,6 +231,26 @@ class DriverRequestCard extends StatelessWidget {
               ),
             ],
           ),
+          if (_isAcceptedAwaitingPayment) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF2D6),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF0D49C)),
+              ),
+              child: const Text(
+                'Booking accepted. Waiting for passenger payment to confirm.',
+                style: TextStyle(
+                  color: Color(0xFF8A5A00),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
           if (note.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
@@ -166,9 +265,10 @@ class DriverRequestCard extends StatelessWidget {
               child: Text(note, style: TextStyle(color: textPrimary)),
             ),
           ],
-          if (!_isRejected) ...[
+          if (_uiState == _DriverRequestUiState.offered ||
+              _uiState == _DriverRequestUiState.pending) ...[
             const SizedBox(height: 14),
-            _isOffered
+            _uiState == _DriverRequestUiState.offered
                 ? OutlinedButton.icon(
                     onPressed: busy
                         ? null
@@ -243,7 +343,7 @@ class DriverRequestCard extends StatelessWidget {
                         child: ElevatedButton.icon(
                           onPressed: busy ? null : onConfirm,
                           icon: const Icon(Icons.send_rounded, size: 18),
-                          label: const Text('Send Offer'),
+                          label: const Text('Accept Booking'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.driverPrimary,
                             foregroundColor: Colors.white,
@@ -262,15 +362,22 @@ class DriverRequestCard extends StatelessWidget {
       ),
     );
   }
+
+  String? _coordsText(double? lat, double? lng) {
+    if (lat == null || lng == null) return null;
+    return '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
+  }
 }
 
+enum _DriverRequestUiState { pending, offered, cancelled, other }
+
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.status});
-  final String status;
+  const _StatusPill({required this.booking});
+  final Booking booking;
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg, text) = _style(status);
+    final (bg, fg, text) = _style(booking.status, booking.paymentStatus);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -284,20 +391,25 @@ class _StatusPill extends StatelessWidget {
     );
   }
 
-  (Color, Color, String) _style(String s) {
-    final status = s.toLowerCase();
+  (Color, Color, String) _style(String statusRaw, String paymentStatusRaw) {
+    final status = statusRaw.toLowerCase();
+    final isPaid = isPaymentPaidStatus(paymentStatusRaw);
+
     if (status.contains('pending') ||
         status.contains('new') ||
         status.contains('request')) {
-      return (const Color(0xFFE8F0FF), const Color(0xFF2F6BFF), 'New Request');
+      return (const Color(0xFFE8F0FF), const Color(0xFF2F6BFF), 'Pending');
     }
-    if (status.contains('confirm') || status.contains('offer')) {
-      return (const Color(0xFFE7F8EF), const Color(0xFF179C5E), 'Offer Sent');
+    if (status.contains('confirm') || isPaid) {
+      return (const Color(0xFFE7F8EF), const Color(0xFF179C5E), 'Confirmed');
+    }
+    if (status.contains('accept') || status.contains('offer')) {
+      return (const Color(0xFFFFF2D6), const Color(0xFFB86B00), 'Accepted');
     }
     if (status.contains('reject') || status.contains('cancel')) {
-      return (const Color(0xFFFFE2E2), const Color(0xFFD64545), 'Declined');
+      return (const Color(0xFFFFE2E2), const Color(0xFFD64545), 'Rejected');
     }
-    return (const Color(0xFFEFF2F6), const Color(0xFF6B7280), s);
+    return (const Color(0xFFEFF2F6), const Color(0xFF6B7280), statusRaw);
   }
 }
 
@@ -337,13 +449,7 @@ class _RatingTrips extends StatelessWidget {
     final rating = passenger?.rating;
     final trips = passenger?.trips;
     if (rating == null && trips == null) {
-      return Text(
-        '⭐ 4.8 • 45 trips',
-        style: TextStyle(
-          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-          fontWeight: FontWeight.w600,
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     final ratingText = rating == null ? '—' : rating.toStringAsFixed(1);
@@ -355,6 +461,72 @@ class _RatingTrips extends StatelessWidget {
         color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
         fontWeight: FontWeight.w600,
       ),
+    );
+  }
+}
+
+class _PassengerLocationRow extends StatelessWidget {
+  const _PassengerLocationRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.isDark,
+    this.coords,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final String? coords;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: muted),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: muted,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (coords != null && coords!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  coords!,
+                  style: TextStyle(
+                    color: muted,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

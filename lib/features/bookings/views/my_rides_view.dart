@@ -170,10 +170,17 @@ class MyRidesView extends GetView<MyRidesController> {
                               final canPay = controller.shouldShowPayAction(
                                 booking,
                               );
+                              final canCancel = controller.canCancelBooking(
+                                booking,
+                              );
                               return BookingCard(
                                 b: booking,
                                 showPay: canPay,
+                                showCancel: canCancel,
                                 isPaying: controller.isPaying(booking.id),
+                                isCanceling: controller.isCancelingBooking(
+                                  booking.id,
+                                ),
                                 payButtonLabel: controller.payButtonLabel(
                                   booking,
                                 ),
@@ -186,6 +193,19 @@ class MyRidesView extends GetView<MyRidesController> {
                                         '/rides/${booking.rideId}',
                                         arguments: {
                                           'seats': booking.seatsBooked,
+                                          'bookingId': booking.id,
+                                          'bookingPickupName':
+                                              booking.passengerPickupName,
+                                          'bookingPickupLat':
+                                              booking.passengerPickupLat,
+                                          'bookingPickupLng':
+                                              booking.passengerPickupLng,
+                                          'bookingDropoffName':
+                                              booking.passengerDropoffName,
+                                          'bookingDropoffLat':
+                                              booking.passengerDropoffLat,
+                                          'bookingDropoffLng':
+                                              booking.passengerDropoffLng,
                                         },
                                       ),
                                 onPay: canPay
@@ -193,6 +213,39 @@ class MyRidesView extends GetView<MyRidesController> {
                                         BookingRoutes.payNow,
                                         arguments: {'booking': booking},
                                       )
+                                    : null,
+                                onCancel: canCancel
+                                    ? () async {
+                                        final confirm =
+                                            await showDialog<bool>(
+                                              context: context,
+                                              builder: (_) => AlertDialog(
+                                                title: const Text(
+                                                  'Cancel booking?',
+                                                ),
+                                                content: const Text(
+                                                  'This will cancel your booking for this ride.',
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Get.back(result: false),
+                                                    child: const Text('Keep'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Get.back(result: true),
+                                                    child: const Text(
+                                                      'Cancel Booking',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ) ??
+                                            false;
+                                        if (!confirm) return;
+                                        await controller.cancelBooking(booking);
+                                      }
                                     : null,
                               );
                             },

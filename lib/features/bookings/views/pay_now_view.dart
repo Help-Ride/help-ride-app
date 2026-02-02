@@ -150,7 +150,7 @@ class _SummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${booking.ride.fromCity} \u2192 ${booking.ride.toCity}',
+            '${booking.pickupLabel} \u2192 ${booking.dropoffLabel}',
             style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 16,

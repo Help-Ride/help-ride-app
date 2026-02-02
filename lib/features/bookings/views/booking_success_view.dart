@@ -15,7 +15,7 @@ class BookingSuccessView extends StatelessWidget {
     final route = (args['route'] ?? '').toString();
     final departure = (args['departure'] ?? '').toString();
     final status = (args['status'] ?? 'pending').toString().toLowerCase();
-    final isConfirmed = status == 'confirmed';
+    final isConfirmed = status.contains('confirm') || status.contains('accept');
     final ref = (args['ref'] ?? '').toString();
 
     final totalRaw = args['total'];
@@ -59,10 +59,7 @@ class BookingSuccessView extends StatelessWidget {
                     ? 'Your ride is confirmed. The driver will contact you soon.'
                     : 'Waiting for the driver to accept your request. You’ll be notified soon.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: muted,
-                  height: 1.4,
-                ),
+                style: TextStyle(color: muted, height: 1.4),
               ),
 
               const SizedBox(height: 20),
@@ -166,7 +163,9 @@ class BookingSuccessView extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     side: BorderSide(
-                      color: isDark ? const Color(0xFF232836) : const Color(0xFFE2E6EF),
+                      color: isDark
+                          ? const Color(0xFF232836)
+                          : const Color(0xFFE2E6EF),
                     ),
                   ),
                   child: const Text(

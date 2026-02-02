@@ -68,28 +68,13 @@ class DriverRequestsController extends GetxController {
 
   DateTime _bookingSortTime(Booking b) => b.updatedAt ?? b.createdAt;
 
-  Booking _withStatus(Booking b, String status) {
-    return Booking(
-      id: b.id,
-      rideId: b.rideId,
-      rideRequestId: b.rideRequestId,
-      passengerId: b.passengerId,
-      seatsBooked: b.seatsBooked,
-      status: status,
-      paymentStatus: b.paymentStatus,
-      paymentIntentId: b.paymentIntentId,
-      createdAt: b.createdAt,
-      updatedAt: DateTime.now(),
-      ride: b.ride,
-      passenger: b.passenger,
-      note: b.note,
-    );
-  }
-
-  void _updateStatus(String bookingId, String status) {
-    final idx = bookings.indexWhere((b) => b.id == bookingId);
-    if (idx == -1) return;
-    bookings[idx] = _withStatus(bookings[idx], status);
+  void _upsertBooking(Booking booking) {
+    final idx = bookings.indexWhere((b) => b.id == booking.id);
+    if (idx == -1) {
+      bookings.insert(0, booking);
+      return;
+    }
+    bookings[idx] = booking;
   }
 
   Future<void> confirm(String bookingId) async {
@@ -97,9 +82,17 @@ class DriverRequestsController extends GetxController {
     actionIds.add(bookingId);
     actionIds.refresh();
     try {
-      await _api.confirmBooking(bookingId);
-      _updateStatus(bookingId, 'confirmed');
-      Get.snackbar('Offer sent', 'Booking confirmed.');
+      final updated = await _api.confirmBooking(bookingId);
+      _upsertBooking(updated);
+      final status = updated.status.toLowerCase();
+      if (status.contains('confirm')) {
+        Get.snackbar('Confirmed', 'Booking confirmed.');
+      } else {
+        Get.snackbar(
+          'Accepted',
+          'Booking accepted. Waiting for passenger payment to confirm.',
+        );
+      }
     } catch (e) {
       Get.snackbar('Failed', e.toString());
     } finally {
@@ -113,8 +106,8 @@ class DriverRequestsController extends GetxController {
     actionIds.add(bookingId);
     actionIds.refresh();
     try {
-      await _api.rejectBooking(bookingId);
-      _updateStatus(bookingId, 'rejected');
+      final updated = await _api.rejectBooking(bookingId);
+      _upsertBooking(updated);
       Get.snackbar('Declined', 'Booking rejected.');
     } catch (e) {
       Get.snackbar('Failed', e.toString());

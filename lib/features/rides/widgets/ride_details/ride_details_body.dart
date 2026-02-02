@@ -55,7 +55,16 @@ class RideDetailsBody extends GetView<RideDetailsController> {
           const SizedBox(height: 14),
 
           const SectionTitle('Trip Details'),
-          RideTripDetailsCard(ride: ride),
+          RideTripDetailsCard(
+            ride: ride,
+            pickupName: controller.tripPickupName,
+            pickupLat: controller.tripPickupLat,
+            pickupLng: controller.tripPickupLng,
+            dropoffName: controller.tripDropoffName,
+            dropoffLat: controller.tripDropoffLat,
+            dropoffLng: controller.tripDropoffLng,
+            showBookingRequestedRouteBanner: controller.hasBookingRouteContext,
+          ),
           const SizedBox(height: 14),
 
           const SectionTitle('Select Seats'),

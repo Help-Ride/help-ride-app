@@ -6,6 +6,7 @@ import '../routes/booking_routes.dart';
 import '../models/booking.dart';
 import '../services/bookings_api.dart';
 import '../services/payments_api.dart';
+import '../utils/booking_formatters.dart';
 import '../../ride_requests/models/ride_request.dart';
 import '../../ride_requests/services/ride_requests_api.dart';
 
@@ -36,6 +37,7 @@ class MyRidesController extends GetxController {
   final bookings = <Booking>[].obs;
   final rideRequests = <RideRequest>[].obs;
   final cancelingRequestIds = <String>{}.obs;
+  final cancelingBookingIds = <String>{}.obs;
   final payingBookingIds = <String>{}.obs;
   final paymentIntentIds = <String, String>{}.obs;
   final paymentSessions = <String, PaymentIntentSession>{}.obs;
@@ -96,6 +98,17 @@ class MyRidesController extends GetxController {
       shouldShowPayAction(booking) &&
       booking.ride.startTime.isAfter(DateTime.now());
 
+  bool canCancelBooking(Booking booking) {
+    if (!booking.ride.startTime.isAfter(DateTime.now())) return false;
+    final status = booking.status.toLowerCase().trim();
+    if (status.contains('cancel') ||
+        status.contains('reject') ||
+        status.contains('complete')) {
+      return false;
+    }
+    return true;
+  }
+
   bool shouldShowPayAction(Booking booking) {
     final state = paymentUiState(booking);
     return state == BookingPaymentUiState.payNow ||
@@ -109,35 +122,38 @@ class MyRidesController extends GetxController {
     final hasFutureRide = booking.ride.startTime.isAfter(DateTime.now());
     if (!hasFutureRide) return BookingPaymentUiState.hidden;
 
-    final isAccepted = bookingStatus == 'accepted';
+    final isAcceptedOrConfirmed =
+        bookingStatus.contains('accepted') || bookingStatus.contains('confirm');
+    final isCancelledOrRejected =
+        bookingStatus.contains('cancel') || bookingStatus.contains('reject');
     final isPaymentPendingStatus =
         bookingStatus.contains('payment_pending') ||
         bookingStatus.contains('payment-pending');
-    final isConfirmed = bookingStatus.contains('confirm');
+    final isPaymentRelevantStatus =
+        isAcceptedOrConfirmed || isPaymentPendingStatus;
 
-    // Product request: always expose payment CTA for accepted bookings.
-    if (isAccepted) {
-      if (_isRefundedStatus(paymentStatus))
+    if (isCancelledOrRejected) {
+      if (_isRefundedStatus(paymentStatus)) {
         return BookingPaymentUiState.refunded;
-      if (_isFailedStatus(paymentStatus)) {
-        return BookingPaymentUiState.paymentFailedRetry;
       }
-      if (_isPendingStatus(paymentStatus) || isPaymentPendingStatus) {
-        return BookingPaymentUiState.paymentPendingRetry;
-      }
-      return BookingPaymentUiState.payNow;
+      return BookingPaymentUiState.hidden;
     }
 
-    if (_isRefundedStatus(paymentStatus)) return BookingPaymentUiState.refunded;
-    if (_isPaidStatus(paymentStatus) ||
-        (isConfirmed && paymentStatus == 'paid')) {
+    if (_isRefundedStatus(paymentStatus)) {
+      return BookingPaymentUiState.refunded;
+    }
+    if (_isPaidStatus(paymentStatus)) {
       return BookingPaymentUiState.paymentComplete;
     }
-    if (_isFailedStatus(paymentStatus)) {
+    if (_isFailedStatus(paymentStatus) && isPaymentRelevantStatus) {
       return BookingPaymentUiState.paymentFailedRetry;
     }
-    if (_isPendingStatus(paymentStatus) || isPaymentPendingStatus) {
+    if ((_isPendingStatus(paymentStatus) || isPaymentPendingStatus) &&
+        isPaymentRelevantStatus) {
       return BookingPaymentUiState.paymentPendingRetry;
+    }
+    if (isPaymentRelevantStatus) {
+      return BookingPaymentUiState.payNow;
     }
 
     return BookingPaymentUiState.hidden;
@@ -170,6 +186,9 @@ class MyRidesController extends GetxController {
   }
 
   bool isPaying(String bookingId) => payingBookingIds.contains(bookingId);
+
+  bool isCancelingBooking(String bookingId) =>
+      cancelingBookingIds.contains(bookingId);
 
   String? paymentIntentIdForBooking(String bookingId) =>
       paymentIntentIds[bookingId];
@@ -375,11 +394,7 @@ class MyRidesController extends GetxController {
   }
 
   bool _isPaidStatus(String status) {
-    final v = status.toLowerCase();
-    return v.contains('paid') ||
-        v.contains('succeeded') ||
-        v.contains('complete') ||
-        v.contains('success');
+    return isPaymentPaidStatus(status);
   }
 
   bool _isPendingStatus(String status) {
@@ -410,6 +425,36 @@ class MyRidesController extends GetxController {
       if (booking.id == id) return booking;
     }
     return null;
+  }
+
+  void _upsertBooking(Booking booking) {
+    final idx = bookings.indexWhere((b) => b.id == booking.id);
+    if (idx == -1) {
+      bookings.insert(0, booking);
+    } else {
+      bookings[idx] = booking;
+    }
+    bookings.refresh();
+    _syncPaymentIntentIds(bookings);
+  }
+
+  Future<void> cancelBooking(Booking booking) async {
+    final bookingId = booking.id.trim();
+    if (bookingId.isEmpty) return;
+    if (cancelingBookingIds.contains(bookingId)) return;
+
+    cancelingBookingIds.add(bookingId);
+    cancelingBookingIds.refresh();
+    try {
+      final updated = await _api.cancelBooking(bookingId);
+      _upsertBooking(updated);
+      Get.snackbar('Cancelled', 'Booking cancelled.');
+    } catch (e) {
+      Get.snackbar('Failed', e.toString());
+    } finally {
+      cancelingBookingIds.remove(bookingId);
+      cancelingBookingIds.refresh();
+    }
   }
 
   Future<void> cancelRequest(String id) async {

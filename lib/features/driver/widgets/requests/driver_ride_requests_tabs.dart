@@ -48,7 +48,7 @@ class DriverRideRequestsTabs extends StatelessWidget {
           ),
           Expanded(
             child: _Pill(
-              text: offeredCount > 0 ? 'Offered  $offeredCount' : 'Offered',
+              text: offeredCount > 0 ? 'Accepted  $offeredCount' : 'Accepted',
               active: active == DriverRideRequestsTab.offered,
               onTap: () => onChange(DriverRideRequestsTab.offered),
               isDark: isDark,

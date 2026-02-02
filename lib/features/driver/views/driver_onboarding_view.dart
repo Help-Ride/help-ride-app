@@ -17,6 +17,17 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
   bool showForm = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (!Get.isRegistered<DriverOnboardingController>()) {
+      Get.lazyPut<DriverOnboardingController>(
+        () => DriverOnboardingController(),
+        fenix: true,
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final primary = AppColors.driverPrimary;
     final isDark = Theme.of(context).brightness == Brightness.dark;
