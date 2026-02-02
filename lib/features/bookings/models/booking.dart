@@ -25,7 +25,7 @@ class BookingRide {
       toCity: (json['toCity'] ?? '').toString(),
       startTime:
           DateTime.tryParse((json['startTime'] ?? '').toString())?.toLocal() ??
-              DateTime.now(),
+          DateTime.now(),
       pricePerSeat: toDouble(json['pricePerSeat']),
       driverId: (json['driverId'] ?? '').toString(),
     );
@@ -63,16 +63,18 @@ class BookingPassenger {
 
     String? first = json['firstName']?.toString();
     String? last = json['lastName']?.toString();
-    final nameSource = json['name'] ??
+    final nameSource =
+        json['name'] ??
         json['fullName'] ??
-        [first, last].where((s) => s != null && s!.isNotEmpty).join(' ');
+        [first, last].where((s) => (s ?? '').isNotEmpty).join(' ');
     final fullName = (nameSource is String ? nameSource : '${nameSource ?? ''}')
         .trim();
 
     return BookingPassenger(
       id: (json['id'] ?? json['userId'] ?? '').toString(),
       name: fullName.isEmpty ? 'Passenger' : fullName,
-      avatarUrl: json['avatarUrl']?.toString() ??
+      avatarUrl:
+          json['avatarUrl']?.toString() ??
           json['photoUrl']?.toString() ??
           json['profileImage']?.toString(),
       rating: toDouble(json['rating'] ?? json['avgRating']),
@@ -84,10 +86,12 @@ class BookingPassenger {
 class Booking {
   final String id;
   final String rideId;
+  final String? rideRequestId;
   final String passengerId;
   final int seatsBooked;
   final String status; // pending/confirmed/cancelled_by_driver/...
   final String paymentStatus;
+  final String? paymentIntentId;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final BookingRide ride;
@@ -97,10 +101,12 @@ class Booking {
   Booking({
     required this.id,
     required this.rideId,
+    this.rideRequestId,
     required this.passengerId,
     required this.seatsBooked,
     required this.status,
     required this.paymentStatus,
+    this.paymentIntentId,
     required this.createdAt,
     this.updatedAt,
     required this.ride,
@@ -112,10 +118,10 @@ class Booking {
     final passengerMap = json['passenger'] is Map
         ? json['passenger'] as Map
         : json['user'] is Map
-            ? json['user'] as Map
-            : json['passengerProfile'] is Map
-                ? json['passengerProfile'] as Map
-                : null;
+        ? json['user'] as Map
+        : json['passengerProfile'] is Map
+        ? json['passengerProfile'] as Map
+        : null;
 
     final rideMap = json['ride'] is Map
         ? json['ride'] as Map
@@ -131,26 +137,48 @@ class Booking {
     return Booking(
       id: (json['id'] ?? '').toString(),
       rideId: (json['rideId'] ?? '').toString(),
+      rideRequestId:
+          (json['rideRequestId'] ??
+                  json['requestId'] ??
+                  (json['rideRequest'] is Map
+                      ? (json['rideRequest'] as Map)['id']
+                      : null))
+              ?.toString(),
       passengerId: (json['passengerId'] ?? '').toString(),
       seatsBooked: (json['seatsBooked'] as num?)?.toInt() ?? 0,
       status: (json['status'] ?? 'pending').toString(),
-      paymentStatus: (json['paymentStatus'] ?? 'unpaid').toString(),
+      paymentStatus:
+          (json['bookingPaymentStatus'] ??
+                  json['paymentStatus'] ??
+                  json['payment_status'] ??
+                  (json['booking'] is Map
+                      ? (json['booking'] as Map)['paymentStatus']
+                      : null) ??
+                  'unpaid')
+              .toString(),
+      paymentIntentId:
+          (json['paymentIntentId'] ??
+                  json['payment_intent_id'] ??
+                  (json['paymentIntent'] is Map
+                      ? (json['paymentIntent'] as Map)['id']
+                      : null))
+              ?.toString(),
       createdAt:
           DateTime.tryParse((json['createdAt'] ?? '').toString())?.toLocal() ??
-              DateTime.now(),
-      updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString())
-          ?.toLocal(),
+          DateTime.now(),
+      updatedAt: DateTime.tryParse(
+        (json['updatedAt'] ?? '').toString(),
+      )?.toLocal(),
       ride: BookingRide.fromJson(rideMap.cast<String, dynamic>()),
       passenger: passengerMap == null
           ? null
-          : BookingPassenger.fromJson(
-              passengerMap.cast<String, dynamic>(),
-            ),
-      note: (json['note'] ??
-              json['message'] ??
-              json['notes'] ??
-              json['pickupNotes'])
-          ?.toString(),
+          : BookingPassenger.fromJson(passengerMap.cast<String, dynamic>()),
+      note:
+          (json['note'] ??
+                  json['message'] ??
+                  json['notes'] ??
+                  json['pickupNotes'])
+              ?.toString(),
     );
   }
 

@@ -85,6 +85,23 @@ class DriverRideDetailsView extends GetView<DriverRideDetailsController> {
               _DriverTimingCard(ride: ride),
               const SizedBox(height: 18),
 
+              const SectionTitle('Ride Actions'),
+              Obx(
+                () => _DriverRideActionsCard(
+                  canStart: controller.canStartRide,
+                  canComplete: controller.canCompleteRide,
+                  loading: controller.rideActionLoading.value,
+                  error: controller.rideActionError.value,
+                  unpaidBookingIds: controller.unpaidBlockingBookingIds.toList(
+                    growable: false,
+                  ),
+                  onStart: controller.startRide,
+                  onComplete: controller.completeRide,
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(height: 18),
+
               const SectionTitle('Booking Requests'),
               Obx(() {
                 final count = controller.newCount;
@@ -174,7 +191,10 @@ class _DriverRideSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = ride.status.toLowerCase();
-    final booked = (ride.seatsTotal - ride.seatsAvailable).clamp(0, ride.seatsTotal);
+    final booked = (ride.seatsTotal - ride.seatsAvailable).clamp(
+      0,
+      ride.seatsTotal,
+    );
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
@@ -220,10 +240,7 @@ class _DriverRideSummaryCard extends StatelessWidget {
             children: [
               Icon(Icons.calendar_today_outlined, size: 16, color: muted),
               const SizedBox(width: 6),
-              Text(
-                fmtDateTime(ride.startTime),
-                style: TextStyle(color: muted),
-              ),
+              Text(fmtDateTime(ride.startTime), style: TextStyle(color: muted)),
               const SizedBox(width: 14),
               Icon(Icons.people_outline, size: 18, color: muted),
               const SizedBox(width: 6),
@@ -245,15 +262,15 @@ class _DriverSeatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final booked = (ride.seatsTotal - ride.seatsAvailable).clamp(0, ride.seatsTotal);
+    final booked = (ride.seatsTotal - ride.seatsAvailable).clamp(
+      0,
+      ride.seatsTotal,
+    );
     return AppCard(
       child: Row(
         children: [
           Expanded(
-            child: MiniInfo(
-              label: 'Total seats',
-              value: '${ride.seatsTotal}',
-            ),
+            child: MiniInfo(label: 'Total seats', value: '${ride.seatsTotal}'),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -264,10 +281,7 @@ class _DriverSeatsCard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: MiniInfo(
-              label: 'Booked',
-              value: '$booked',
-            ),
+            child: MiniInfo(label: 'Booked', value: '$booked'),
           ),
         ],
       ),
@@ -298,6 +312,106 @@ class _DriverTimingCard extends StatelessWidget {
               value: arrival == null ? 'Not set' : fmtDateTime(arrival),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DriverRideActionsCard extends StatelessWidget {
+  const _DriverRideActionsCard({
+    required this.canStart,
+    required this.canComplete,
+    required this.loading,
+    required this.error,
+    required this.unpaidBookingIds,
+    required this.onStart,
+    required this.onComplete,
+    required this.isDark,
+  });
+
+  final bool canStart;
+  final bool canComplete;
+  final bool loading;
+  final String? error;
+  final List<String> unpaidBookingIds;
+  final VoidCallback onStart;
+  final VoidCallback onComplete;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: loading || !canStart ? null : onStart,
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: AppColors.passengerPrimary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: loading && canStart
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Start ride'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: loading || !canComplete ? null : onComplete,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: loading && canComplete
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Complete ride'),
+                ),
+              ),
+            ],
+          ),
+          if (error != null && error!.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              error!,
+              style: const TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          if (unpaidBookingIds.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Unpaid bookings: ${unpaidBookingIds.join(', ')}',
+              style: TextStyle(
+                color: muted,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ],
         ],
       ),
     );

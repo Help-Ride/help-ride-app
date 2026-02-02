@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:get/get.dart';
 import '../../../shared/services/api_client.dart';
+import '../routes/booking_routes.dart';
 import '../models/booking.dart';
 import '../services/bookings_api.dart';
 import '../services/payments_api.dart';
@@ -9,6 +10,19 @@ import '../../ride_requests/models/ride_request.dart';
 import '../../ride_requests/services/ride_requests_api.dart';
 
 enum MyRidesTab { upcoming, past, requests }
+
+enum PaymentAttemptResult { confirmed, processing, cancelled, failed, refunded }
+
+enum PaymentPollResult { paid, pending, failed, refunded }
+
+enum BookingPaymentUiState {
+  payNow,
+  paymentPendingRetry,
+  paymentFailedRetry,
+  paymentComplete,
+  refunded,
+  hidden,
+}
 
 class MyRidesController extends GetxController {
   late final BookingsApi _api;
@@ -23,6 +37,8 @@ class MyRidesController extends GetxController {
   final rideRequests = <RideRequest>[].obs;
   final cancelingRequestIds = <String>{}.obs;
   final payingBookingIds = <String>{}.obs;
+  final paymentIntentIds = <String, String>{}.obs;
+  final paymentSessions = <String, PaymentIntentSession>{}.obs;
 
   @override
   Future<void> onInit() async {
@@ -41,6 +57,7 @@ class MyRidesController extends GetxController {
       final list = await _api.myBookings();
       final requests = await _requestsApi.myRideRequests();
       bookings.assignAll(list);
+      _syncPaymentIntentIds(list);
       rideRequests.assignAll(requests);
     } catch (e) {
       error.value = e.toString();
@@ -55,9 +72,7 @@ class MyRidesController extends GetxController {
     final now = DateTime.now();
     final upcoming =
         bookings.where((b) => b.ride.startTime.isAfter(now)).toList()
-          ..sort(
-            (a, b) => _bookingSortTime(b).compareTo(_bookingSortTime(a)),
-          );
+          ..sort((a, b) => _bookingSortTime(b).compareTo(_bookingSortTime(a)));
 
     final past = bookings.where((b) => !b.ride.startTime.isAfter(now)).toList()
       ..sort((a, b) => _bookingSortTime(b).compareTo(_bookingSortTime(a)));
@@ -69,9 +84,7 @@ class MyRidesController extends GetxController {
 
   List<RideRequest> get filteredRequests {
     final list = rideRequests.toList()
-      ..sort(
-        (a, b) => _requestSortTime(b).compareTo(_requestSortTime(a)),
-      );
+      ..sort((a, b) => _requestSortTime(b).compareTo(_requestSortTime(a)));
     return list;
   }
 
@@ -80,72 +93,225 @@ class MyRidesController extends GetxController {
   DateTime _requestSortTime(RideRequest r) => r.updatedAt ?? r.createdAt;
 
   bool canPay(Booking booking) =>
-      booking.status.toLowerCase() == 'accepted' &&
+      shouldShowPayAction(booking) &&
       booking.ride.startTime.isAfter(DateTime.now());
 
-  bool isPaying(String bookingId) =>
-      payingBookingIds.contains(bookingId);
+  bool shouldShowPayAction(Booking booking) {
+    final state = paymentUiState(booking);
+    return state == BookingPaymentUiState.payNow ||
+        state == BookingPaymentUiState.paymentPendingRetry ||
+        state == BookingPaymentUiState.paymentFailedRetry;
+  }
 
-  Future<void> payToConfirm(Booking booking) async {
-    final id = booking.id.trim();
-    if (id.isEmpty) return;
-    if (payingBookingIds.contains(id)) return;
+  BookingPaymentUiState paymentUiState(Booking booking) {
+    final bookingStatus = booking.status.toLowerCase().trim();
+    final paymentStatus = booking.paymentStatus.toLowerCase().trim();
+    final hasFutureRide = booking.ride.startTime.isAfter(DateTime.now());
+    if (!hasFutureRide) return BookingPaymentUiState.hidden;
 
-    payingBookingIds.add(id);
+    final isAccepted = bookingStatus == 'accepted';
+    final isPaymentPendingStatus =
+        bookingStatus.contains('payment_pending') ||
+        bookingStatus.contains('payment-pending');
+    final isConfirmed = bookingStatus.contains('confirm');
+
+    // Product request: always expose payment CTA for accepted bookings.
+    if (isAccepted) {
+      if (_isRefundedStatus(paymentStatus))
+        return BookingPaymentUiState.refunded;
+      if (_isFailedStatus(paymentStatus)) {
+        return BookingPaymentUiState.paymentFailedRetry;
+      }
+      if (_isPendingStatus(paymentStatus) || isPaymentPendingStatus) {
+        return BookingPaymentUiState.paymentPendingRetry;
+      }
+      return BookingPaymentUiState.payNow;
+    }
+
+    if (_isRefundedStatus(paymentStatus)) return BookingPaymentUiState.refunded;
+    if (_isPaidStatus(paymentStatus) ||
+        (isConfirmed && paymentStatus == 'paid')) {
+      return BookingPaymentUiState.paymentComplete;
+    }
+    if (_isFailedStatus(paymentStatus)) {
+      return BookingPaymentUiState.paymentFailedRetry;
+    }
+    if (_isPendingStatus(paymentStatus) || isPaymentPendingStatus) {
+      return BookingPaymentUiState.paymentPendingRetry;
+    }
+
+    return BookingPaymentUiState.hidden;
+  }
+
+  String payButtonLabel(Booking booking) {
+    switch (paymentUiState(booking)) {
+      case BookingPaymentUiState.paymentPendingRetry:
+        return 'Payment in progress / retry';
+      case BookingPaymentUiState.paymentFailedRetry:
+        return 'Payment failed, retry';
+      default:
+        return 'Pay now';
+    }
+  }
+
+  String? paymentStateLabel(Booking booking) {
+    switch (paymentUiState(booking)) {
+      case BookingPaymentUiState.paymentPendingRetry:
+        return 'Payment in progress / retry';
+      case BookingPaymentUiState.paymentComplete:
+        return 'Payment complete';
+      case BookingPaymentUiState.paymentFailedRetry:
+        return 'Payment failed, retry';
+      case BookingPaymentUiState.refunded:
+        return 'Refunded';
+      default:
+        return null;
+    }
+  }
+
+  bool isPaying(String bookingId) => payingBookingIds.contains(bookingId);
+
+  String? paymentIntentIdForBooking(String bookingId) =>
+      paymentIntentIds[bookingId];
+
+  PaymentIntentSession? paymentSessionForBooking(String bookingId) =>
+      paymentSessions[bookingId];
+
+  Future<PaymentAttemptResult> payToConfirm(Booking booking) async {
+    final bookingId = booking.id.trim();
+    if (bookingId.isEmpty) return PaymentAttemptResult.failed;
+    if (payingBookingIds.contains(bookingId)) {
+      return PaymentAttemptResult.processing;
+    }
+
+    payingBookingIds.add(bookingId);
     payingBookingIds.refresh();
 
     try {
-      final clientSecret =
-          await _paymentsApi.createPaymentIntent(bookingId: id);
+      final session = await _paymentsApi.createPaymentIntent(
+        bookingId: bookingId,
+      );
+      paymentSessions[bookingId] = session;
+      paymentSessions.refresh();
+
+      final paymentIntentId = (session.paymentIntentId ?? '').trim();
+      if (paymentIntentId.isNotEmpty) {
+        paymentIntentIds[bookingId] = paymentIntentId;
+        paymentIntentIds.refresh();
+      }
 
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
-          paymentIntentClientSecret: clientSecret,
-          merchantDisplayName: 'Help Ride',
+          paymentIntentClientSecret: session.clientSecret,
+          merchantDisplayName: 'HelpRide',
+          applePay: const PaymentSheetApplePay(merchantCountryCode: 'CA'),
           style: ThemeMode.system,
         ),
       );
 
       await Stripe.instance.presentPaymentSheet();
 
-      final confirmed = await _pollForConfirmation(id);
-      if (confirmed) {
+      final pollResultRaw = await Get.toNamed(
+        BookingRoutes.paymentProcessing,
+        arguments: {
+          'route': '${booking.ride.fromCity} \u2192 ${booking.ride.toCity}',
+          'paymentIntentId':
+              paymentIntentIds[bookingId] ?? booking.paymentIntentId,
+          'pollFuture': _pollForPaymentStatus(
+            bookingId: bookingId,
+            paymentIntentId:
+                paymentIntentIds[bookingId] ??
+                booking.paymentIntentId ??
+                session.paymentIntentId,
+          ),
+        },
+      );
+      final pollResult = pollResultRaw is String
+          ? pollResultRaw
+          : PaymentPollResult.pending.name;
+
+      await fetch();
+
+      final parsedPollResult = _parsePollResult(pollResult);
+      if (parsedPollResult == PaymentPollResult.paid) {
         Get.snackbar('Payment complete', 'Booking confirmed.');
+        if (Get.currentRoute != '/my-rides') {
+          Get.offAllNamed('/my-rides');
+        }
+        return PaymentAttemptResult.confirmed;
+      }
+      if (parsedPollResult == PaymentPollResult.refunded) {
+        Get.snackbar('Refunded', 'Payment was refunded.');
+        return PaymentAttemptResult.refunded;
+      }
+      if (parsedPollResult == PaymentPollResult.failed) {
+        Get.snackbar('Payment failed', 'Payment failed');
+        return PaymentAttemptResult.failed;
       } else {
-        Get.snackbar(
-          'Payment submitted',
-          'Waiting for confirmation. Check back soon.',
-        );
+        Get.snackbar('Payment processing...', 'Waiting for PAID webhook.');
+        return PaymentAttemptResult.processing;
       }
     } on StripeException catch (e) {
       final code = e.error.code.toString().toLowerCase();
       if (code.contains('cancel')) {
-        Get.snackbar('Payment cancelled', 'You can try again anytime.');
+        Get.snackbar('Payment cancelled', 'Payment cancelled');
+        return PaymentAttemptResult.cancelled;
       } else {
-        Get.snackbar(
-          'Payment failed',
-          e.error.message ?? 'Please try again.',
-        );
+        Get.snackbar('Payment failed', e.error.message ?? 'Payment failed');
+        return PaymentAttemptResult.failed;
       }
     } catch (e) {
       Get.snackbar('Payment failed', e.toString());
+      return PaymentAttemptResult.failed;
     } finally {
-      payingBookingIds.remove(id);
+      payingBookingIds.remove(bookingId);
       payingBookingIds.refresh();
     }
   }
 
-  Future<bool> _pollForConfirmation(String bookingId) async {
-    final deadline = DateTime.now().add(const Duration(seconds: 15));
+  Future<PaymentPollResult> _pollForPaymentStatus({
+    required String bookingId,
+    String? paymentIntentId,
+  }) async {
+    final deadline = DateTime.now().add(const Duration(minutes: 2));
+    final intentId = (paymentIntentId ?? '').trim();
 
     while (DateTime.now().isBefore(deadline)) {
+      if (intentId.isNotEmpty) {
+        try {
+          final intent = await _paymentsApi.getPaymentIntentStatus(
+            paymentIntentId: intentId,
+          );
+          _mergeIntentStatus(bookingId, intent);
+
+          final mergedStatus = _mergedPaymentStatus(intent);
+          if (_isPaidStatus(mergedStatus)) return PaymentPollResult.paid;
+          if (_isRefundedStatus(mergedStatus)) {
+            return PaymentPollResult.refunded;
+          }
+          if (_isFailedStatus(mergedStatus)) return PaymentPollResult.failed;
+        } catch (_) {
+          // Keep fallback polling on bookings endpoint.
+        }
+      }
+
       try {
         final list = await _api.myBookings();
         bookings.assignAll(list);
+        _syncPaymentIntentIds(list);
+
         final match = _findBooking(list, bookingId);
-        if (match != null &&
-            match.status.toLowerCase() == 'confirmed') {
-          return true;
+        if (match != null) {
+          final paymentStatus = match.paymentStatus.toLowerCase();
+          if (_isPaidStatus(paymentStatus)) {
+            return PaymentPollResult.paid;
+          }
+          if (_isRefundedStatus(paymentStatus)) {
+            return PaymentPollResult.refunded;
+          }
+          if (_isFailedStatus(paymentStatus)) {
+            return PaymentPollResult.failed;
+          }
         }
       } catch (_) {
         // Best-effort polling.
@@ -154,7 +320,89 @@ class MyRidesController extends GetxController {
       await Future.delayed(const Duration(seconds: 3));
     }
 
-    return false;
+    return PaymentPollResult.pending;
+  }
+
+  PaymentPollResult _parsePollResult(String value) {
+    switch (value) {
+      case 'paid':
+        return PaymentPollResult.paid;
+      case 'refunded':
+        return PaymentPollResult.refunded;
+      case 'failed':
+        return PaymentPollResult.failed;
+      default:
+        return PaymentPollResult.pending;
+    }
+  }
+
+  void _syncPaymentIntentIds(List<Booking> list) {
+    final known = <String, String>{...paymentIntentIds};
+    for (final booking in list) {
+      final id = booking.id.trim();
+      final paymentIntentId = (booking.paymentIntentId ?? '').trim();
+      if (id.isEmpty || paymentIntentId.isEmpty) continue;
+      known[id] = paymentIntentId;
+    }
+    paymentIntentIds.assignAll(known);
+  }
+
+  void _mergeIntentStatus(String bookingId, PaymentIntentStatus status) {
+    final bookingKey = bookingId.trim();
+    if (bookingKey.isEmpty) return;
+
+    if (status.paymentIntentId.trim().isNotEmpty) {
+      paymentIntentIds[bookingKey] = status.paymentIntentId.trim();
+      paymentIntentIds.refresh();
+    }
+
+    final current = paymentSessions[bookingKey];
+    paymentSessions[bookingKey] = PaymentIntentSession(
+      clientSecret: current?.clientSecret ?? '',
+      paymentIntentId: status.paymentIntentId.trim().isEmpty
+          ? current?.paymentIntentId
+          : status.paymentIntentId.trim(),
+      amount: status.amount ?? current?.amount,
+      currency: status.currency ?? current?.currency,
+    );
+    paymentSessions.refresh();
+  }
+
+  String _mergedPaymentStatus(PaymentIntentStatus status) {
+    final bookingPaymentStatus = (status.bookingPaymentStatus ?? '').trim();
+    if (bookingPaymentStatus.isNotEmpty) return bookingPaymentStatus;
+    return status.intentStatus;
+  }
+
+  bool _isPaidStatus(String status) {
+    final v = status.toLowerCase();
+    return v.contains('paid') ||
+        v.contains('succeeded') ||
+        v.contains('complete') ||
+        v.contains('success');
+  }
+
+  bool _isPendingStatus(String status) {
+    final v = status.toLowerCase();
+    return v.contains('pending') ||
+        v.contains('processing') ||
+        v.contains('requires_action') ||
+        v.contains('requires-confirmation') ||
+        v.contains('requires_confirmation');
+  }
+
+  bool _isFailedStatus(String status) {
+    final v = status.toLowerCase();
+    return v.contains('failed') ||
+        v.contains('cancelled') ||
+        v.contains('canceled') ||
+        v.contains('requires_payment_method') ||
+        v.contains('declined');
+  }
+
+  bool _isRefundedStatus(String status) {
+    final v = status.toLowerCase();
+    return v.contains('refund');
   }
 
   Booking? _findBooking(List<Booking> list, String id) {

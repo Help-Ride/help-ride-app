@@ -72,10 +72,12 @@ class DriverRequestsController extends GetxController {
     return Booking(
       id: b.id,
       rideId: b.rideId,
+      rideRequestId: b.rideRequestId,
       passengerId: b.passengerId,
       seatsBooked: b.seatsBooked,
       status: status,
       paymentStatus: b.paymentStatus,
+      paymentIntentId: b.paymentIntentId,
       createdAt: b.createdAt,
       updatedAt: DateTime.now(),
       ride: b.ride,

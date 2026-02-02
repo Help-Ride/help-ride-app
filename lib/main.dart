@@ -23,8 +23,12 @@ Future<void> main() async {
   await dotenv.load(fileName: ".env");
 
   final stripeKey = dotenv.env['STRIPE_PUBLISHABLE_KEY']?.trim();
+  final stripeMerchantId = dotenv.env['STRIPE_MERCHANT_IDENTIFIER']?.trim();
   if (stripeKey != null && stripeKey.isNotEmpty) {
     Stripe.publishableKey = stripeKey;
+    if (stripeMerchantId != null && stripeMerchantId.isNotEmpty) {
+      Stripe.merchantIdentifier = stripeMerchantId;
+    }
     await Stripe.instance.applySettings();
   } else if (kDebugMode) {
     debugPrint('Missing STRIPE_PUBLISHABLE_KEY in .env');

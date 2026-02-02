@@ -9,6 +9,8 @@ class BookingCard extends StatelessWidget {
     required this.b,
     this.showPay = false,
     this.isPaying = false,
+    this.payButtonLabel = 'Pay now',
+    this.paymentStateLabel,
     this.onPay,
     this.onDetails,
   });
@@ -16,6 +18,8 @@ class BookingCard extends StatelessWidget {
   final Booking b;
   final bool showPay;
   final bool isPaying;
+  final String payButtonLabel;
+  final String? paymentStateLabel;
   final VoidCallback? onPay;
   final VoidCallback? onDetails;
 
@@ -58,6 +62,16 @@ class BookingCard extends StatelessWidget {
               ),
             ],
           ),
+          if (paymentStateLabel != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              paymentStateLabel!,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
 
           Row(
@@ -129,7 +143,9 @@ class BookingCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 side: BorderSide(
-                  color: isDark ? const Color(0xFF232836) : const Color(0xFFE2E6EF),
+                  color: isDark
+                      ? const Color(0xFF232836)
+                      : const Color(0xFFE2E6EF),
                 ),
               ),
               child: const Text('Details'),
@@ -145,10 +161,12 @@ class BookingCard extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.passengerPrimary,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor:
-                      isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
-                  disabledForegroundColor:
-                      isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
+                  disabledBackgroundColor: isDark
+                      ? const Color(0xFF1C2331)
+                      : const Color(0xFFE9EEF6),
+                  disabledForegroundColor: isDark
+                      ? AppColors.darkMuted
+                      : const Color(0xFF9AA3B2),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -160,9 +178,9 @@ class BookingCard extends StatelessWidget {
                         width: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text(
-                        'Pay to confirm',
-                        style: TextStyle(fontWeight: FontWeight.w800),
+                    : Text(
+                        payButtonLabel,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
               ),
             ),

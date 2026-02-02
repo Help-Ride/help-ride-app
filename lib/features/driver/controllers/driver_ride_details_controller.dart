@@ -1,8 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/features/bookings/models/booking.dart';
 import 'package:help_ride/features/bookings/services/bookings_api.dart';
+import 'package:help_ride/features/driver/services/driver_rides_api.dart';
 import 'package:help_ride/features/rides/models/ride.dart';
 import 'package:help_ride/features/rides/services/rides_api.dart';
+import 'package:help_ride/shared/services/api_exception.dart';
 import 'package:help_ride/shared/services/api_client.dart';
 
 enum DriverRideRequestsTab { all, newRequests, offered }
@@ -17,8 +20,12 @@ class DriverRideDetailsController extends GetxController {
   final requests = <Booking>[].obs;
   final requestsTab = DriverRideRequestsTab.all.obs;
   final actionIds = <String>{}.obs;
+  final rideActionLoading = false.obs;
+  final rideActionError = RxnString();
+  final unpaidBlockingBookingIds = <String>[].obs;
 
   late final RidesApi _ridesApi;
+  late final DriverRidesApi _driverRidesApi;
   late final BookingsApi _bookingsApi;
 
   String get rideId => Get.parameters['id'] ?? '';
@@ -28,6 +35,7 @@ class DriverRideDetailsController extends GetxController {
     super.onInit();
     final client = await ApiClient.create();
     _ridesApi = RidesApi(client);
+    _driverRidesApi = DriverRidesApi(client);
     _bookingsApi = BookingsApi(client);
 
     if (rideId.trim().isEmpty) {
@@ -54,6 +62,16 @@ class DriverRideDetailsController extends GetxController {
   void setRequestsTab(DriverRideRequestsTab t) => requestsTab.value = t;
 
   bool isActing(String id) => actionIds.contains(id);
+
+  bool get canStartRide {
+    final status = ride.value?.status.toLowerCase() ?? '';
+    return status.contains('open') || status.contains('scheduled');
+  }
+
+  bool get canCompleteRide {
+    final status = ride.value?.status.toLowerCase() ?? '';
+    return status.contains('ongoing') || status.contains('in_progress');
+  }
 
   bool _isNew(Booking b) {
     final s = b.status.toLowerCase();
@@ -101,10 +119,12 @@ class DriverRideDetailsController extends GetxController {
     return Booking(
       id: b.id,
       rideId: b.rideId,
+      rideRequestId: b.rideRequestId,
       passengerId: b.passengerId,
       seatsBooked: b.seatsBooked,
       status: status,
       paymentStatus: b.paymentStatus,
+      paymentIntentId: b.paymentIntentId,
       createdAt: b.createdAt,
       updatedAt: DateTime.now(),
       ride: b.ride,
@@ -150,4 +170,110 @@ class DriverRideDetailsController extends GetxController {
       actionIds.refresh();
     }
   }
+
+  Future<void> startRide() async {
+    await _runRideLifecycleAction(
+      action: () => _driverRidesApi.startRide(rideId),
+      successTitle: 'Ride started',
+      successMessage: 'Ride is now in progress.',
+    );
+  }
+
+  Future<void> completeRide() async {
+    await _runRideLifecycleAction(
+      action: () => _driverRidesApi.completeRide(rideId),
+      successTitle: 'Ride completed',
+      successMessage: 'Ride marked as completed.',
+    );
+  }
+
+  Future<void> _runRideLifecycleAction({
+    required Future<Map<String, dynamic>> Function() action,
+    required String successTitle,
+    required String successMessage,
+  }) async {
+    if (rideActionLoading.value) return;
+    if (rideId.trim().isEmpty) return;
+
+    rideActionLoading.value = true;
+    rideActionError.value = null;
+    unpaidBlockingBookingIds.clear();
+
+    try {
+      await action();
+      await fetch();
+      await fetchRequests();
+      Get.snackbar(successTitle, successMessage);
+    } catch (e) {
+      final block = _extractPaymentBlock(e);
+      if (block != null) {
+        rideActionError.value = block.message;
+        unpaidBlockingBookingIds.assignAll(block.unpaidBookingIds);
+        final suffix = block.unpaidBookingIds.isEmpty
+            ? ''
+            : ' (${block.unpaidBookingIds.join(', ')})';
+        Get.snackbar('Action blocked', '${block.message}$suffix');
+      } else {
+        rideActionError.value = 'Could not update ride status.';
+        Get.snackbar('Failed', e.toString());
+      }
+    } finally {
+      rideActionLoading.value = false;
+    }
+  }
+
+  _PaymentBlockInfo? _extractPaymentBlock(Object error) {
+    ApiException? apiError;
+    if (error is ApiException) {
+      apiError = error;
+    } else if (error is DioException && error.error is ApiException) {
+      apiError = error.error as ApiException;
+    }
+    if (apiError == null) return null;
+
+    final details = apiError.details;
+    if (details is! Map) return null;
+    final map = details.cast<String, dynamic>();
+
+    final ids = _extractUnpaidBookingIds(map);
+    if (ids.isEmpty) return null;
+
+    final message = (map['message'] ?? map['error'] ?? apiError.message)
+        .toString();
+    return _PaymentBlockInfo(message: message, unpaidBookingIds: ids);
+  }
+
+  List<String> _extractUnpaidBookingIds(Map<String, dynamic> map) {
+    final direct = _toStringList(map['unpaidBookingIds']);
+    if (direct.isNotEmpty) return direct;
+
+    final snakeCase = _toStringList(map['unpaid_booking_ids']);
+    if (snakeCase.isNotEmpty) return snakeCase;
+
+    final data = map['data'];
+    if (data is Map) {
+      return _extractUnpaidBookingIds(data.cast<String, dynamic>());
+    }
+    return const [];
+  }
+
+  List<String> _toStringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+}
+
+class _PaymentBlockInfo {
+  const _PaymentBlockInfo({
+    required this.message,
+    required this.unpaidBookingIds,
+  });
+
+  final String message;
+  final List<String> unpaidBookingIds;
 }

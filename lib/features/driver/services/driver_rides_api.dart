@@ -78,4 +78,22 @@ class DriverRidesApi {
     }
     await _client.delete<void>('/rides/$id');
   }
+
+  Future<Map<String, dynamic>> startRide(String rideId) async {
+    final id = rideId.trim();
+    if (id.isEmpty) {
+      throw ArgumentError('ride id can not be empty');
+    }
+    final res = await _client.put<Map<String, dynamic>>('/rides/$id/start');
+    return res.data ?? <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> completeRide(String rideId) async {
+    final id = rideId.trim();
+    if (id.isEmpty) {
+      throw ArgumentError('ride id can not be empty');
+    }
+    final res = await _client.put<Map<String, dynamic>>('/rides/$id/complete');
+    return res.data ?? <String, dynamic>{};
+  }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../controllers/my_rides_controller.dart';
+import '../routes/booking_routes.dart';
 import '../widgets/rides_tabs.dart';
 import '../widgets/booking_card.dart';
 import '../../ride_requests/widgets/ride_request_card.dart';
@@ -96,8 +97,7 @@ class MyRidesView extends GetView<MyRidesController> {
                                   const SizedBox(height: 14),
                               itemBuilder: (_, i) {
                                 final r = requests[i];
-                                final canceling = controller
-                                    .cancelingRequestIds
+                                final canceling = controller.cancelingRequestIds
                                     .contains(r.id);
                                 return RideRequestCard(
                                   request: r,
@@ -123,8 +123,7 @@ class MyRidesView extends GetView<MyRidesController> {
                                           TextButton(
                                             onPressed: () =>
                                                 Get.back(result: true),
-                                            child:
-                                                const Text('Cancel Request'),
+                                            child: const Text('Cancel Request'),
                                           ),
                                         ],
                                       ),
@@ -168,21 +167,32 @@ class MyRidesView extends GetView<MyRidesController> {
                                 const SizedBox(height: 14),
                             itemBuilder: (_, i) {
                               final booking = list[i];
-                              final canPay = controller.canPay(booking);
+                              final canPay = controller.shouldShowPayAction(
+                                booking,
+                              );
                               return BookingCard(
                                 b: booking,
                                 showPay: canPay,
                                 isPaying: controller.isPaying(booking.id),
+                                payButtonLabel: controller.payButtonLabel(
+                                  booking,
+                                ),
+                                paymentStateLabel: controller.paymentStateLabel(
+                                  booking,
+                                ),
                                 onDetails: booking.rideId.trim().isEmpty
                                     ? null
                                     : () => Get.toNamed(
-                                          '/rides/${booking.rideId}',
-                                          arguments: {
-                                            'seats': booking.seatsBooked,
-                                          },
-                                        ),
+                                        '/rides/${booking.rideId}',
+                                        arguments: {
+                                          'seats': booking.seatsBooked,
+                                        },
+                                      ),
                                 onPay: canPay
-                                    ? () => controller.payToConfirm(booking)
+                                    ? () => Get.toNamed(
+                                        BookingRoutes.payNow,
+                                        arguments: {'booking': booking},
+                                      )
                                     : null,
                               );
                             },
