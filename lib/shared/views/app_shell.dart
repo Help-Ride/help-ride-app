@@ -78,21 +78,27 @@ class _AppShellState extends State<AppShell> {
       }
 
       final uiRole = theme.role.value;
+      final driverGate = Get.find<DriverGateController>();
+      final hideBottomNavForDriverOnboarding =
+          uiRole == AppRole.driver && !driverGate.hasDriverProfile;
       final config = uiRole == AppRole.driver
           ? _driverConfig()
           : _passengerConfig();
 
       if (index >= config.items.length) index = 0;
+      final activeIndex = hideBottomNavForDriverOnboarding ? 0 : index;
 
       final isDark = Theme.of(context).brightness == Brightness.dark;
       return Scaffold(
-        body: config.pages[index],
-        bottomNavigationBar: _FigmaBottomNavBar(
-          index: index,
-          isDark: isDark,
-          items: config.items,
-          onChanged: (i) => setState(() => index = i),
-        ),
+        body: config.pages[activeIndex],
+        bottomNavigationBar: hideBottomNavForDriverOnboarding
+            ? null
+            : _FigmaBottomNavBar(
+                index: activeIndex,
+                isDark: isDark,
+                items: config.items,
+                onChanged: (i) => setState(() => index = i),
+              ),
       );
     });
   }

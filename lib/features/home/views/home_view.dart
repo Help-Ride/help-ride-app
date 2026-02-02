@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:help_ride/features/driver/controllers/driver_gate_controller.dart';
 import 'package:help_ride/features/driver/views/driver_home_gate_view.dart';
+import 'package:help_ride/features/driver/views/driver_onboarding_view.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/role_toggle.dart';
 import '../../../shared/controllers/session_controller.dart';
@@ -13,29 +15,38 @@ class HomeView extends GetView<HomeController> {
   @override
   Widget build(BuildContext context) {
     final c = controller;
+    final driverGate = Get.find<DriverGateController>();
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-          child: Column(
-            children: [
-              _HomeHeader(controller: c),
-              const SizedBox(height: 18),
-              Expanded(
-                child: Obx(() {
-                  return c.role.value == HomeRole.passenger
-                      ? const PassengerHome()
-                      : const DriverHomeGateView();
-                }),
-              ),
-            ],
+    return Obx(() {
+      final showDriverOnboardingFullscreen =
+          c.role.value == HomeRole.driver && !driverGate.hasDriverProfile;
+
+      if (showDriverOnboardingFullscreen) {
+        return const DriverOnboardingView();
+      }
+
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+            child: Column(
+              children: [
+                _HomeHeader(controller: c),
+                const SizedBox(height: 18),
+                Expanded(
+                  child: Obx(() {
+                    return c.role.value == HomeRole.passenger
+                        ? const PassengerHome()
+                        : const DriverHomeGateView();
+                  }),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
 
@@ -83,7 +94,9 @@ class _HomeHeader extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 30,
                           fontWeight: FontWeight.w800,
-                          color: isDark ? AppColors.darkText : AppColors.lightText,
+                          color: isDark
+                              ? AppColors.darkText
+                              : AppColors.lightText,
                           height: 1.0,
                         ),
                       ),
@@ -95,7 +108,9 @@ class _HomeHeader extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 36,
                           fontWeight: FontWeight.w900,
-                          color: isDark ? AppColors.darkText : AppColors.lightText,
+                          color: isDark
+                              ? AppColors.darkText
+                              : AppColors.lightText,
                           height: 1.0,
                         ),
                       ),
