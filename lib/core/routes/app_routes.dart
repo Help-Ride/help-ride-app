@@ -19,7 +19,7 @@ class AppRoutes {
     ...RidesRoutes.pages, // /rides/search etc.
     ...RideRequestRoutes.pages, // /ride-requests/*
     ...BookingRoutes.pages, // /booking/success etc.
-    ...DriverRoutes.pages, // /driver/onboarding etc.
+    ...DriverRoutes.pages, // /driver/*
     GetPage(name: shell, page: () => const AppShell(), binding: ShellBinding()),
   ];
 }

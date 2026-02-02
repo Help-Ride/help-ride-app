@@ -15,30 +15,15 @@ class PassengerProfileView extends StatefulWidget {
   State<PassengerProfileView> createState() => _PassengerProfileViewState();
 }
 
-class _PassengerProfileViewState extends State<PassengerProfileView>
-    with WidgetsBindingObserver {
+class _PassengerProfileViewState extends State<PassengerProfileView> {
   late final ProfileController _controller;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _controller = Get.isRegistered<ProfileController>()
         ? Get.find<ProfileController>()
         : Get.put(ProfileController());
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _controller.handleStripeReturn();
-    }
   }
 
   @override
@@ -64,7 +49,8 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
 
-      final isDriver = user.driverProfile != null || user.roleDefault == 'driver';
+      final isDriver =
+          user.driverProfile != null || user.roleDefault == 'driver';
       final roleLabel = isDriver ? 'Driver' : 'Passenger';
       final isVerified =
           user.emailVerified || user.driverProfile?.isVerified == true;
@@ -103,9 +89,6 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                     context,
                     _controller.driverProfile.value,
                   ),
-                  onSetupPayouts: _controller.startStripeOnboarding,
-                  payoutLoading: _controller.stripeLoading.value,
-                  payoutReady: user.stripeOnboarded,
                 ),
                 const SizedBox(height: 20),
               ],
@@ -138,10 +121,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
               const SizedBox(height: 8),
               _ActionGroup(
                 items: const [
-                  _ActionItem(
-                    icon: Icons.settings_outlined,
-                    label: 'Settings',
-                  ),
+                  _ActionItem(icon: Icons.settings_outlined, label: 'Settings'),
                   _ActionItem(
                     icon: Icons.notifications_outlined,
                     label: 'Notifications',
@@ -154,10 +134,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
               const SizedBox(height: 8),
               _ActionGroup(
                 items: const [
-                  _ActionItem(
-                    icon: Icons.help_outline,
-                    label: 'Help Center',
-                  ),
+                  _ActionItem(icon: Icons.help_outline, label: 'Help Center'),
                   _ActionItem(
                     icon: Icons.policy_outlined,
                     label: 'Terms & Privacy',
@@ -245,9 +222,12 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
     final yearCtrl = TextEditingController(text: profile?.carYear ?? '');
     final colorCtrl = TextEditingController(text: profile?.carColor ?? '');
     final plateCtrl = TextEditingController(text: profile?.plateNumber ?? '');
-    final licenseCtrl = TextEditingController(text: profile?.licenseNumber ?? '');
-    final insuranceCtrl =
-        TextEditingController(text: profile?.insuranceInfo ?? '');
+    final licenseCtrl = TextEditingController(
+      text: profile?.licenseNumber ?? '',
+    );
+    final insuranceCtrl = TextEditingController(
+      text: profile?.insuranceInfo ?? '',
+    );
 
     await _showEditSheet(
       context,
@@ -402,9 +382,9 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
   }
 
   void _showError(BuildContext context, Object e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(e.toString())),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(e.toString())));
   }
 }
 
@@ -439,9 +419,12 @@ class _UserCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor:
-                isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
-            backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+            backgroundColor: isDark
+                ? const Color(0xFF1C2331)
+                : const Color(0xFFE9EEF6),
+            backgroundImage: avatarUrl.isNotEmpty
+                ? NetworkImage(avatarUrl)
+                : null,
             child: avatarUrl.isEmpty
                 ? Text(
                     initials.toUpperCase(),
@@ -468,20 +451,14 @@ class _UserCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   user.email,
-                  style: TextStyle(
-                    color: _mutedText(isDark),
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: _mutedText(isDark), fontSize: 13),
                 ),
                 if ((user.phone ?? '').isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       user.phone!,
-                      style: TextStyle(
-                        color: _mutedText(isDark),
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: _mutedText(isDark), fontSize: 13),
                     ),
                   ),
                 const SizedBox(height: 10),
@@ -490,8 +467,7 @@ class _UserCard extends StatelessWidget {
                     _TagChip(
                       label: roleLabel,
                       textColor: roleColor,
-                      background:
-                          roleColor.withOpacity(isDark ? 0.22 : 0.12),
+                      background: roleColor.withOpacity(isDark ? 0.22 : 0.12),
                     ),
                     if (isVerified)
                       Padding(
@@ -530,18 +506,12 @@ class _DriverProfileCard extends StatelessWidget {
     required this.loading,
     required this.isDark,
     required this.onEdit,
-    required this.onSetupPayouts,
-    required this.payoutLoading,
-    required this.payoutReady,
   });
 
   final DriverProfile? profile;
   final bool loading;
   final bool isDark;
   final VoidCallback onEdit;
-  final VoidCallback onSetupPayouts;
-  final bool payoutLoading;
-  final bool payoutReady;
 
   @override
   Widget build(BuildContext context) {
@@ -588,8 +558,16 @@ class _DriverProfileCard extends StatelessWidget {
             value: _joinParts(profile?.carMake, profile?.carModel),
             isDark: isDark,
           ),
-          _DriverInfoRow(label: 'Year', value: profile?.carYear, isDark: isDark),
-          _DriverInfoRow(label: 'Color', value: profile?.carColor, isDark: isDark),
+          _DriverInfoRow(
+            label: 'Year',
+            value: profile?.carYear,
+            isDark: isDark,
+          ),
+          _DriverInfoRow(
+            label: 'Color',
+            value: profile?.carColor,
+            isDark: isDark,
+          ),
           _DriverInfoRow(
             label: 'License Plate',
             value: profile?.plateNumber,
@@ -619,53 +597,16 @@ class _DriverProfileCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton(
-              onPressed: payoutLoading ? null : onSetupPayouts,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.driverPrimary,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor:
-                    isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
-                disabledForegroundColor:
-                    isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              child: payoutLoading
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (payoutReady)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 6),
-                            child: Icon(Icons.check_circle, size: 16),
-                          ),
-                        const Text(
-                          'Setup Payouts',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
         ],
       ),
     );
   }
 
   String _joinParts(String? a, String? b) {
-    final parts = [a, b].where((p) => p != null && p.trim().isNotEmpty).toList();
+    final parts = [
+      a,
+      b,
+    ].where((p) => p != null && p.trim().isNotEmpty).toList();
     return parts.isEmpty ? '—' : parts.join(' ');
   }
 }
@@ -690,10 +631,7 @@ class _DriverInfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(
-                color: _mutedText(isDark),
-                fontSize: 13,
-              ),
+              style: TextStyle(color: _mutedText(isDark), fontSize: 13),
             ),
           ),
           Expanded(
@@ -729,10 +667,17 @@ class _StatusPill extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(99)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(99),
+      ),
       child: Text(
         label,
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
       ),
     );
   }
@@ -831,11 +776,7 @@ class _ActionItem {
   final String label;
   final VoidCallback? onTap;
 
-  const _ActionItem({
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
+  const _ActionItem({required this.icon, required this.label, this.onTap});
 }
 
 class _ProfileActionTile extends StatelessWidget {
@@ -882,10 +823,7 @@ class _LogoutCard extends StatelessWidget {
         leading: const Icon(Icons.logout, color: Colors.red),
         title: const Text(
           'Log out',
-          style: TextStyle(
-            color: Colors.red,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
         ),
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14),
@@ -915,7 +853,9 @@ class _EditField extends StatelessWidget {
       inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: _mutedText(Get.find<ThemeController>().isDark.value)),
+        labelStyle: TextStyle(
+          color: _mutedText(Get.find<ThemeController>().isDark.value),
+        ),
         filled: true,
         fillColor: _fieldFill(Get.find<ThemeController>().isDark.value),
         border: OutlineInputBorder(

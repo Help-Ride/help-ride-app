@@ -8,14 +8,6 @@ class DriverHomeGateView extends GetView<DriverGateController> {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final hasProfile = controller.session.user.value?.driverProfile != null;
-
-      if (!hasProfile) {
-        Future.microtask(() => Get.toNamed('/driver/onboarding'));
-        return const SizedBox.shrink();
-      }
-      return const DriverHomeView();
-    });
+    return const DriverHomeView();
   }
 }
