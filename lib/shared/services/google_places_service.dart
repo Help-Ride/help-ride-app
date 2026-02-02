@@ -46,7 +46,7 @@ class GooglePlacesService {
   Future<List<PlacesPrediction>> autocomplete({
     required String input,
     required String sessionToken,
-    String? countryCode, // "ca"
+    String? countryCode, // "us"
   }) async {
     final q = input.trim();
     if (q.isEmpty) return [];

@@ -27,7 +27,7 @@ class PlacesService {
 
   /// Autocomplete predictions.
   ///
-  /// [countryCode] example: "ca".
+  /// [countryCode] example: "us".
   /// [sessionToken] optional but recommended (billing optimization & better results).
   Future<List<PlaceResult>> autocomplete(
     String query, {
@@ -45,7 +45,7 @@ class PlacesService {
     };
 
     if (countryCode != null && countryCode.trim().isNotEmpty) {
-      // REST API uses "components=country:ca".
+      // REST API uses "components=country:us".
       params['components'] = 'country:${countryCode.trim().toLowerCase()}';
     }
 

@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:help_ride/features/home/services/drivers_api.dart';
+import '../routes/driver_routes.dart';
 import '../../../shared/controllers/session_controller.dart';
 import '../../../shared/services/api_client.dart';
 
@@ -59,8 +60,11 @@ class DriverOnboardingController extends GetxController {
       // ✅ refresh session so driverProfile becomes available
       await _session.bootstrap();
 
-      // ✅ go back to driver gate; it will now show dashboard
-      Get.back();
+      // Close only when opened as a dedicated onboarding route.
+      if (Get.currentRoute == DriverRoutes.onboarding &&
+          (Get.key.currentState?.canPop() ?? false)) {
+        Get.back();
+      }
     } catch (e) {
       error.value = e.toString();
     } finally {

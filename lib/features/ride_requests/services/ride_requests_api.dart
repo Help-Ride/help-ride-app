@@ -85,10 +85,7 @@ class RideRequestsApi {
       if (seatsNeeded != null) 'seatsNeeded': seatsNeeded,
     };
 
-    final res = await _client.put<dynamic>(
-      '/ride-requests/$id',
-      data: payload,
-    );
+    final res = await _client.put<dynamic>('/ride-requests/$id', data: payload);
 
     final data = res.data;
     if (data is Map) {
@@ -171,6 +168,28 @@ class RideRequestsApi {
     return [];
   }
 
+  Future<RideRequest?> getRideRequestById(String rideRequestId) async {
+    final id = rideRequestId.trim();
+    if (id.isEmpty) return null;
+
+    dynamic payload;
+    try {
+      final res = await _client.get<dynamic>('/ride-requests/$id/detail');
+      payload = res.data;
+    } catch (_) {
+      try {
+        final res = await _client.get<dynamic>('/ride-requests/$id');
+        payload = res.data;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final map = _extractMap(payload);
+    if (map == null) return null;
+    return RideRequest.fromJson(map);
+  }
+
   Future<RideRequestOffer> createOffer({
     required String rideRequestId,
     required String rideId,
@@ -178,10 +197,7 @@ class RideRequestsApi {
   }) async {
     final res = await _client.post<dynamic>(
       '/ride-requests/$rideRequestId/offers',
-      data: {
-        'rideId': rideId,
-        'seatsOffered': seatsOffered,
-      },
+      data: {'rideId': rideId, 'seatsOffered': seatsOffered},
     );
     final data = res.data;
     if (data is Map) {
@@ -218,8 +234,9 @@ class RideRequestsApi {
   }
 
   Future<List<RideRequestOffer>> listOffers(String rideRequestId) async {
-    final res =
-        await _client.get<dynamic>('/ride-requests/$rideRequestId/offers');
+    final res = await _client.get<dynamic>(
+      '/ride-requests/$rideRequestId/offers',
+    );
     final data = res.data;
     if (data is List) {
       return data
@@ -252,5 +269,20 @@ class RideRequestsApi {
     await _client.put<void>(
       '/ride-requests/$rideRequestId/offers/$offerId/reject',
     );
+  }
+
+  Map<String, dynamic>? _extractMap(dynamic data) {
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) {
+      final casted = data.cast<String, dynamic>();
+      final nestedData = casted['data'];
+      if (nestedData is Map<String, dynamic>) return nestedData;
+      if (nestedData is Map) return nestedData.cast<String, dynamic>();
+      final request = casted['request'];
+      if (request is Map<String, dynamic>) return request;
+      if (request is Map) return request.cast<String, dynamic>();
+      return casted;
+    }
+    return null;
   }
 }

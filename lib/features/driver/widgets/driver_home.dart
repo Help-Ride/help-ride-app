@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../home/widgets/common/app_card.dart';
 import '../controllers/driver_home_controller.dart';
+import '../controllers/driver_realtime_controller.dart';
 import '../services/driver_earnings_api.dart';
 
 class DriverHomeView extends GetView<DriverHomeController> {
@@ -14,6 +15,7 @@ class DriverHomeView extends GetView<DriverHomeController> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
     final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final realtime = Get.find<DriverRealtimeController>();
 
     return Obx(() {
       final summary = controller.summary.value;
@@ -28,12 +30,118 @@ class DriverHomeView extends GetView<DriverHomeController> {
       final openRidesRaw = summary.ridesTotal - summary.ridesCompleted;
       final openRides = openRidesRaw < 0 ? 0 : openRidesRaw;
 
+      final online = realtime.isOnline.value;
+      final connecting = realtime.isConnecting.value;
+      final reconnecting = realtime.isReconnecting.value;
+      final socketConnected = realtime.socketConnected.value;
+      final streaming = realtime.isStreamingLocation.value;
+      final locationError = realtime.locationError.value;
+      final latestPosition = realtime.lastPosition.value;
+
+      final availabilityStatus = online
+          ? reconnecting
+                ? 'Reconnecting...'
+                : (socketConnected ? 'Online' : 'Connecting...')
+          : 'Offline';
+
+      final availabilityHint = online
+          ? (streaming
+                ? 'Receiving offers + updating your location.'
+                : 'Connected. Waiting for location updates...')
+          : 'Go online to receive ride offers.';
+
       return RefreshIndicator(
         onRefresh: controller.refreshAll,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.only(bottom: 16),
           children: [
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Driver Availability',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              availabilityStatus,
+                              style: TextStyle(
+                                color: online
+                                    ? AppColors.driverPrimary
+                                    : AppColors.error,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              availabilityHint,
+                              style: TextStyle(
+                                color: muted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (connecting)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 10),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      Switch.adaptive(
+                        value: online,
+                        onChanged: connecting ? null : realtime.setOnline,
+                        activeThumbColor: AppColors.driverPrimary,
+                        activeTrackColor: AppColors.driverPrimary.withValues(
+                          alpha: 0.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (latestPosition != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Last location: ${latestPosition.latitude.toStringAsFixed(4)}, ${latestPosition.longitude.toStringAsFixed(4)}',
+                      style: TextStyle(
+                        color: muted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  if (locationError != null &&
+                      locationError.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _normalizeError(locationError),
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
             SizedBox(
               height: 54,
               width: double.infinity,

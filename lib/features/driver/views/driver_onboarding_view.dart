@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/features/home/controllers/home_controller.dart';
+import 'package:help_ride/core/routes/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../controllers/driver_onboarding_controller.dart';
 
@@ -19,7 +20,6 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
   Widget build(BuildContext context) {
     final primary = AppColors.driverPrimary;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -168,7 +168,7 @@ class _DriverCta extends StatelessWidget {
           child: TextButton(
             onPressed: () {
               Get.find<HomeController>().setRole(HomeRole.passenger);
-              Get.offAllNamed('/home');
+              Get.offAllNamed(AppRoutes.shell);
             },
             child: Text('Not now', style: TextStyle(color: primary)),
           ),
@@ -246,7 +246,9 @@ class ExoField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
+            fillColor: isDark
+                ? const Color(0xFF1C2331)
+                : const Color(0xFFF3F5F8),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 16,
