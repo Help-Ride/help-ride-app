@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:get/get.dart';
+import 'dart:math' as math;
 import '../../../shared/services/api_client.dart';
 import '../../../shared/widgets/place_picker_field.dart';
 import '../models/ride_request.dart';
 import '../services/ride_requests_api.dart';
 import '../../bookings/controllers/my_rides_controller.dart';
+import '../../bookings/services/bookings_api.dart';
 
 class RideRequestFormController extends GetxController {
+  static const double _minRouteDistanceKm = 0.1;
+
   late final RideRequestsApi _api;
+  late final BookingsApi _bookingsApi;
 
   final loading = false.obs;
   final error = RxnString();
@@ -18,6 +24,8 @@ class RideRequestFormController extends GetxController {
 
   final fromPick = Rxn<PlacePick>();
   final toPick = Rxn<PlacePick>();
+  final pickupLocation = Rxn<RideRequestLocationDraft>();
+  final dropoffLocation = Rxn<RideRequestLocationDraft>();
 
   final date = Rxn<DateTime>();
   final time = Rxn<TimeOfDay>();
@@ -37,6 +45,7 @@ class RideRequestFormController extends GetxController {
     super.onInit();
     final client = await ApiClient.create();
     _api = RideRequestsApi(client);
+    _bookingsApi = BookingsApi(client);
 
     _hydrateFromArgs();
 
@@ -77,11 +86,30 @@ class RideRequestFormController extends GetxController {
       toCtrl.text = request.toCity;
       seatsCtrl.text = request.seatsNeeded.toString();
       date.value = request.preferredDate;
-      time.value = _parseTime(request.preferredTime);
-      arrivalTime.value =
-          request.arrivalTime == null ? null : _parseTime(request.arrivalTime!);
+      time.value = _parseTime(request.preferredTime ?? '');
+      arrivalTime.value = request.arrivalTime == null
+          ? null
+          : _parseTime(request.arrivalTime!);
       rideType.value = request.rideType;
       tripType.value = request.tripType;
+      final fromLat = request.fromLat;
+      final fromLng = request.fromLng;
+      final toLat = request.toLat;
+      final toLng = request.toLng;
+      if (fromLat != null && fromLng != null) {
+        pickupLocation.value = RideRequestLocationDraft(
+          name: request.fromCity,
+          lat: fromLat,
+          lng: fromLng,
+        );
+      }
+      if (toLat != null && toLng != null) {
+        dropoffLocation.value = RideRequestLocationDraft(
+          name: request.toCity,
+          lat: toLat,
+          lng: toLng,
+        );
+      }
       return;
     }
 
@@ -101,11 +129,29 @@ class RideRequestFormController extends GetxController {
     final toLat = _readDouble(args['toLat']);
     final toLng = _readDouble(args['toLng']);
     if (fromCity.isNotEmpty && fromLat != null && fromLng != null) {
-      fromPick.value = PlacePick(fullText: fromCity, latLng: LatLng(fromLat, fromLng));
+      setPickupPlace(
+        PlacePick(fullText: fromCity, latLng: LatLng(fromLat, fromLng)),
+      );
     }
     if (toCity.isNotEmpty && toLat != null && toLng != null) {
-      toPick.value = PlacePick(fullText: toCity, latLng: LatLng(toLat, toLng));
+      setDropoffPlace(
+        PlacePick(fullText: toCity, latLng: LatLng(toLat, toLng)),
+      );
     }
+  }
+
+  void setPickupPlace(PlacePick place) {
+    fromPick.value = place;
+    pickupLocation.value = RideRequestLocationDraft.fromPlacePick(place);
+    fromCtrl.text = place.fullText;
+    _recomputeCanSubmit();
+  }
+
+  void setDropoffPlace(PlacePick place) {
+    toPick.value = place;
+    dropoffLocation.value = RideRequestLocationDraft.fromPlacePick(place);
+    toCtrl.text = place.fullText;
+    _recomputeCanSubmit();
   }
 
   void _recomputeCanSubmit() {
@@ -117,7 +163,7 @@ class RideRequestFormController extends GetxController {
 
     final hasRoute = isEditing
         ? fromCtrl.text.trim().isNotEmpty && toCtrl.text.trim().isNotEmpty
-        : fromPick.value?.latLng != null && toPick.value?.latLng != null;
+        : pickupLocation.value != null && dropoffLocation.value != null;
 
     return hasRoute && date.value != null && time.value != null && seats > 0;
   }
@@ -137,6 +183,7 @@ class RideRequestFormController extends GetxController {
   }
 
   TimeOfDay? _parseTime(String raw) {
+    if (raw.trim().isEmpty) return null;
     final parts = raw.split(':');
     if (parts.length < 2) return null;
     final h = int.tryParse(parts[0]);
@@ -160,6 +207,10 @@ class RideRequestFormController extends GetxController {
 
     final seats = int.parse(seatsCtrl.text.trim());
     final preferredLocal = preferredDateTimeLocal!;
+    if (preferredLocal.isBefore(DateTime.now())) {
+      error.value = 'Preferred date/time must be in the future.';
+      return;
+    }
     final preferredTime = _formatTime(time.value)!;
     final arrival = _formatTime(arrivalTime.value);
 
@@ -176,29 +227,53 @@ class RideRequestFormController extends GetxController {
         );
         _afterSuccess('Updated', 'Ride request updated.');
       } else {
-        final from = fromPick.value;
-        final to = toPick.value;
-        if (from?.latLng == null || to?.latLng == null) {
+        final pickup = pickupLocation.value;
+        final dropoff = dropoffLocation.value;
+        if (pickup == null || dropoff == null) {
           error.value = 'Pick both locations using the map search.';
           loading.value = false;
           return;
         }
-        await _api.createRideRequest(
-          fromCity: from!.fullText,
-          fromLat: from.latLng!.lat,
-          fromLng: from.latLng!.lng,
-          toCity: to!.fullText,
-          toLat: to.latLng!.lat,
-          toLng: to.latLng!.lng,
-          preferredDateUtc: preferredLocal.toUtc(),
-          preferredTime: preferredTime,
-          arrivalTime: arrival,
-          seatsNeeded: seats,
-          rideType: rideType.value,
-          tripType: tripType.value,
-        );
-        _afterSuccess('Requested', 'Ride request submitted.');
+        final routeDistanceKm = _distanceKmBetween(pickup, dropoff);
+        if (routeDistanceKm < _minRouteDistanceKm) {
+          error.value =
+              'Pickup and drop-off are too close. Please choose different locations.';
+          Get.snackbar('Failed', error.value!);
+          loading.value = false;
+          return;
+        }
+        final preferredUtc = preferredLocal.toUtc();
+        final nowUtc = DateTime.now().toUtc();
+        final leadMinutes = preferredUtc.difference(nowUtc).inMinutes;
+        final useJitFlow = leadMinutes <= 120;
+        if (useJitFlow) {
+          await _submitJitRequest(
+            pickup: pickup,
+            dropoff: dropoff,
+            preferredLocal: preferredLocal,
+            preferredTime: preferredTime,
+            arrival: arrival,
+            seats: seats,
+          );
+        } else {
+          await _submitOfferRequest(
+            pickup: pickup,
+            dropoff: dropoff,
+            preferredLocal: preferredLocal,
+            preferredTime: preferredTime,
+            arrival: arrival,
+            seats: seats,
+          );
+        }
       }
+    } on StripeException catch (e) {
+      final code = e.error.code.toString().toLowerCase();
+      if (code.contains('cancel')) {
+        error.value = 'Payment cancelled.';
+      } else {
+        error.value = e.error.message ?? 'Payment failed.';
+      }
+      Get.snackbar('Failed', error.value ?? 'Failed');
     } catch (e) {
       error.value = e.toString();
       Get.snackbar('Failed', error.value ?? 'Failed');
@@ -207,11 +282,178 @@ class RideRequestFormController extends GetxController {
     }
   }
 
+  Future<void> _submitOfferRequest({
+    required RideRequestLocationDraft pickup,
+    required RideRequestLocationDraft dropoff,
+    required DateTime preferredLocal,
+    required String preferredTime,
+    required String? arrival,
+    required int seats,
+  }) async {
+    try {
+      await _api.createRideRequest(
+        fromCity: pickup.name,
+        fromLat: pickup.lat,
+        fromLng: pickup.lng,
+        toCity: dropoff.name,
+        toLat: dropoff.lat,
+        toLng: dropoff.lng,
+        preferredDateUtc: preferredLocal.toUtc(),
+        preferredTime: preferredTime,
+        arrivalTime: arrival,
+        seatsNeeded: seats,
+        rideType: rideType.value,
+        tripType: tripType.value,
+        mode: RideRequestMode.offer,
+      );
+      _afterSuccess('Requested', 'Ride request submitted.');
+    } on RideRequestJitRequiredException {
+      await _submitJitRequest(
+        pickup: pickup,
+        dropoff: dropoff,
+        preferredLocal: preferredLocal,
+        preferredTime: preferredTime,
+        arrival: arrival,
+        seats: seats,
+      );
+    }
+  }
+
+  Future<void> _submitJitRequest({
+    required RideRequestLocationDraft pickup,
+    required RideRequestLocationDraft dropoff,
+    required DateTime preferredLocal,
+    required String preferredTime,
+    required String? arrival,
+    required int seats,
+  }) async {
+    final intent = await _api.createJitIntent(
+      fromCity: pickup.name,
+      fromLat: pickup.lat,
+      fromLng: pickup.lng,
+      toCity: dropoff.name,
+      toLat: dropoff.lat,
+      toLng: dropoff.lng,
+      preferredDateUtc: preferredLocal.toUtc(),
+      preferredTime: preferredTime,
+      arrivalTime: arrival,
+      seatsNeeded: seats,
+      rideType: rideType.value,
+      tripType: tripType.value,
+    );
+
+    await Stripe.instance.initPaymentSheet(
+      paymentSheetParameters: SetupPaymentSheetParameters(
+        paymentIntentClientSecret: intent.clientSecret,
+        merchantDisplayName: 'HelpRide',
+        applePay: const PaymentSheetApplePay(merchantCountryCode: 'CA'),
+        style: ThemeMode.system,
+      ),
+    );
+    await Stripe.instance.presentPaymentSheet();
+    // JIT request is created by backend webhook/callback after successful payment.
+    // Mobile app should not call POST /ride-requests for JIT flow.
+    await _showFindingDriverAndRefresh();
+    _afterSuccess('Payment complete', 'Finding driver now...');
+  }
+
+  Future<void> _showFindingDriverAndRefresh() async {
+    if (!(Get.isDialogOpen ?? false)) {
+      Get.dialog<void>(const _FindingDriverDialog(), barrierDismissible: false);
+    }
+    try {
+      for (var attempt = 0; attempt < 4; attempt++) {
+        await Future.wait([_api.myRideRequests(), _bookingsApi.myBookings()]);
+        if (Get.isRegistered<MyRidesController>()) {
+          await Get.find<MyRidesController>().fetch();
+        }
+        if (attempt < 3) {
+          await Future.delayed(const Duration(seconds: 2));
+        }
+      }
+    } finally {
+      if (Get.isDialogOpen ?? false) {
+        Get.back<void>();
+      }
+    }
+  }
+
+  double _distanceKmBetween(
+    RideRequestLocationDraft from,
+    RideRequestLocationDraft to,
+  ) {
+    const earthRadiusKm = 6371.0;
+    final dLat = _degToRad(to.lat - from.lat);
+    final dLng = _degToRad(to.lng - from.lng);
+    final a =
+        math.pow(math.sin(dLat / 2), 2) +
+        math.cos(_degToRad(from.lat)) *
+            math.cos(_degToRad(to.lat)) *
+            math.pow(math.sin(dLng / 2), 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
+
+  double _degToRad(double deg) => deg * (math.pi / 180.0);
+
   void _afterSuccess(String title, String message) {
     if (Get.isRegistered<MyRidesController>()) {
       Get.find<MyRidesController>().fetch();
     }
     Get.back();
     Get.snackbar(title, message);
+  }
+}
+
+class RideRequestLocationDraft {
+  const RideRequestLocationDraft({
+    required this.name,
+    required this.lat,
+    required this.lng,
+  });
+
+  final String name;
+  final double lat;
+  final double lng;
+
+  factory RideRequestLocationDraft.fromPlacePick(PlacePick place) {
+    final latLng = place.latLng;
+    if (latLng == null) {
+      throw ArgumentError('Missing coordinates for selected place');
+    }
+    return RideRequestLocationDraft(
+      name: place.fullText.trim(),
+      lat: latLng.lat,
+      lng: latLng.lng,
+    );
+  }
+}
+
+class _FindingDriverDialog extends StatelessWidget {
+  const _FindingDriverDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: Row(
+          children: const [
+            SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Payment successful. Finding driver...',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -24,12 +24,20 @@ class DriverRideOffer {
     required this.rideRequestId,
     required this.pickupAddress,
     required this.dropoffAddress,
+    this.pickupLat,
+    this.pickupLng,
+    this.dropoffLat,
+    this.dropoffLng,
     required this.raw,
   });
 
   final String rideRequestId;
   final String pickupAddress;
   final String dropoffAddress;
+  final double? pickupLat;
+  final double? pickupLng;
+  final double? dropoffLat;
+  final double? dropoffLng;
   final Map<String, dynamic> raw;
 
   factory DriverRideOffer.fromPayload(dynamic payload) {
@@ -43,11 +51,15 @@ class DriverRideOffer {
       _asMap(data['ride_request']),
       _asMap(data['request']),
     ]);
-    final sources = [map, data, request];
+    final booking = _firstNonEmptyMap([
+      _asMap(map['booking']),
+      _asMap(data['booking']),
+    ]);
+    final sources = [map, data, request, booking];
 
     final rideRequestId =
         _readFirstString(
-          maps: [map, data],
+          maps: [map, data, booking],
           keys: const [
             'rideRequestId',
             'ride_request_id',
@@ -69,6 +81,8 @@ class DriverRideOffer {
             'pickup_address',
             'pickupLocation',
             'pickup_location',
+            'passengerPickupName',
+            'passenger_pickup_name',
             'pickup',
             'fromAddress',
             'from_address',
@@ -90,6 +104,8 @@ class DriverRideOffer {
             'dropoff_address',
             'dropoffLocation',
             'dropoff_location',
+            'passengerDropoffName',
+            'passenger_dropoff_name',
             'dropoff',
             'toAddress',
             'to_address',
@@ -103,10 +119,91 @@ class DriverRideOffer {
         ) ??
         fallbackDropoffAddress;
 
+    final pickupLat = _readFirstDouble(
+      maps: sources,
+      isLatitude: true,
+      keys: const [
+        'passengerPickupLat',
+        'passenger_pickup_lat',
+        'pickupLat',
+        'pickup_lat',
+        'pickupLocation',
+        'pickup_location',
+        'pickup',
+        'fromLat',
+        'from_lat',
+        'from',
+        'originLat',
+        'origin_lat',
+        'origin',
+      ],
+    );
+    final pickupLng = _readFirstDouble(
+      maps: sources,
+      isLatitude: false,
+      keys: const [
+        'passengerPickupLng',
+        'passenger_pickup_lng',
+        'pickupLng',
+        'pickup_lng',
+        'pickupLocation',
+        'pickup_location',
+        'pickup',
+        'fromLng',
+        'from_lng',
+        'from',
+        'originLng',
+        'origin_lng',
+        'origin',
+      ],
+    );
+    final dropoffLat = _readFirstDouble(
+      maps: sources,
+      isLatitude: true,
+      keys: const [
+        'passengerDropoffLat',
+        'passenger_dropoff_lat',
+        'dropoffLat',
+        'dropoff_lat',
+        'dropoffLocation',
+        'dropoff_location',
+        'dropoff',
+        'toLat',
+        'to_lat',
+        'to',
+        'destinationLat',
+        'destination_lat',
+        'destination',
+      ],
+    );
+    final dropoffLng = _readFirstDouble(
+      maps: sources,
+      isLatitude: false,
+      keys: const [
+        'passengerDropoffLng',
+        'passenger_dropoff_lng',
+        'dropoffLng',
+        'dropoff_lng',
+        'dropoffLocation',
+        'dropoff_location',
+        'dropoff',
+        'toLng',
+        'to_lng',
+        'to',
+        'destinationLng',
+        'destination_lng',
+        'destination',
+      ],
+    );
+
     return DriverRideOffer(
       rideRequestId: rideRequestId,
       pickupAddress: pickup,
       dropoffAddress: dropoff,
+      pickupLat: pickupLat,
+      pickupLng: pickupLng,
+      dropoffLat: dropoffLat,
+      dropoffLng: dropoffLng,
       raw: map,
     );
   }
@@ -119,10 +216,18 @@ class DriverRideOffer {
       rideRequestId: request.id,
       pickupAddress: pickup.isEmpty ? fallbackPickupAddress : pickup,
       dropoffAddress: dropoff.isEmpty ? fallbackDropoffAddress : dropoff,
+      pickupLat: request.fromLat,
+      pickupLng: request.fromLng,
+      dropoffLat: request.toLat,
+      dropoffLng: request.toLng,
       raw: {
         'rideRequestId': request.id,
         'fromCity': request.fromCity,
         'toCity': request.toCity,
+        'fromLat': request.fromLat,
+        'fromLng': request.fromLng,
+        'toLat': request.toLat,
+        'toLng': request.toLng,
       },
     );
   }
@@ -286,14 +391,17 @@ class DriverRealtimeController extends GetxController
     final offer = activeOffer.value;
     if (offer == null || offerActionLoading.value) return;
 
+    _traceRealtime('accept_tap rideRequestId=${offer.rideRequestId}');
     offerActionLoading.value = true;
     await _connectSocket();
 
+    _traceRealtime('emit ride:accept rideRequestId=${offer.rideRequestId}');
     _socket?.emit('ride:accept', {'rideRequestId': offer.rideRequestId});
 
     _acceptTimeoutTimer?.cancel();
     _acceptTimeoutTimer = Timer(const Duration(seconds: 10), () {
       if (!offerActionLoading.value) return;
+      _traceRealtime('accept_timeout rideRequestId=${offer.rideRequestId}');
       offerActionLoading.value = false;
       Get.snackbar('Still waiting', 'No confirmation yet. Please try again.');
     });
@@ -370,6 +478,7 @@ class DriverRealtimeController extends GetxController
     socket.onConnect((_) {
       socketConnected.value = true;
       isReconnecting.value = false;
+      _traceRealtime('socket_connected');
       if (isOnline.value) {
         final position = lastPosition.value;
         if (position != null) _emitDriverOnline(position);
@@ -378,6 +487,7 @@ class DriverRealtimeController extends GetxController
 
     socket.onDisconnect((_) {
       socketConnected.value = false;
+      _traceRealtime('socket_disconnected');
       if (isOnline.value) {
         isReconnecting.value = true;
       }
@@ -385,11 +495,13 @@ class DriverRealtimeController extends GetxController
 
     socket.onConnectError((_) {
       socketConnected.value = false;
+      _traceRealtime('socket_connect_error');
       if (isOnline.value) isReconnecting.value = true;
     });
 
     socket.onError((_) {
       socketConnected.value = false;
+      _traceRealtime('socket_error');
       if (isOnline.value) isReconnecting.value = true;
     });
 
@@ -579,6 +691,13 @@ class DriverRealtimeController extends GetxController
   }
 
   void _onRideOfferEvent(dynamic payload) {
+    final map = _asMap(payload);
+    final id =
+        _readString(map['rideRequestId']) ??
+        _readString(map['ride_request_id']) ??
+        _readString(_asMap(map['rideRequest'])['id']) ??
+        '';
+    _traceRealtime('event ride:offer rideRequestId=$id');
     unawaited(_handleRideOfferEvent(payload));
   }
 
@@ -600,6 +719,7 @@ class DriverRealtimeController extends GetxController
         _readString(_asMap(map['rideRequest'])['id']) ??
         '';
 
+    _traceRealtime('event ride:cancelled rideRequestId=$rideRequestId');
     final current = activeOffer.value;
     if (current == null) return;
     if (rideRequestId.isNotEmpty && current.rideRequestId != rideRequestId) {
@@ -620,6 +740,18 @@ class DriverRealtimeController extends GetxController
         _readString(map['ride_request_id']) ??
         _readString(_asMap(map['rideRequest'])['id']) ??
         '';
+    final ok = _readBool(map['ok']) || _looksAcceptedStatus(map);
+    final status =
+        _readString(map['status']) ?? _readString(map['result']) ?? '';
+    final reasonPreview =
+        (_readString(map['reason']) ??
+                _readString(map['error']) ??
+                _readString(map['message']) ??
+                '')
+            .trim();
+    _traceRealtime(
+      'event ride:accept_result rideRequestId=$rideRequestId ok=$ok status=$status reason=$reasonPreview',
+    );
 
     if (rideRequestId.isNotEmpty && rideRequestId != current.rideRequestId) {
       return;
@@ -628,7 +760,6 @@ class DriverRealtimeController extends GetxController
     _acceptTimeoutTimer?.cancel();
     offerActionLoading.value = false;
 
-    final ok = _readBool(map['ok']) || _looksAcceptedStatus(map);
     final reason =
         (_readString(map['reason']) ??
                 _readString(map['error']) ??
@@ -646,6 +777,10 @@ class DriverRealtimeController extends GetxController
           'rideRequestId': acceptedOffer.rideRequestId,
           'pickupAddress': acceptedOffer.pickupAddress,
           'dropoffAddress': acceptedOffer.dropoffAddress,
+          'pickupLat': acceptedOffer.pickupLat,
+          'pickupLng': acceptedOffer.pickupLng,
+          'dropoffLat': acceptedOffer.dropoffLat,
+          'dropoffLng': acceptedOffer.dropoffLng,
           'result': map,
         },
       );
@@ -669,6 +804,7 @@ class DriverRealtimeController extends GetxController
     if (id.isEmpty) return;
     if (activeOffer.value != null) return;
 
+    _traceRealtime('push_offer rideRequestId=$id');
     await _connectSocket();
 
     DriverRideOffer offer;
@@ -680,6 +816,10 @@ class DriverRealtimeController extends GetxController
         rideRequestId: id,
         pickupAddress: DriverRideOffer.fallbackPickupAddress,
         dropoffAddress: DriverRideOffer.fallbackDropoffAddress,
+        pickupLat: null,
+        pickupLng: null,
+        dropoffLat: null,
+        dropoffLng: null,
         raw: {'rideRequestId': id},
       );
     }
@@ -695,8 +835,15 @@ class DriverRealtimeController extends GetxController
     final dropoffMissing =
         dropoff.isEmpty ||
         dropoff == DriverRideOffer.fallbackDropoffAddress.toLowerCase();
+    final pickupCoordsMissing =
+        offer.pickupLat == null || offer.pickupLng == null;
+    final dropoffCoordsMissing =
+        offer.dropoffLat == null || offer.dropoffLng == null;
 
-    if (!pickupMissing && !dropoffMissing) {
+    if (!pickupMissing &&
+        !dropoffMissing &&
+        !pickupCoordsMissing &&
+        !dropoffCoordsMissing) {
       return offer;
     }
 
@@ -714,11 +861,20 @@ class DriverRealtimeController extends GetxController
       dropoffAddress: dropoffMissing
           ? fromRequest.dropoffAddress
           : offer.dropoffAddress,
+      pickupLat: pickupCoordsMissing ? fromRequest.pickupLat : offer.pickupLat,
+      pickupLng: pickupCoordsMissing ? fromRequest.pickupLng : offer.pickupLng,
+      dropoffLat: dropoffCoordsMissing
+          ? fromRequest.dropoffLat
+          : offer.dropoffLat,
+      dropoffLng: dropoffCoordsMissing
+          ? fromRequest.dropoffLng
+          : offer.dropoffLng,
       raw: {...offer.raw, ...fromRequest.raw},
     );
   }
 
   void _showOffer(DriverRideOffer offer) {
+    _traceRealtime('show_offer rideRequestId=${offer.rideRequestId}');
     activeOffer.value = offer;
     offerActionLoading.value = false;
     offerSecondsRemaining.value = _offerCountdownSeconds;
@@ -763,6 +919,10 @@ class DriverRealtimeController extends GetxController
   }
 
   void _clearOffer({required bool closeDialog}) {
+    final id = activeOffer.value?.rideRequestId ?? '';
+    if (id.isNotEmpty) {
+      _traceRealtime('clear_offer rideRequestId=$id');
+    }
     _stopOfferTimer();
     _acceptTimeoutTimer?.cancel();
     offerActionLoading.value = false;
@@ -833,6 +993,10 @@ class DriverRealtimeController extends GetxController
 
     return uri.toString();
   }
+
+  void _traceRealtime(String message) {
+    debugPrint('[DriverRealtime] $message');
+  }
 }
 
 Map<String, dynamic> _asMap(dynamic value) {
@@ -887,21 +1051,63 @@ String? _readFirstAddress({
   return null;
 }
 
+double? _readFirstDouble({
+  required List<Map<String, dynamic>> maps,
+  required bool isLatitude,
+  required List<String> keys,
+}) {
+  for (final map in maps) {
+    for (final key in keys) {
+      final value = _readCoordinateValue(map[key], isLatitude: isLatitude);
+      if (value != null) return value;
+    }
+  }
+  return null;
+}
+
 String? _readAddressValue(dynamic value) {
+  final map = _asMap(value);
+  if (map.isNotEmpty) {
+    return _readString(map['address']) ??
+        _readString(map['formattedAddress']) ??
+        _readString(map['formatted_address']) ??
+        _readString(map['fullAddress']) ??
+        _readString(map['full_address']) ??
+        _readString(map['name']) ??
+        _readString(map['label']) ??
+        _readString(map['title']) ??
+        _readString(map['city']) ??
+        _readString(map['city_name']);
+  }
+
   final direct = _readString(value);
+  if (direct == null) return null;
+
+  // Some payloads send coordinate objects in pickup/dropoff fields.
+  // Don't render raw "{lat: ..., lng: ...}" as the address line.
+  final normalized = direct.toLowerCase();
+  final looksLikeCoordinateObject =
+      normalized.startsWith('{') &&
+      normalized.contains('lat') &&
+      (normalized.contains('lng') || normalized.contains('lon'));
+  if (looksLikeCoordinateObject) return null;
+  return direct;
+}
+
+double? _readCoordinateValue(dynamic value, {required bool isLatitude}) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+
+  final direct = double.tryParse(value.toString().trim());
   if (direct != null) return direct;
 
   final map = _asMap(value);
   if (map.isEmpty) return null;
-
-  return _readString(map['address']) ??
-      _readString(map['formattedAddress']) ??
-      _readString(map['formatted_address']) ??
-      _readString(map['fullAddress']) ??
-      _readString(map['full_address']) ??
-      _readString(map['name']) ??
-      _readString(map['label']) ??
-      _readString(map['title']) ??
-      _readString(map['city']) ??
-      _readString(map['city_name']);
+  if (isLatitude) {
+    return _readCoordinateValue(map['lat'], isLatitude: true) ??
+        _readCoordinateValue(map['latitude'], isLatitude: true);
+  }
+  return _readCoordinateValue(map['lng'], isLatitude: false) ??
+      _readCoordinateValue(map['lon'], isLatitude: false) ??
+      _readCoordinateValue(map['longitude'], isLatitude: false);
 }

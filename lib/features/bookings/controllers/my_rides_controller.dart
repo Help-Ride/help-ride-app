@@ -86,14 +86,135 @@ class MyRidesController extends GetxController {
   }
 
   List<RideRequest> get filteredRequests {
-    final list = rideRequests.toList()
-      ..sort((a, b) => _requestSortTime(b).compareTo(_requestSortTime(a)));
+    final hiddenRequestIds = _requestIdsAlreadyConvertedToBookings();
+    final list =
+        rideRequests
+            .where((request) => !hiddenRequestIds.contains(request.id.trim()))
+            .toList()
+          ..sort((a, b) => _requestSortTime(b).compareTo(_requestSortTime(a)));
     return list;
   }
 
   DateTime _bookingSortTime(Booking b) => b.updatedAt ?? b.createdAt;
 
   DateTime _requestSortTime(RideRequest r) => r.updatedAt ?? r.createdAt;
+
+  Set<String> _requestIdsAlreadyConvertedToBookings() {
+    if (rideRequests.isEmpty || bookings.isEmpty) return const <String>{};
+
+    final idsLinkedByBooking = bookings
+        .map((booking) => (booking.rideRequestId ?? '').trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    final bookingPaymentIntentIds = bookings
+        .map((booking) => (booking.paymentIntentId ?? '').trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    final hiddenRequestIds = <String>{...idsLinkedByBooking};
+
+    for (final request in rideRequests) {
+      final requestId = request.id.trim();
+      if (requestId.isEmpty || hiddenRequestIds.contains(requestId)) continue;
+
+      final requestJitIntentId = (request.jitPaymentIntentId ?? '').trim();
+      if (requestJitIntentId.isNotEmpty &&
+          bookingPaymentIntentIds.contains(requestJitIntentId)) {
+        hiddenRequestIds.add(requestId);
+        continue;
+      }
+
+      // Fallback when backend does not include rideRequestId/payment intent link.
+      if (_looksLikeJitRequestAlreadyBooked(request)) {
+        hiddenRequestIds.add(requestId);
+      }
+    }
+
+    return hiddenRequestIds;
+  }
+
+  bool _looksLikeJitRequestAlreadyBooked(RideRequest request) {
+    if (request.mode != RideRequestMode.jit) return false;
+    if (_isCanceledLikeStatus(request.status)) return false;
+
+    final requestedAt = request.preferredDate;
+    for (final booking in bookings) {
+      if (_isCanceledLikeStatus(booking.status)) continue;
+      if (request.seatsNeeded > 0 &&
+          booking.seatsBooked > 0 &&
+          request.seatsNeeded != booking.seatsBooked) {
+        continue;
+      }
+
+      final minutesDiff = booking.ride.startTime
+          .difference(requestedAt)
+          .inMinutes
+          .abs();
+      if (minutesDiff > 45) continue;
+      if (_isSameRoute(request, booking)) return true;
+    }
+
+    return false;
+  }
+
+  bool _isSameRoute(RideRequest request, Booking booking) {
+    final pickupByCoords = _isSameCoordinatePoint(
+      request.fromLat,
+      request.fromLng,
+      booking.passengerPickupLat,
+      booking.passengerPickupLng,
+    );
+    final dropoffByCoords = _isSameCoordinatePoint(
+      request.toLat,
+      request.toLng,
+      booking.passengerDropoffLat,
+      booking.passengerDropoffLng,
+    );
+    if (pickupByCoords && dropoffByCoords) return true;
+
+    final requestPickup = _normalizePlaceLabel(request.fromCity);
+    final requestDropoff = _normalizePlaceLabel(request.toCity);
+    final bookingPickup = _normalizePlaceLabel(booking.pickupLabel);
+    final bookingDropoff = _normalizePlaceLabel(booking.dropoffLabel);
+
+    if (requestPickup.isEmpty ||
+        requestDropoff.isEmpty ||
+        bookingPickup.isEmpty ||
+        bookingDropoff.isEmpty) {
+      return false;
+    }
+
+    return requestPickup == bookingPickup && requestDropoff == bookingDropoff;
+  }
+
+  bool _isSameCoordinatePoint(
+    double? latA,
+    double? lngA,
+    double? latB,
+    double? lngB,
+  ) {
+    if (latA == null || lngA == null || latB == null || lngB == null) {
+      return false;
+    }
+    const tolerance = 0.002; // roughly ~200m
+    return (latA - latB).abs() <= tolerance && (lngA - lngB).abs() <= tolerance;
+  }
+
+  String _normalizePlaceLabel(String raw) {
+    return raw
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  bool _isCanceledLikeStatus(String raw) {
+    final normalized = raw.toLowerCase().trim();
+    return normalized.contains('cancel') ||
+        normalized.contains('reject') ||
+        normalized.contains('delete') ||
+        normalized.contains('expired');
+  }
 
   bool canPay(Booking booking) =>
       shouldShowPayAction(booking) &&

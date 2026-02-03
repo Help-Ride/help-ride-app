@@ -53,7 +53,7 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
                   hintText: 'Where are you starting from?',
                   icon: Icons.place_outlined,
                   controller: controller.fromCtrl,
-                  onPicked: (p) => controller.fromPick.value = p,
+                  onPicked: controller.setPickupPlace,
                 ),
                 const SizedBox(height: 12),
                 PlacePickerField(
@@ -62,7 +62,7 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
                   icon: Icons.place,
                   iconColor: primary,
                   controller: controller.toCtrl,
-                  onPicked: (p) => controller.toPick.value = p,
+                  onPicked: controller.setDropoffPlace,
                 ),
               ],
 
@@ -119,7 +119,8 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
                 onTap: () async {
                   final picked = await showTimePicker(
                     context: context,
-                    initialTime: controller.arrivalTime.value ?? TimeOfDay.now(),
+                    initialTime:
+                        controller.arrivalTime.value ?? TimeOfDay.now(),
                   );
                   if (picked != null) controller.arrivalTime.value = picked;
                 },
@@ -220,8 +221,9 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed:
-                        controller.loading.value ? null : () => Get.back(),
+                    onPressed: controller.loading.value
+                        ? null
+                        : () => Get.back(),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -244,8 +246,8 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
                     onPressed: controller.loading.value
                         ? null
                         : (controller.canSubmitFlag.value
-                            ? controller.submit
-                            : null),
+                              ? controller.submit
+                              : null),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                       padding: const EdgeInsets.symmetric(vertical: 14),

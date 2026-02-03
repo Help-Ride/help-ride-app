@@ -88,7 +88,7 @@ class RideRequestCard extends StatelessWidget {
               Icon(Icons.access_time, size: 16, color: muted),
               const SizedBox(width: 6),
               Text(
-                request.preferredTime,
+                request.preferredTime ?? '—',
                 style: TextStyle(color: muted),
               ),
               if (request.arrivalTime != null &&
@@ -96,10 +96,7 @@ class RideRequestCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Icon(Icons.timer_outlined, size: 16, color: muted),
                 const SizedBox(width: 6),
-                Text(
-                  request.arrivalTime!,
-                  style: TextStyle(color: muted),
-                ),
+                Text(request.arrivalTime!, style: TextStyle(color: muted)),
               ],
               const Spacer(),
               Icon(Icons.event_seat_outlined, size: 16, color: muted),
@@ -279,19 +276,35 @@ Future<void> _openOffersSheet(BuildContext context, RideRequest request) async {
                   Text(
                     'No offers yet.',
                     style: TextStyle(
-                      color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      color: isDark
+                          ? AppColors.darkMuted
+                          : AppColors.lightMuted,
                     ),
                   )
                 else
                   Column(
-                            children: offers
-                        .map((o) => _OfferTile(
-                              offer: o,
-                              onAccept: () =>
-                                  _handleOfferAction(context, request, o, true, setState, loadOffers),
-                              onReject: () =>
-                                  _handleOfferAction(context, request, o, false, setState, loadOffers),
-                            ))
+                    children: offers
+                        .map(
+                          (o) => _OfferTile(
+                            offer: o,
+                            onAccept: () => _handleOfferAction(
+                              context,
+                              request,
+                              o,
+                              true,
+                              setState,
+                              loadOffers,
+                            ),
+                            onReject: () => _handleOfferAction(
+                              context,
+                              request,
+                              o,
+                              false,
+                              setState,
+                              loadOffers,
+                            ),
+                          ),
+                        )
                         .toList(),
                   ),
               ],
@@ -373,10 +386,7 @@ class _OfferTile extends StatelessWidget {
           if (ride != null)
             Text(
               '${ride.fromCity} → ${ride.toCity}',
-              style: TextStyle(
-                color: textPrimary,
-                fontWeight: FontWeight.w800,
-              ),
+              style: TextStyle(color: textPrimary, fontWeight: FontWeight.w800),
             ),
           if (driver != null) ...[
             const SizedBox(height: 8),
@@ -493,9 +503,12 @@ class _DriverInfoRow extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 18,
-          backgroundColor:
-              isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
-          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+          backgroundColor: isDark
+              ? const Color(0xFF1C2331)
+              : const Color(0xFFE9EEF6),
+          backgroundImage: avatarUrl.isNotEmpty
+              ? NetworkImage(avatarUrl)
+              : null,
           child: avatarUrl.isEmpty
               ? Text(
                   initials,

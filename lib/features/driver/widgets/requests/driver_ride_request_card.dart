@@ -74,7 +74,7 @@ class DriverRideRequestCard extends StatelessWidget {
               Icon(Icons.access_time, size: 16, color: muted),
               const SizedBox(width: 6),
               Text(
-                request.preferredTime,
+                request.preferredTime ?? '—',
                 style: TextStyle(color: muted),
               ),
               if (request.arrivalTime != null &&
