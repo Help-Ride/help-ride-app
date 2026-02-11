@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/controllers/session_controller.dart';
 import '../../../shared/models/user.dart';
+import '../../support/routes/support_routes.dart';
 import '../controllers/profile_controller.dart';
 
 class PassengerProfileView extends StatefulWidget {
@@ -133,9 +134,13 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
               _SectionLabel(label: 'SUPPORT', isDark: isDark),
               const SizedBox(height: 8),
               _ActionGroup(
-                items: const [
-                  _ActionItem(icon: Icons.help_outline, label: 'Help Center'),
+                items: [
                   _ActionItem(
+                    icon: Icons.help_outline,
+                    label: 'Help Center',
+                    onTap: () => Get.toNamed(SupportRoutes.tickets),
+                  ),
+                  const _ActionItem(
                     icon: Icons.policy_outlined,
                     label: 'Terms & Privacy',
                   ),
