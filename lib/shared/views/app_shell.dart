@@ -5,7 +5,6 @@ import 'package:help_ride/features/bookings/views/my_rides_view.dart';
 import 'package:help_ride/features/driver/controllers/driver_gate_controller.dart';
 import 'package:help_ride/features/driver/controllers/driver_home_controller.dart';
 import 'package:help_ride/features/driver/controllers/driver_my_rides_controller.dart';
-import 'package:help_ride/features/driver/controllers/driver_realtime_controller.dart';
 import 'package:help_ride/features/driver/views/driver_my_rides_view.dart';
 import '../../core/theme/theme_controller.dart';
 import '../controllers/session_controller.dart';
@@ -43,10 +42,6 @@ class _AppShellState extends State<AppShell> {
     );
     Get.lazyPut<DriverHomeController>(
       () => DriverHomeController(),
-      fenix: true,
-    );
-    Get.lazyPut<DriverRealtimeController>(
-      () => DriverRealtimeController(),
       fenix: true,
     );
 
