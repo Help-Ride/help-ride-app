@@ -31,8 +31,11 @@ class RideTripDetailsCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
-    final pickupValue = _nonEmpty(pickupName) ?? ride.fromCity;
-    final dropoffValue = _nonEmpty(dropoffName) ?? ride.toCity;
+    final pickupValue = compactAddress(_nonEmpty(pickupName) ?? ride.fromCity);
+    final dropoffValue = compactAddress(
+      _nonEmpty(dropoffName) ?? ride.toCity,
+      maxParts: 4,
+    );
     final pickupCoords = _coordsText(pickupLat, pickupLng);
     final dropoffCoords = _coordsText(dropoffLat, dropoffLng);
     final duration = _formatDuration(ride.startTime, ride.arrivalTime);
@@ -67,9 +70,12 @@ class RideTripDetailsCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               pickupValue,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                height: 1.15,
                 color: textPrimary,
               ),
             ),
@@ -93,9 +99,12 @@ class RideTripDetailsCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               dropoffValue,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                height: 1.15,
                 color: textPrimary,
               ),
             ),

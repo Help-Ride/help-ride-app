@@ -43,7 +43,7 @@ class SectionTitle extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w800,
           fontSize: 14,
           color: isDark ? AppColors.darkText : AppColors.lightText,
         ),
@@ -94,7 +94,7 @@ class TripRow extends StatelessWidget {
                 Text(
                   value,
                   style: TextStyle(
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     color: isDark ? AppColors.darkText : AppColors.lightText,
                   ),
                 ),
@@ -130,13 +130,36 @@ class MiniInfo extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
             color: isDark ? AppColors.darkText : AppColors.lightText,
           ),
         ),
       ],
     );
   }
+}
+
+String compactAddress(String location, {int maxParts = 3}) {
+  final raw = location.trim();
+  if (raw.isEmpty) return '';
+
+  final parts = raw
+      .split(',')
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return raw;
+
+  final lowerLast = parts.last.toLowerCase();
+  if (lowerLast == 'usa' ||
+      lowerLast == 'united states' ||
+      lowerLast == 'canada') {
+    parts.removeLast();
+  }
+
+  final count = maxParts.clamp(1, parts.length);
+  return parts.take(count).join(', ');
 }
 
 class Avatar extends StatelessWidget {

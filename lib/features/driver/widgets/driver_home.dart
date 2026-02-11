@@ -384,12 +384,10 @@ class _EarningTile extends StatelessWidget {
 
     final fromCity = (ride?.fromCity ?? '').trim();
     final toCity = (ride?.toCity ?? '').trim();
-    final shortRoute = _routeLabel(
-      from: _compactLocation(fromCity),
-      to: _compactLocation(toCity),
-    );
+    final fromLine = _compactAddress(fromCity);
+    final toLine = _compactAddress(toCity);
+    final shortRoute = _routeLabel(from: fromLine, to: toLine);
     final longRoute = _routeLabel(from: fromCity, to: toCity);
-    final routeDetail = longRoute == shortRoute ? null : longRoute;
 
     final amount = _formatCents(
       payment.driverEarningsCents,
@@ -418,15 +416,29 @@ class _EarningTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text(
-                    shortRoute,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: textPrimary,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 17,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _RouteLine(
+                        icon: Icons.trip_origin,
+                        iconColor: muted,
+                        text: fromLine.isEmpty ? 'Pickup unavailable' : fromLine,
+                        textColor: textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        maxLines: 1,
+                      ),
+                      const SizedBox(height: 2),
+                      _RouteLine(
+                        icon: Icons.location_on_outlined,
+                        iconColor: muted,
+                        text: toLine.isEmpty ? 'Dropoff unavailable' : toLine,
+                        textColor: textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        maxLines: 2,
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -440,22 +452,29 @@ class _EarningTile extends StatelessWidget {
                 ),
               ],
             ),
-            if (routeDetail != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                routeDetail,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: muted, fontSize: 12),
-              ),
-            ],
             const SizedBox(height: 8),
-            Text(
-              'Passenger: ${(passengerName == null || passengerName.isEmpty) ? 'Passenger' : passengerName}',
-              style: TextStyle(
-                color: textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Passenger: ',
+                    style: TextStyle(
+                      color: muted,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  TextSpan(
+                    text: (passengerName == null || passengerName.isEmpty)
+                        ? 'Passenger'
+                        : passengerName,
+                    style: TextStyle(
+                      color: textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 8),
@@ -481,6 +500,53 @@ class _EarningTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _RouteLine extends StatelessWidget {
+  const _RouteLine({
+    required this.icon,
+    required this.iconColor,
+    required this.text,
+    required this.textColor,
+    required this.fontWeight,
+    required this.fontSize,
+    required this.maxLines,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String text;
+  final Color textColor;
+  final FontWeight fontWeight;
+  final double fontSize;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(icon, size: 15, color: iconColor),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: textColor,
+              fontWeight: fontWeight,
+              fontSize: fontSize,
+              height: 1.15,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -738,7 +804,7 @@ Future<void> _showPaymentDetails(
   );
 }
 
-String _compactLocation(String location) {
+String _compactAddress(String location) {
   final raw = location.trim();
   if (raw.isEmpty) return '';
 
@@ -748,12 +814,21 @@ String _compactLocation(String location) {
       .where((part) => part.isNotEmpty)
       .toList();
   if (parts.isEmpty) return raw;
-  if (parts.length == 1) return parts.first;
 
-  final city = parts.first;
-  final region = parts.length >= 2 ? parts[1] : '';
-  if (region.isEmpty) return city;
-  return '$city, $region';
+  final lowerLast = parts.isEmpty ? '' : parts.last.toLowerCase();
+  if (lowerLast == 'usa' ||
+      lowerLast == 'united states' ||
+      lowerLast == 'canada') {
+    parts.removeLast();
+  }
+
+  if (parts.length >= 3) {
+    return '${parts[0]}, ${parts[1]}, ${parts[2]}';
+  }
+  if (parts.length == 2) {
+    return '${parts[0]}, ${parts[1]}';
+  }
+  return parts.first;
 }
 
 String _routeLabel({required String from, required String to}) {

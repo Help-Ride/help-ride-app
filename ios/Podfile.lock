@@ -9,6 +9,40 @@ PODS:
     - GoogleUtilities/Environment (~> 8.0)
     - GoogleUtilities/UserDefaults (~> 8.0)
     - PromisesObjC (~> 2.4)
+  - DKImagePickerController/Core (4.3.9):
+    - DKImagePickerController/ImageDataManager
+    - DKImagePickerController/Resource
+  - DKImagePickerController/ImageDataManager (4.3.9)
+  - DKImagePickerController/PhotoGallery (4.3.9):
+    - DKImagePickerController/Core
+    - DKPhotoGallery
+  - DKImagePickerController/Resource (4.3.9)
+  - DKPhotoGallery (0.0.19):
+    - DKPhotoGallery/Core (= 0.0.19)
+    - DKPhotoGallery/Model (= 0.0.19)
+    - DKPhotoGallery/Preview (= 0.0.19)
+    - DKPhotoGallery/Resource (= 0.0.19)
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Core (0.0.19):
+    - DKPhotoGallery/Model
+    - DKPhotoGallery/Preview
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Model (0.0.19):
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Preview (0.0.19):
+    - DKPhotoGallery/Model
+    - DKPhotoGallery/Resource
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Resource (0.0.19):
+    - SDWebImage
+    - SwiftyGif
+  - file_picker (0.0.1):
+    - DKImagePickerController/PhotoGallery
+    - Flutter
   - Firebase/CoreOnly (12.8.0):
     - FirebaseCore (~> 12.8.0)
   - Firebase/Messaging (12.8.0):
@@ -113,6 +147,9 @@ PODS:
     - NWWebSocket (~> 0.5.9)
     - PusherTweetNacl (~> 1.2.0)
   - PusherTweetNacl (1.2.0)
+  - SDWebImage (5.21.6):
+    - SDWebImage/Core (= 5.21.6)
+  - SDWebImage/Core (5.21.6)
   - Stripe (25.0.1):
     - StripeApplePay (= 25.0.1)
     - StripeCore (= 25.0.1)
@@ -168,10 +205,12 @@ PODS:
     - StripeUICore (= 25.0.1)
   - StripeUICore (25.0.1):
     - StripeCore (= 25.0.1)
+  - SwiftyGif (5.4.5)
   - url_launcher_ios (0.0.1):
     - Flutter
 
 DEPENDENCIES:
+  - file_picker (from `.symlinks/plugins/file_picker/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
@@ -188,6 +227,8 @@ SPEC REPOS:
   trunk:
     - AppAuth
     - AppCheckCore
+    - DKImagePickerController
+    - DKPhotoGallery
     - Firebase
     - FirebaseCore
     - FirebaseCoreInternal
@@ -203,6 +244,7 @@ SPEC REPOS:
     - PromisesObjC
     - PusherSwift
     - PusherTweetNacl
+    - SDWebImage
     - Stripe
     - StripeApplePay
     - StripeCore
@@ -211,8 +253,11 @@ SPEC REPOS:
     - StripePaymentSheet
     - StripePaymentsUI
     - StripeUICore
+    - SwiftyGif
 
 EXTERNAL SOURCES:
+  file_picker:
+    :path: ".symlinks/plugins/file_picker/ios"
   firebase_core:
     :path: ".symlinks/plugins/firebase_core/ios"
   firebase_messaging:
@@ -239,6 +284,9 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   AppAuth: d4f13a8fe0baf391b2108511793e4b479691fb73
   AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
+  DKImagePickerController: 946cec48c7873164274ecc4624d19e3da4c1ef3c
+  DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
+  file_picker: a0560bc09d61de87f12d246fc47d2119e6ef37be
   Firebase: 9a58fdbc9d8655ed7b79a19cf9690bb007d3d46d
   firebase_core: ee30637e6744af8e0c12a6a1e8a9718506ec2398
   firebase_messaging: 343de01a8d3e18b60df0c6d37f7174c44ae38e02
@@ -263,6 +311,7 @@ SPEC CHECKSUMS:
   pusher_channels_flutter: 2723222f2686852dd91d13780938d11cca114a39
   PusherSwift: 84a45a6b62c137c52ca948626817989d3127c022
   PusherTweetNacl: 015f56f2cf010e718703f2bd9bca66fdcc91b208
+  SDWebImage: 1bb6a1b84b6fe87b972a102bdc77dd589df33477
   Stripe: 4728e3e0dd8df134e4a420ab504e929a93a815f0
   stripe_ios: b6b8ef64e89a5409da466b4e6a2a6a26178892a6
   StripeApplePay: 43997281ace138a1c75a8f2d7be11925ea28644c
@@ -272,6 +321,7 @@ SPEC CHECKSUMS:
   StripePaymentSheet: 3f93ce6ea84afde770d3c7e18a9b8f99aed63896
   StripePaymentsUI: 626726a01255a6458c35436f7f6431dacee82684
   StripeUICore: 30f8352fd7a5cf1541b7777a57b3ad1133bf6763
+  SwiftyGif: 706c60cf65fa2bc5ee0313beece843c8eb8194d4
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
 
 PODFILE CHECKSUM: 6082d58521864565db60ac319d973501d893956d

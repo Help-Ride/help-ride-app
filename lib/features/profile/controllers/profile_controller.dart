@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:get/get.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/models/user.dart';
 import '../../../shared/services/api_client.dart';
+import '../models/driver_document.dart';
 import '../services/profile_api.dart';
 
 class ProfileController extends GetxController {
@@ -9,8 +12,12 @@ class ProfileController extends GetxController {
   late final SessionController _session;
 
   final driverProfile = Rxn<DriverProfile>();
+  final driverDocuments = <DriverDocument>[].obs;
   final loading = false.obs;
   final driverLoading = false.obs;
+  final docsLoading = false.obs;
+  final docsUploading = false.obs;
+  final docsError = RxnString();
 
   @override
   Future<void> onInit() async {
@@ -20,6 +27,7 @@ class ProfileController extends GetxController {
     _api = ProfileApi(client);
     driverProfile.value = _session.user.value?.driverProfile;
     await refreshDriverProfile();
+    await refreshDriverDocuments();
   }
 
   Future<void> refreshDriverProfile() async {
@@ -35,6 +43,61 @@ class ProfileController extends GetxController {
       // Ignore missing driver profile for passengers.
     } finally {
       driverLoading.value = false;
+    }
+  }
+
+  Future<void> refreshDriverDocuments({bool silent = false}) async {
+    final userId = _session.user.value?.id ?? '';
+    if (userId.isEmpty) return;
+    if (!silent) {
+      docsLoading.value = true;
+    }
+    docsError.value = null;
+    try {
+      final docs = await _api.getDriverDocuments(userId);
+      driverDocuments.assignAll(docs);
+    } catch (_) {
+      driverDocuments.clear();
+      docsError.value = 'Could not load documents right now.';
+    } finally {
+      docsLoading.value = false;
+    }
+  }
+
+  Future<void> uploadDriverLicenseDocument({
+    required String filePath,
+    required String fileName,
+    required String mimeType,
+  }) async {
+    final userId = _session.user.value?.id ?? '';
+    if (userId.isEmpty) return;
+    docsUploading.value = true;
+    docsError.value = null;
+    try {
+      final file = File(filePath);
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        throw Exception('Selected file is empty.');
+      }
+
+      final presign = await _api.getDriverDocumentPresign(
+        userId,
+        type: 'license',
+        fileName: fileName,
+        mimeType: mimeType,
+      );
+
+      await _api.uploadFileToPresignedUrl(
+        uploadUrl: presign.uploadUrl,
+        bytes: bytes,
+        mimeType: mimeType,
+      );
+      await refreshDriverDocuments(silent: true);
+    } catch (e) {
+      docsError.value = e.toString();
+      rethrow;
+    } finally {
+      docsUploading.value = false;
     }
   }
 

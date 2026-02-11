@@ -25,7 +25,7 @@ class DriverRideDetailsView extends GetView<DriverRideDetailsController> {
         foregroundColor: isDark ? AppColors.darkText : AppColors.lightText,
         title: const Text(
           'Ride Details',
-          style: TextStyle(fontWeight: FontWeight.w900),
+          style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: SafeArea(
@@ -210,7 +210,7 @@ class _DriverRideSummaryCard extends StatelessWidget {
               Text(
                 '\$${ride.pricePerSeat.toStringAsFixed(0)}/seat',
                 style: TextStyle(
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                   color: textPrimary,
                 ),
               ),
@@ -223,12 +223,12 @@ class _DriverRideSummaryCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${ride.fromCity}  →  ${ride.toCity}',
+                  '${compactAddress(ride.fromCity)}  →  ${compactAddress(ride.toCity, maxParts: 4)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
                     color: textPrimary,
                   ),
                 ),

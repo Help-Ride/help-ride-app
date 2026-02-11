@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
+import 'package:mime/mime.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/controllers/session_controller.dart';
 import '../../../shared/models/user.dart';
+import '../models/driver_document.dart';
 import '../../support/routes/support_routes.dart';
+import '../routes/profile_routes.dart';
 import '../controllers/profile_controller.dart';
 
 class PassengerProfileView extends StatefulWidget {
@@ -140,9 +144,10 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                     label: 'Help Center',
                     onTap: () => Get.toNamed(SupportRoutes.tickets),
                   ),
-                  const _ActionItem(
+                  _ActionItem(
                     icon: Icons.policy_outlined,
                     label: 'Terms & Privacy',
+                    onTap: () => Get.toNamed(ProfileRoutes.termsPrivacy),
                   ),
                 ],
                 isDark: isDark,
@@ -233,11 +238,13 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
     final insuranceCtrl = TextEditingController(
       text: profile?.insuranceInfo ?? '',
     );
+    _controller.refreshDriverDocuments();
 
     await _showEditSheet(
       context,
       title: profile == null ? 'Create Driver Profile' : 'Edit Driver Profile',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _EditField(controller: makeCtrl, label: 'Car make'),
           const SizedBox(height: 12),
@@ -254,6 +261,11 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
           _EditField(controller: plateCtrl, label: 'Plate number'),
           const SizedBox(height: 12),
           _EditField(controller: licenseCtrl, label: 'License number'),
+          const SizedBox(height: 12),
+          _DriverDocumentUploadSection(
+            controller: _controller,
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
           const SizedBox(height: 12),
           _EditField(controller: insuranceCtrl, label: 'Insurance info'),
         ],
@@ -295,91 +307,96 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            18,
-            16,
-            18,
-            16 + MediaQuery.of(sheetContext).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE6EAF2),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
+        final viewInsets = MediaQuery.of(sheetContext).viewInsets.bottom;
+        final maxHeight = MediaQuery.of(sheetContext).size.height * 0.9;
+        return AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(bottom: viewInsets),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: _textPrimary(isDark),
-                      ),
+                  Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE6EAF2),
+                      borderRadius: BorderRadius.circular(99),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () {
-                      if (Navigator.of(sheetContext).canPop()) {
-                        Navigator.of(sheetContext).pop();
-                      }
-                    },
-                    icon: const Icon(Icons.close),
-                    color: _mutedText(isDark),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: _textPrimary(isDark),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          if (Navigator.of(sheetContext).canPop()) {
+                            Navigator.of(sheetContext).pop();
+                          }
+                        },
+                        icon: const Icon(Icons.close),
+                        color: _mutedText(isDark),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 12),
+                  Flexible(child: SingleChildScrollView(child: child)),
+                  const SizedBox(height: 16),
+                  Obx(() {
+                    final saving = isSaving.value;
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                final ok = await onSave();
+                                if (!ok) return;
+                                if (Navigator.of(sheetContext).canPop()) {
+                                  Navigator.of(sheetContext).pop();
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.passengerPrimary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Save',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                      ),
+                    );
+                  }),
                 ],
               ),
-              const SizedBox(height: 12),
-              child,
-              const SizedBox(height: 16),
-              Obx(() {
-                final saving = isSaving.value;
-                return SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: saving
-                        ? null
-                        : () async {
-                            final ok = await onSave();
-                            if (!ok) return;
-                            if (Navigator.of(sheetContext).canPop()) {
-                              Navigator.of(sheetContext).pop();
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.passengerPrimary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'Save',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                  ),
-                );
-              }),
-            ],
+            ),
           ),
         );
       },
@@ -837,6 +854,291 @@ class _LogoutCard extends StatelessWidget {
   }
 }
 
+class _DriverDocumentUploadSection extends StatefulWidget {
+  const _DriverDocumentUploadSection({
+    required this.controller,
+    required this.isDark,
+  });
+
+  final ProfileController controller;
+  final bool isDark;
+
+  @override
+  State<_DriverDocumentUploadSection> createState() =>
+      _DriverDocumentUploadSectionState();
+}
+
+class _DriverDocumentUploadSectionState
+    extends State<_DriverDocumentUploadSection> {
+  bool _pickingFile = false;
+
+  Future<void> _pickAndUpload() async {
+    if (_pickingFile || widget.controller.docsUploading.value) return;
+
+    setState(() => _pickingFile = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowMultiple: false,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
+        withData: false,
+      );
+      if (!mounted || result == null || result.files.isEmpty) return;
+
+      final file = result.files.single;
+      final path = file.path;
+      if (path == null || path.trim().isEmpty) {
+        _showSnack('Could not read the selected file.');
+        return;
+      }
+
+      final fileName = file.name.trim().isNotEmpty
+          ? file.name.trim()
+          : path.split('/').last;
+      final mimeType =
+          lookupMimeType(path, headerBytes: file.bytes) ??
+          _mimeTypeForExt(file.extension);
+
+      await widget.controller.uploadDriverLicenseDocument(
+        filePath: path,
+        fileName: fileName,
+        mimeType: mimeType,
+      );
+      if (!mounted) return;
+      _showSnack('License document uploaded successfully.');
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(_friendlyError(e));
+    } finally {
+      if (mounted) {
+        setState(() => _pickingFile = false);
+      }
+    }
+  }
+
+  String _mimeTypeForExt(String? ext) {
+    switch ((ext ?? '').toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  String _friendlyError(Object error) {
+    final fromController = widget.controller.docsError.value;
+    if (fromController != null && fromController.trim().isNotEmpty) {
+      return fromController.replaceFirst('Exception: ', '').trim();
+    }
+    final cleaned = error.toString().replaceFirst('Exception: ', '').trim();
+    if (cleaned.isEmpty) return 'Upload failed. Please try again.';
+    return cleaned;
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final loading = widget.controller.docsLoading.value;
+      final uploading = widget.controller.docsUploading.value;
+      final error = widget.controller.docsError.value;
+      final licenseDocs =
+          widget.controller.driverDocuments
+              .where((doc) => doc.type.toLowerCase() == 'license')
+              .toList()
+            ..sort(
+              (a, b) => _sortKey(
+                b.updatedAt ?? b.createdAt,
+              ).compareTo(_sortKey(a.updatedAt ?? a.createdAt)),
+            );
+
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _surfaceCard(widget.isDark),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _cardBorder(widget.isDark)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'License Verification',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: _textPrimary(widget.isDark),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Upload a clear photo or PDF of your license.',
+              style: TextStyle(fontSize: 12, color: _mutedText(widget.isDark)),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: uploading || _pickingFile ? null : _pickAndUpload,
+                icon: uploading || _pickingFile
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: _textPrimary(widget.isDark),
+                        ),
+                      )
+                    : const Icon(Icons.upload_file_outlined, size: 18),
+                label: Text(
+                  uploading || _pickingFile
+                      ? 'Uploading...'
+                      : licenseDocs.isEmpty
+                      ? 'Upload license document'
+                      : 'Replace license document',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _textPrimary(widget.isDark),
+                  side: BorderSide(color: _cardBorder(widget.isDark)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            if (loading) ...[
+              const SizedBox(height: 10),
+              const LinearProgressIndicator(minHeight: 2),
+            ],
+            if (error != null && error.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                error.replaceFirst('Exception: ', ''),
+                style: const TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            if (licenseDocs.isEmpty)
+              Text(
+                'No license document uploaded yet.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _mutedText(widget.isDark),
+                ),
+              )
+            else
+              Column(
+                children: [
+                  for (final doc in licenseDocs)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _DriverDocumentTile(
+                        isDark: widget.isDark,
+                        document: doc,
+                      ),
+                    ),
+                ],
+              ),
+          ],
+        ),
+      );
+    });
+  }
+
+  int _sortKey(String? raw) {
+    final dt = DateTime.tryParse(raw ?? '');
+    if (dt == null) return 0;
+    return dt.millisecondsSinceEpoch;
+  }
+}
+
+class _DriverDocumentTile extends StatelessWidget {
+  const _DriverDocumentTile({required this.isDark, required this.document});
+
+  final bool isDark;
+  final DriverDocument document;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (document.fileName ?? '').trim().isEmpty
+        ? 'License document'
+        : document.fileName!.trim();
+    final status = _docStatusLabel(document.status);
+    final statusColor = _docStatusColor(status);
+    final timestamp = _formatDocTimestamp(
+      document.updatedAt ?? document.createdAt,
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: _fieldFill(isDark),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.description_outlined, size: 18, color: _mutedText(isDark)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    color: _textPrimary(isDark),
+                  ),
+                ),
+                if (timestamp != null)
+                  Text(
+                    'Uploaded $timestamp',
+                    style: TextStyle(fontSize: 11, color: _mutedText(isDark)),
+                  ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(isDark ? 0.25 : 0.12),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Text(
+              status,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: statusColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EditField extends StatelessWidget {
   const _EditField({
     required this.controller,
@@ -870,6 +1172,39 @@ class _EditField extends StatelessWidget {
       ),
     );
   }
+}
+
+String _docStatusLabel(String? raw) {
+  final v = (raw ?? '').trim().toLowerCase();
+  if (v.isEmpty) return 'Uploaded';
+  if (v == 'approved') return 'Approved';
+  if (v == 'rejected') return 'Rejected';
+  if (v == 'pending') return 'Pending';
+  return '${v[0].toUpperCase()}${v.substring(1)}';
+}
+
+Color _docStatusColor(String status) {
+  switch (status.toLowerCase()) {
+    case 'approved':
+      return AppColors.passengerPrimary;
+    case 'rejected':
+      return Colors.redAccent;
+    case 'pending':
+      return Colors.orange;
+    default:
+      return const Color(0xFF4B79E5);
+  }
+}
+
+String? _formatDocTimestamp(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return null;
+  final dt = DateTime.tryParse(raw.trim());
+  if (dt == null) return null;
+  final local = dt.toLocal();
+  final mm = local.month.toString().padLeft(2, '0');
+  final dd = local.day.toString().padLeft(2, '0');
+  final yy = local.year.toString();
+  return '$mm/$dd/$yy';
 }
 
 Color _surfaceBg(bool isDark) => isDark ? AppColors.darkBg : AppColors.lightBg;
