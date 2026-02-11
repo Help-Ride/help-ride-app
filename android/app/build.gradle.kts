@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.exocodelabs.helpride"
+    namespace = "ca.helpride.mobile"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.exocodelabs.helpride"
+        applicationId = "ca.helpride.mobile"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

@@ -1,4 +1,4 @@
-package com.exocodelabs.helpride
+package ca.helpride.mobile
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
