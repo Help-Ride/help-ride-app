@@ -225,7 +225,7 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
       final res = await widget.places.autocomplete(
         query: query,
         sessionToken: _sessionToken,
-        country: 'US',
+        country: 'CA',
       );
 
       if (!mounted) return;

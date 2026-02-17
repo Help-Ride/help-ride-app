@@ -11,7 +11,7 @@ class LocationSearchSheet extends StatefulWidget {
     super.key,
     required this.title,
     required this.places,
-    this.countryCode = "us",
+    this.countryCode = "ca",
   });
 
   final String title;
@@ -21,7 +21,7 @@ class LocationSearchSheet extends StatefulWidget {
   static Future<PlaceResult?> open({
     required String title,
     required PlacesService places,
-    String? countryCode = "us",
+    String? countryCode = "ca",
   }) {
     final isDark = Get.isDarkMode;
     return Get.bottomSheet<PlaceResult>(
