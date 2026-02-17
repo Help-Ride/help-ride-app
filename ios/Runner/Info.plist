@@ -61,6 +61,8 @@
 
 	<key>GMSApiKey</key>
 	<string>AIzaSyDO-kwH3nnMJTj0e0VeqL4EgQjabSKEgBE</string>
+	<key>GIDClientID</key>
+	<string>269308288512-ued9q6dtkmrbhi9111gpg263er6knef3.apps.googleusercontent.com</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We use your location to suggest nearby pickup points.</string>
 	<key>UIBackgroundModes</key>
