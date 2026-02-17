@@ -31,16 +31,26 @@
 			<string>google-signin</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.269308288512-ued9q6dtkmrbhi9111gpg263er6knef3</string>
+				<string>com.googleusercontent.apps.723283297879-47e82oqdpcnaqv999ie6f79u412on6l8</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>GIDClientID</key>
+	<string>723283297879-47e82oqdpcnaqv999ie6f79u412on6l8.apps.googleusercontent.com</string>
+	<key>GMSApiKey</key>
+	<string>AIzaSyDO-kwH3nnMJTj0e0VeqL4EgQjabSKEgBE</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We use your location to suggest nearby pickup points.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -57,17 +67,6 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-
-	<key>GMSApiKey</key>
-	<string>AIzaSyDO-kwH3nnMJTj0e0VeqL4EgQjabSKEgBE</string>
-	<key>GIDClientID</key>
-	<string>269308288512-ued9q6dtkmrbhi9111gpg263er6knef3.apps.googleusercontent.com</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We use your location to suggest nearby pickup points.</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
 	</array>
 </dict>
 </plist>
