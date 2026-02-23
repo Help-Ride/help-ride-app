@@ -38,75 +38,6 @@ class DriverHomeView extends GetView<DriverHomeController> {
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
-                final compact = constraints.maxWidth < 420;
-                final buttonHeight = compact ? 52.0 : 54.0;
-                final createButton = SizedBox(
-                  height: buttonHeight,
-                  child: ElevatedButton.icon(
-                    onPressed: () => Get.toNamed(DriverRoutes.createRide),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.driverPrimary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 0,
-                    ),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text(
-                      'Create a Ride',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                );
-
-                final searchButton = SizedBox(
-                  height: buttonHeight,
-                  child: OutlinedButton.icon(
-                    onPressed: () => Get.toNamed(DriverRoutes.rideRequests),
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: isDark
-                          ? const Color(0xFF111827)
-                          : const Color(0xFFF3F8FF),
-                      foregroundColor: AppColors.driverPrimary,
-                      side: const BorderSide(
-                        color: AppColors.driverPrimary,
-                        width: 1.2,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    icon: const Icon(Icons.search, size: 18),
-                    label: const Text(
-                      'Search Ride',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                );
-
-                if (compact) {
-                  return Column(
-                    children: [
-                      SizedBox(width: double.infinity, child: createButton),
-                      const SizedBox(height: 10),
-                      SizedBox(width: double.infinity, child: searchButton),
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    Expanded(child: createButton),
-                    const SizedBox(width: 10),
-                    Expanded(child: searchButton),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 14),
-            LayoutBuilder(
-              builder: (context, constraints) {
                 final width = constraints.maxWidth;
                 final cardWidth = width >= 760
                     ? (width - 24) / 3
@@ -214,6 +145,75 @@ class DriverHomeView extends GetView<DriverHomeController> {
                 },
               ),
             ],
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 420;
+                final buttonHeight = compact ? 52.0 : 54.0;
+                final createButton = SizedBox(
+                  height: buttonHeight,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Get.toNamed(DriverRoutes.createRide),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.driverPrimary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text(
+                      'Create a Ride',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                );
+
+                final searchButton = SizedBox(
+                  height: buttonHeight,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Get.toNamed(DriverRoutes.rideRequests),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: isDark
+                          ? const Color(0xFF111827)
+                          : const Color(0xFFF3F8FF),
+                      foregroundColor: AppColors.driverPrimary,
+                      side: const BorderSide(
+                        color: AppColors.driverPrimary,
+                        width: 1.2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.search, size: 18),
+                    label: const Text(
+                      'Search Ride',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                );
+
+                if (compact) {
+                  return Column(
+                    children: [
+                      SizedBox(width: double.infinity, child: createButton),
+                      const SizedBox(height: 10),
+                      SizedBox(width: double.infinity, child: searchButton),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: createButton),
+                    const SizedBox(width: 10),
+                    Expanded(child: searchButton),
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
