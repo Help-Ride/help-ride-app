@@ -151,6 +151,8 @@ class _LocationSearchSheetState extends State<LocationSearchSheet> {
                 controller: _ctrl,
                 autofocus: true,
                 onChanged: _onQueryChanged,
+                onTapOutside: (_) =>
+                    FocusManager.instance.primaryFocus?.unfocus(),
                 decoration: appInputDecoration(
                   context,
                   hintText: "Search a place...",

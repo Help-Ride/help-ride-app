@@ -191,7 +191,20 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
       title: 'Edit Profile',
       formKey: formKey,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _SheetSectionTitle(
+            title: 'Profile Photo',
+            subtitle: 'Upload a profile image and save it with your account.',
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
+          const SizedBox(height: 12),
+          _ProfilePhotoUploadField(
+            controller: _controller,
+            avatarCtrl: avatarCtrl,
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
+          const SizedBox(height: 12),
           _EditField(
             controller: nameCtrl,
             label: 'Full name',
@@ -214,9 +227,9 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
           const SizedBox(height: 12),
           _EditField(
             controller: avatarCtrl,
-            label: 'Avatar URL',
+            label: 'Photo URL or key',
             keyboardType: TextInputType.url,
-            validator: (value) => InputValidators.optionalUrl(value ?? ''),
+            validator: (value) => _avatarValueValidator(value ?? ''),
           ),
         ],
       ),
@@ -925,6 +938,189 @@ class _LogoutCard extends StatelessWidget {
   }
 }
 
+class _ProfilePhotoUploadField extends StatefulWidget {
+  const _ProfilePhotoUploadField({
+    required this.controller,
+    required this.avatarCtrl,
+    required this.isDark,
+  });
+
+  final ProfileController controller;
+  final TextEditingController avatarCtrl;
+  final bool isDark;
+
+  @override
+  State<_ProfilePhotoUploadField> createState() =>
+      _ProfilePhotoUploadFieldState();
+}
+
+class _ProfilePhotoUploadFieldState extends State<_ProfilePhotoUploadField> {
+  bool _pickingFile = false;
+
+  Future<void> _pickAndUpload() async {
+    if (_pickingFile || widget.controller.avatarUploading.value) return;
+
+    setState(() => _pickingFile = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowMultiple: false,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+        withData: false,
+      );
+      if (!mounted || result == null || result.files.isEmpty) return;
+
+      final file = result.files.single;
+      final path = file.path;
+      if (path == null || path.trim().isEmpty) {
+        _showSnack('Could not read the selected file.');
+        return;
+      }
+
+      final fileName = file.name.trim().isNotEmpty
+          ? file.name.trim()
+          : path.split('/').last;
+      final mimeType =
+          lookupMimeType(path, headerBytes: file.bytes) ??
+          _mimeTypeForExt(file.extension);
+
+      final uploadedValue = await widget.controller.uploadProfilePhoto(
+        filePath: path,
+        fileName: fileName,
+        mimeType: mimeType,
+      );
+      if (!mounted) return;
+      widget.avatarCtrl.text = uploadedValue;
+      widget.avatarCtrl.selection = TextSelection.collapsed(
+        offset: uploadedValue.length,
+      );
+      _showSnack('Profile photo uploaded.');
+    } catch (e) {
+      if (!mounted) return;
+      final fromController = widget.controller.avatarUploadError.value;
+      final message = (fromController ?? e.toString())
+          .replaceFirst('Exception: ', '')
+          .trim();
+      _showSnack(message.isEmpty ? 'Profile photo upload failed.' : message);
+    } finally {
+      if (mounted) {
+        setState(() => _pickingFile = false);
+      }
+    }
+  }
+
+  String _mimeTypeForExt(String? ext) {
+    switch ((ext ?? '').toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.avatarCtrl,
+      builder: (_, __) {
+        final avatarValue = widget.avatarCtrl.text.trim();
+        final hasHttpUrl =
+            avatarValue.startsWith('https://') ||
+            avatarValue.startsWith('http://');
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _surfaceCard(widget.isDark),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _cardBorder(widget.isDark)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: _chipNeutralBg(widget.isDark),
+                    backgroundImage: hasHttpUrl
+                        ? NetworkImage(avatarValue)
+                        : null,
+                    child: hasHttpUrl
+                        ? null
+                        : Icon(
+                            Icons.person_outline,
+                            color: _mutedText(widget.isDark),
+                          ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Photo preview',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: _textPrimary(widget.isDark),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Obx(() {
+                final uploading =
+                    widget.controller.avatarUploading.value || _pickingFile;
+                return SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: uploading ? null : _pickAndUpload,
+                    icon: uploading
+                        ? SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _textPrimary(widget.isDark),
+                            ),
+                          )
+                        : const Icon(Icons.photo_camera_outlined, size: 18),
+                    label: Text(
+                      uploading
+                          ? 'Uploading...'
+                          : avatarValue.isEmpty
+                          ? 'Upload profile photo'
+                          : 'Replace profile photo',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _textPrimary(widget.isDark),
+                      side: BorderSide(color: _cardBorder(widget.isDark)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _DriverDocumentUploadSection extends StatefulWidget {
   const _DriverDocumentUploadSection({
     required this.controller,
@@ -1232,18 +1428,32 @@ const _driverDocumentRequirements = <_DriverDocumentRequirement>[
     aliases: ['driver_license'],
   ),
   _DriverDocumentRequirement(
-    type: 'registration',
-    title: 'Vehicle Registration',
-    buttonLabel: 'registration document',
-    description: 'Upload your current vehicle registration document.',
-    aliases: ['vehicle_registration', 'car_registration'],
-  ),
-  _DriverDocumentRequirement(
     type: 'insurance',
     title: 'Insurance Proof',
     buttonLabel: 'insurance document',
     description: 'Upload active insurance proof for this vehicle.',
     aliases: ['insurance_proof', 'proof_of_insurance'],
+  ),
+  _DriverDocumentRequirement(
+    type: 'ownership',
+    title: 'Ownership Document',
+    buttonLabel: 'ownership document',
+    description:
+        'Upload ownership proof (vehicle title/ownership or registration).',
+    aliases: [
+      'registration',
+      'vehicle_registration',
+      'car_registration',
+      'vehicle_ownership',
+      'ownership_proof',
+    ],
+  ),
+  _DriverDocumentRequirement(
+    type: 'other',
+    title: 'Other Document',
+    buttonLabel: 'other document',
+    description: 'Upload any additional supporting document (optional).',
+    aliases: ['misc', 'miscellaneous', 'additional_document'],
   ),
 ];
 
@@ -1376,11 +1586,27 @@ class _EditField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
+      onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
       validator: validator,
       autovalidateMode: AutovalidateMode.onUserInteraction,
       decoration: appInputDecoration(context, labelText: label, radius: 14),
     );
   }
+}
+
+String? _avatarValueValidator(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return null;
+
+  final uri = Uri.tryParse(trimmed);
+  final isUrl = uri != null && uri.hasScheme && uri.host.trim().isNotEmpty;
+  if (isUrl) return null;
+
+  // Allow non-URL object keys returned by upload endpoints.
+  final isStorageKey = RegExp(r'^[A-Za-z0-9/_\-.]{3,}$').hasMatch(trimmed);
+  if (isStorageKey) return null;
+
+  return 'Enter a valid image URL or uploaded image key.';
 }
 
 String _driverDocTypeLabel(String raw) {
@@ -1389,14 +1615,22 @@ String _driverDocTypeLabel(String raw) {
     case 'license':
     case 'driver_license':
       return 'License';
-    case 'registration':
-    case 'vehicle_registration':
-    case 'car_registration':
-      return 'Registration';
     case 'insurance':
     case 'insurance_proof':
     case 'proof_of_insurance':
       return 'Insurance';
+    case 'ownership':
+    case 'registration':
+    case 'vehicle_registration':
+    case 'car_registration':
+    case 'vehicle_ownership':
+    case 'ownership_proof':
+      return 'Ownership';
+    case 'other':
+    case 'misc':
+    case 'miscellaneous':
+    case 'additional_document':
+      return 'Other';
     default:
       if (value.isEmpty) return 'Driver';
       return '${value[0].toUpperCase()}${value.substring(1)}';

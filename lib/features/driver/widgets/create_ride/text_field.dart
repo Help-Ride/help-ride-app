@@ -43,6 +43,7 @@ class ExoTextField extends StatelessWidget {
           controller: controller,
           keyboardType: keyboardType,
           onChanged: onChanged,
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           inputFormatters: inputFormatters,
           decoration: appInputDecoration(
             context,

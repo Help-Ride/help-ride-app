@@ -5,15 +5,18 @@ class DismissKeyboard extends StatelessWidget {
 
   final Widget child;
 
+  void _dismissKeyboard() {
+    final currentFocus = FocusManager.instance.primaryFocus;
+    if (currentFocus == null || !currentFocus.hasFocus) return;
+    currentFocus.unfocus();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      behavior: HitTestBehavior.deferToChild,
-      onTap: () {
-        final currentFocus = FocusManager.instance.primaryFocus;
-        if (currentFocus == null) return;
-        currentFocus.unfocus();
-      },
+      behavior: HitTestBehavior.translucent,
+      onTap: _dismissKeyboard,
+      onPanDown: (_) => _dismissKeyboard(),
       child: child,
     );
   }

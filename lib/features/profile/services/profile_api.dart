@@ -110,6 +110,53 @@ class ProfileApi {
       uploadUrl: uploadUrl.toString(),
       documentId: (payload['documentId'] ?? payload['id'])?.toString(),
       key: payload['key']?.toString(),
+      publicUrl:
+          (payload['publicUrl'] ??
+                  payload['fileUrl'] ??
+                  payload['assetUrl'] ??
+                  payload['cdnUrl'] ??
+                  payload['downloadUrl'])
+              ?.toString(),
+    );
+  }
+
+  Future<DriverDocumentPresign> getUserAvatarPresign(
+    String userId, {
+    required String fileName,
+    required String mimeType,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/users/$userId/avatar/presign',
+      data: {'fileName': fileName, 'mimeType': mimeType},
+    );
+
+    final payload = _extractMap(res.data);
+    final uploadUrl =
+        payload['uploadUrl'] ??
+        payload['url'] ??
+        payload['presignedUrl'] ??
+        payload['presignUrl'];
+    if (uploadUrl == null || uploadUrl.toString().trim().isEmpty) {
+      throw Exception('Could not get avatar upload URL.');
+    }
+
+    final avatarRaw = payload['avatar'];
+    final avatar = avatarRaw is Map
+        ? Map<String, dynamic>.from(avatarRaw)
+        : const <String, dynamic>{};
+
+    return DriverDocumentPresign(
+      uploadUrl: uploadUrl.toString(),
+      key: (avatar['s3Key'] ?? payload['s3Key'] ?? payload['key'])?.toString(),
+      publicUrl:
+          (avatar['url'] ??
+                  payload['url'] ??
+                  payload['publicUrl'] ??
+                  payload['fileUrl'] ??
+                  payload['assetUrl'] ??
+                  payload['cdnUrl'] ??
+                  payload['downloadUrl'])
+              ?.toString(),
     );
   }
 

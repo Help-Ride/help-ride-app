@@ -34,10 +34,12 @@ class DriverDocumentPresign {
   final String uploadUrl;
   final String? documentId;
   final String? key;
+  final String? publicUrl;
 
   const DriverDocumentPresign({
     required this.uploadUrl,
     this.documentId,
     this.key,
+    this.publicUrl,
   });
 }

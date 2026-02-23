@@ -465,6 +465,8 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
               child: TextField(
                 controller: _queryCtrl,
                 autofocus: true,
+                onTapOutside: (_) =>
+                    FocusManager.instance.primaryFocus?.unfocus(),
                 decoration: appInputDecoration(
                   context,
                   hintText: "Search address / place",

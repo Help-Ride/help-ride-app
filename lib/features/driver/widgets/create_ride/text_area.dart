@@ -34,6 +34,7 @@ class ExoTextArea extends StatelessWidget {
           controller: controller,
           minLines: 4,
           maxLines: 6,
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           decoration: appInputDecoration(
             context,
             hintText: hint,

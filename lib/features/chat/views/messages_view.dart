@@ -153,6 +153,7 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       onChanged: onChanged,
+      onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
       decoration: appInputDecoration(
         context,
         hintText: 'Search conversations...',

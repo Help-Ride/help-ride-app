@@ -56,6 +56,7 @@ class AuthTextField extends StatelessWidget {
           keyboardType: keyboardType,
           obscureText: obscureText,
           onChanged: onChanged,
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           textInputAction: textInputAction,
           onSubmitted: onSubmitted,
           inputFormatters: inputFormatters,

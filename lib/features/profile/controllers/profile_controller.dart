@@ -18,6 +18,8 @@ class ProfileController extends GetxController {
   final docsLoading = false.obs;
   final docsUploading = false.obs;
   final docsError = RxnString();
+  final avatarUploading = false.obs;
+  final avatarUploadError = RxnString();
 
   @override
   Future<void> onInit() async {
@@ -116,6 +118,52 @@ class ProfileController extends GetxController {
       rethrow;
     } finally {
       docsUploading.value = false;
+    }
+  }
+
+  Future<String> uploadProfilePhoto({
+    required String filePath,
+    required String fileName,
+    required String mimeType,
+  }) async {
+    final userId = _session.user.value?.id ?? '';
+    if (userId.isEmpty) {
+      throw Exception('Missing user session.');
+    }
+
+    avatarUploading.value = true;
+    avatarUploadError.value = null;
+    try {
+      final file = File(filePath);
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        throw Exception('Selected file is empty.');
+      }
+
+      final presign = await _api.getUserAvatarPresign(
+        userId,
+        fileName: fileName,
+        mimeType: mimeType,
+      );
+
+      await _api.uploadFileToPresignedUrl(
+        uploadUrl: presign.uploadUrl,
+        bytes: bytes,
+        mimeType: mimeType,
+      );
+
+      final candidate = (presign.publicUrl ?? '').trim().isNotEmpty
+          ? presign.publicUrl!.trim()
+          : (presign.key ?? '').trim();
+      if (candidate.isEmpty) {
+        throw Exception('Upload succeeded but image URL is missing.');
+      }
+      return candidate;
+    } catch (e) {
+      avatarUploadError.value = e.toString();
+      rethrow;
+    } finally {
+      avatarUploading.value = false;
     }
   }
 

@@ -443,6 +443,8 @@ class _Composer extends StatelessWidget {
                 controller: controller,
                 onChanged: onChanged,
                 onSubmitted: (_) => onSend(),
+                onTapOutside: (_) =>
+                    FocusManager.instance.primaryFocus?.unfocus(),
                 decoration: appInputDecoration(
                   context,
                   hintText: 'Type a message...',

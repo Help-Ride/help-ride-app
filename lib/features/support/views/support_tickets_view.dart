@@ -504,6 +504,7 @@ class _InputField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
+      onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
       validator: validator,
       autovalidateMode: AutovalidateMode.onUserInteraction,
       decoration: appInputDecoration(context, labelText: label, radius: 14),

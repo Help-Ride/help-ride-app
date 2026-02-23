@@ -205,6 +205,7 @@ class _Field extends StatelessWidget {
         TextField(
           keyboardType: keyboardType,
           onChanged: onChanged,
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           inputFormatters: inputFormatters,
           decoration: appInputDecoration(
             context,
