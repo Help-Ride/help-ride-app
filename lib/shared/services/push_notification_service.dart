@@ -101,8 +101,13 @@ class PushNotificationService {
       return;
     }
 
-    await _registerToken(token.trim());
-    _resetRetryAttempts();
+    try {
+      await _registerToken(token.trim());
+      _resetRetryAttempts();
+    } catch (_) {
+      _log('FCM token registration failed; scheduling retry.');
+      _scheduleRetry();
+    }
   }
 
   Future<void> unregisterDeviceTokenIfNeeded() async {
@@ -277,7 +282,12 @@ class PushNotificationService {
       return;
     }
 
-    await _registerToken(token.trim());
+    try {
+      await _registerToken(token.trim());
+    } catch (_) {
+      _log('FCM token refresh registration failed; scheduling retry.');
+      _scheduleRetry();
+    }
   }
 
   Future<void> _registerToken(String token) async {

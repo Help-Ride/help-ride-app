@@ -6,6 +6,7 @@ import 'package:help_ride/shared/services/api_exception.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/token_storage.dart';
 import '../../../shared/models/user.dart';
+import '../../../shared/services/push_notification_service.dart';
 import '../routes/auth_routes.dart';
 import '../services/auth_api.dart';
 
@@ -116,6 +117,12 @@ class EmailVerificationController extends GetxController {
           }
           session.user.value = User.fromJson(userJson);
           session.status.value = SessionStatus.authenticated;
+          try {
+            await PushNotificationService.instance
+                .registerDeviceTokenIfNeeded();
+          } catch (_) {
+            // Best-effort token registration.
+          }
         } else {
           await session.bootstrap();
         }

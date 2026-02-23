@@ -43,6 +43,12 @@
 	<string>AIzaSyDO-kwH3nnMJTj0e0VeqL4EgQjabSKEgBE</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>We use your camera so you can take and upload photos for your profile and ride requests.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We use your photo library so you can choose and upload photos for your profile and ride requests.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We use your location to suggest nearby pickup points and keep location-based ride features working.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We use your location to suggest nearby pickup points.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
