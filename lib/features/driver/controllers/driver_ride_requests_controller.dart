@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
+import 'package:help_ride/shared/models/location_sample.dart';
 import '../../../shared/services/api_client.dart';
+import '../../../shared/services/location_sync_service.dart';
+import '../../../shared/services/push_notification_service.dart';
 import '../../../shared/widgets/place_picker_field.dart';
 import '../../ride_requests/models/ride_request.dart';
 import '../../ride_requests/models/ride_request_offer.dart';
@@ -46,6 +50,7 @@ class DriverRideRequestsController extends GetxController {
   static const int _defaultLimit = 20;
   static const double _minMoveMeters = 300;
   static const Duration _minFetchInterval = Duration(minutes: 5);
+  static const Duration _onlineSyncInterval = Duration(minutes: 4);
 
   final tab = DriverRideRequestsTab.requests.obs;
 
@@ -56,6 +61,7 @@ class DriverRideRequestsController extends GetxController {
 
   final radiusKm = defaultRadiusKm.obs;
   final sortByDistance = false.obs;
+  final driverOnline = true.obs;
 
   final locationLoading = false.obs;
   final locationError = RxnString();
@@ -77,18 +83,24 @@ class DriverRideRequestsController extends GetxController {
 
   DateTime? _lastFetchAt;
   Position? _lastFetchPosition;
+  Timer? _onlineSyncTimer;
+  StreamSubscription<String>? _rideRequestPushSub;
 
   @override
   Future<void> onInit() async {
     super.onInit();
     _client = await ApiClient.create();
     _api = RideRequestsApi(_client);
+    _bindRideRequestPushRefresh();
+    _startOnlineSyncTimer();
     await fetchOffers();
     await refreshNearbyRequests(force: true);
   }
 
   @override
   void onClose() {
+    _rideRequestPushSub?.cancel();
+    _onlineSyncTimer?.cancel();
     fromCtrl.dispose();
     toCtrl.dispose();
     super.onClose();
@@ -119,6 +131,18 @@ class DriverRideRequestsController extends GetxController {
     }
   }
 
+  void setDriverOnline(bool value) {
+    if (driverOnline.value == value) return;
+    driverOnline.value = value;
+    if (!value) {
+      _onlineSyncTimer?.cancel();
+      return;
+    }
+    _startOnlineSyncTimer();
+    unawaited(_syncDriverLocation(force: true));
+    unawaited(refreshNearbyRequests(force: true));
+  }
+
   Future<void> searchRequests() async {
     final from = (fromPick.value?.fullText ?? fromCtrl.text).trim();
     final to = (toPick.value?.fullText ?? toCtrl.text).trim();
@@ -146,9 +170,7 @@ class DriverRideRequestsController extends GetxController {
         toLat: toLat,
         toLng: toLng,
       );
-      list.sort(
-        (a, b) => _requestSortTime(b).compareTo(_requestSortTime(a)),
-      );
+      list.sort((a, b) => _requestSortTime(b).compareTo(_requestSortTime(a)));
       requests.assignAll(list);
     } catch (e) {
       requestsError.value = e.toString();
@@ -168,6 +190,9 @@ class DriverRideRequestsController extends GetxController {
   Future<void> refreshNearbyRequests({bool force = false}) async {
     final position = await _resolvePosition(requestPermission: force);
     if (position == null) return;
+    if (driverOnline.value) {
+      unawaited(_syncDriverLocationWithPosition(position, force: force));
+    }
 
     final now = DateTime.now();
     if (!force && _lastFetchAt != null) {
@@ -196,9 +221,7 @@ class DriverRideRequestsController extends GetxController {
         radiusKm: radiusKm.value,
         limit: _defaultLimit,
       );
-      list.sort(
-        (a, b) => _requestSortTime(b).compareTo(_requestSortTime(a)),
-      );
+      list.sort((a, b) => _requestSortTime(b).compareTo(_requestSortTime(a)));
       requests.assignAll(list);
       _lastFetchAt = now;
       _lastFetchPosition = position;
@@ -259,6 +282,48 @@ class DriverRideRequestsController extends GetxController {
       locationError.value = e.toString();
     } finally {
       locationLoading.value = false;
+    }
+  }
+
+  void _bindRideRequestPushRefresh() {
+    _rideRequestPushSub = PushNotificationService.instance.rideOfferStream
+        .listen((rideRequestId) {
+          if (!driverOnline.value) return;
+          if (rideRequestId.trim().isEmpty) return;
+          unawaited(refreshNearbyRequests(force: true));
+        });
+  }
+
+  void _startOnlineSyncTimer() {
+    _onlineSyncTimer?.cancel();
+    if (!driverOnline.value) return;
+    _onlineSyncTimer = Timer.periodic(_onlineSyncInterval, (_) {
+      if (!driverOnline.value) return;
+      unawaited(_syncDriverLocation());
+    });
+  }
+
+  Future<void> _syncDriverLocation({bool force = false}) async {
+    if (!driverOnline.value) return;
+    final position =
+        currentPosition.value ??
+        await _resolvePosition(requestPermission: force);
+    if (position == null) return;
+    await _syncDriverLocationWithPosition(position, force: force);
+  }
+
+  Future<void> _syncDriverLocationWithPosition(
+    Position position, {
+    bool force = false,
+  }) async {
+    try {
+      await LocationSyncService.instance.syncMyLocation(
+        sample: LocationSample.fromPosition(position),
+        requestPermission: false,
+        force: force,
+      );
+    } catch (_) {
+      // Location sync is best-effort.
     }
   }
 
@@ -391,19 +456,13 @@ class DriverRideRequestsController extends GetxController {
     }).toList();
   }
 
-  double _distanceKm(
-    double lat1,
-    double lon1,
-    double lat2,
-    double lon2,
-  ) {
+  double _distanceKm(double lat1, double lon1, double lat2, double lon2) {
     const earthRadiusKm = 6371.0;
     final dLat = _degToRad(lat2 - lat1);
     final dLon = _degToRad(lon2 - lon1);
-    final a = pow(sin(dLat / 2), 2) +
-        cos(_degToRad(lat1)) *
-            cos(_degToRad(lat2)) *
-            pow(sin(dLon / 2), 2);
+    final a =
+        pow(sin(dLat / 2), 2) +
+        cos(_degToRad(lat1)) * cos(_degToRad(lat2)) * pow(sin(dLon / 2), 2);
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return earthRadiusKm * c;
   }

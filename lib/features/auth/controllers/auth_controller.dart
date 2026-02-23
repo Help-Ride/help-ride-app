@@ -4,6 +4,7 @@ import 'package:email_validator/email_validator.dart';
 import 'package:help_ride/core/routes/app_routes.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_exception.dart';
+import 'package:help_ride/shared/services/location_sync_service.dart';
 import '../routes/auth_routes.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/token_storage.dart';
@@ -80,13 +81,15 @@ class AuthController extends GetxController {
     error.value = null;
 
     try {
+      final authLocation = await LocationSyncService.instance
+          .captureCurrentLocation(requestPermission: false);
       final result = await _authApi.loginWithEmail(
         email: email.value.trim(),
         password: password.value.trim(),
+        location: authLocation,
       );
 
-      if (result.accessToken != null &&
-          result.accessToken!.trim().isNotEmpty) {
+      if (result.accessToken != null && result.accessToken!.trim().isNotEmpty) {
         await _tokenStorage.saveAccessToken(result.accessToken!.trim());
         await _tokenStorage.saveAuthProvider('email');
         if (result.refreshToken != null &&
@@ -133,12 +136,16 @@ class AuthController extends GetxController {
       final acc = await _googleOAuth.signIn();
       if (acc == null) return; // user cancelled
 
+      final authLocation = await LocationSyncService.instance
+          .captureCurrentLocation(requestPermission: false);
+      final oauthName = acc.name.trim().isEmpty ? 'User' : acc.name.trim();
       final tokens = await _oauthApi.oauthLogin(
         provider: 'google',
         providerUserId: acc.id,
         email: acc.email,
-        name: acc.name ?? 'User',
+        name: oauthName,
         avatarUrl: acc.avatarUrl,
+        location: authLocation,
       );
 
       await _tokenStorage.saveAccessToken(tokens.accessToken);
@@ -176,8 +183,7 @@ class AuthController extends GetxController {
         name: name.value.trim().isEmpty ? null : name.value.trim(),
       );
 
-      if (result.accessToken != null &&
-          result.accessToken!.trim().isNotEmpty) {
+      if (result.accessToken != null && result.accessToken!.trim().isNotEmpty) {
         await _tokenStorage.saveAccessToken(result.accessToken!.trim());
         await _tokenStorage.saveAuthProvider('email');
         if (result.refreshToken != null &&

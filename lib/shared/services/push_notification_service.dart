@@ -44,6 +44,10 @@ class PushNotificationService {
         description: 'Ride offer alerts for drivers',
         importance: Importance.max,
       );
+  static const Set<String> _rideRequestKinds = {
+    'ride_request_created',
+    'ride_request_created_nearby',
+  };
 
   Stream<String> get rideOfferStream => _rideOfferController.stream;
 
@@ -197,6 +201,9 @@ class PushNotificationService {
       debugPrint('FCM foreground message: ${message.messageId}');
     }
     final rideRequestId = _extractRideRequestId(message);
+    if (rideRequestId != null && rideRequestId.isNotEmpty) {
+      _rideOfferController.add(rideRequestId);
+    }
     await _showForegroundNotification(message, rideRequestId: rideRequestId);
   }
 
@@ -263,6 +270,21 @@ class PushNotificationService {
   String? _extractRideRequestId(RemoteMessage message) {
     final data = message.data;
     if (data.isEmpty) return null;
+
+    final kind = _firstNonEmpty(data, const [
+      'kind',
+      'notificationKind',
+      'notification_kind',
+      'event',
+      'type',
+    ]);
+    if (kind != null && kind.isNotEmpty) {
+      final normalized = kind.trim().toLowerCase();
+      if (!_rideRequestKinds.contains(normalized)) {
+        return null;
+      }
+    }
+
     return _firstNonEmpty(data, const [
       'rideRequestId',
       'ride_request_id',

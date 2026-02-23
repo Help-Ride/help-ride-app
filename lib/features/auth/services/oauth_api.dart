@@ -1,4 +1,5 @@
 import '../../../shared/services/api_client.dart';
+import '../../../shared/models/location_sample.dart';
 
 class OAuthApi {
   OAuthApi(this._client);
@@ -10,18 +11,21 @@ class OAuthApi {
     required String email,
     required String name,
     String? avatarUrl,
+    LocationSample? location,
   }) async {
+    final payload = <String, dynamic>{
+      'provider': provider,
+      'providerUserId': providerUserId,
+      'email': email,
+      'name': name,
+      'avatarUrl': avatarUrl,
+      if (location != null) ...location.toApiJson(),
+    };
     final res = await _client.post<Map<String, dynamic>>(
       '/auth/oauth',
       skipAuthLogout: true,
       skipAuthRefresh: true,
-      data: {
-        'provider': provider,
-        'providerUserId': providerUserId,
-        'email': email,
-        'name': name,
-        'avatarUrl': avatarUrl,
-      },
+      data: payload,
     );
 
     final data = res.data ?? {};
@@ -32,10 +36,9 @@ class OAuthApi {
     if (directAccess is String && directAccess.isNotEmpty) {
       return OAuthTokens(
         accessToken: directAccess,
-        refreshToken:
-            directRefresh is String && directRefresh.isNotEmpty
-                ? directRefresh
-                : null,
+        refreshToken: directRefresh is String && directRefresh.isNotEmpty
+            ? directRefresh
+            : null,
       );
     }
 
@@ -47,8 +50,7 @@ class OAuthApi {
         final r = tokens['refreshToken'];
         return OAuthTokens(
           accessToken: t,
-          refreshToken:
-              r is String && r.isNotEmpty ? r : null,
+          refreshToken: r is String && r.isNotEmpty ? r : null,
         );
       }
     }

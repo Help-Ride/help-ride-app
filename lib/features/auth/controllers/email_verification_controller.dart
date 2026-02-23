@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/core/routes/app_routes.dart';
@@ -6,6 +8,7 @@ import 'package:help_ride/shared/services/api_exception.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/token_storage.dart';
 import '../../../shared/models/user.dart';
+import '../../../shared/services/location_sync_service.dart';
 import '../../../shared/services/push_notification_service.dart';
 import '../routes/auth_routes.dart';
 import '../services/auth_api.dart';
@@ -126,6 +129,12 @@ class EmailVerificationController extends GetxController {
         } else {
           await session.bootstrap();
         }
+        unawaited(
+          LocationSyncService.instance.syncMyLocation(
+            requestPermission: false,
+            force: true,
+          ),
+        );
         Get.offAllNamed(AppRoutes.shell);
       } else {
         message.value = 'Email verified. Please sign in.';

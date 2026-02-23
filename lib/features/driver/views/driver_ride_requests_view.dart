@@ -193,8 +193,9 @@ class _RequestsTab extends StatelessWidget {
               Obx(() {
                 return Wrap(
                   spacing: 8,
-                  children:
-                      DriverRideRequestsController.radiusOptionsKm.map((km) {
+                  children: DriverRideRequestsController.radiusOptionsKm.map((
+                    km,
+                  ) {
                     final active = controller.radiusKm.value == km;
                     return ChoiceChip(
                       label: Text('${km.toInt()} km'),
@@ -211,14 +212,36 @@ class _RequestsTab extends StatelessWidget {
               }),
               const SizedBox(height: 8),
               Obx(() {
+                return Row(
+                  children: [
+                    Text(
+                      'Driver online',
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.darkMuted
+                            : AppColors.lightMuted,
+                      ),
+                    ),
+                    const Spacer(),
+                    Switch(
+                      value: controller.driverOnline.value,
+                      onChanged: controller.setDriverOnline,
+                      activeThumbColor: AppColors.driverPrimary,
+                    ),
+                  ],
+                );
+              }),
+              const SizedBox(height: 8),
+              Obx(() {
                 final canSort = controller.locationReady;
                 return Row(
                   children: [
                     Text(
                       'Sort by distance',
                       style: TextStyle(
-                        color:
-                            isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                        color: isDark
+                            ? AppColors.darkMuted
+                            : AppColors.lightMuted,
                       ),
                     ),
                     const Spacer(),
@@ -286,8 +309,9 @@ class _RequestsTab extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.my_location,
-                      color:
-                          isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      color: isDark
+                          ? AppColors.darkMuted
+                          : AppColors.lightMuted,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -352,8 +376,10 @@ class _RequestsTab extends StatelessWidget {
           child: Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
-              tilePadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+              tilePadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 2,
+              ),
               childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
               leading: Icon(
                 Icons.alt_route,
@@ -427,8 +453,7 @@ class _RequestsTab extends StatelessWidget {
         });
       }
 
-      final initialLoading =
-          controller.requestsLoading.value && list.isEmpty;
+      final initialLoading = controller.requestsLoading.value && list.isEmpty;
 
       Widget body;
       if (initialLoading) {
@@ -633,8 +658,10 @@ Future<void> _openOfferSheet(
     builder: (_) {
       return StatefulBuilder(
         builder: (context, setState) {
-          final ride =
-              rides.firstWhere((r) => r.id == selectedRideId, orElse: () => rides.first);
+          final ride = rides.firstWhere(
+            (r) => r.id == selectedRideId,
+            orElse: () => rides.first,
+          );
           final maxSeats = ride.seatsAvailable <= 0 ? 1 : ride.seatsAvailable;
           if (seatsOffered > maxSeats) {
             seatsOffered = maxSeats;
@@ -691,8 +718,10 @@ Future<void> _openOfferSheet(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -736,8 +765,9 @@ Future<void> _openOfferSheet(
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color:
-                            isDark ? AppColors.darkText : AppColors.lightText,
+                        color: isDark
+                            ? AppColors.darkText
+                            : AppColors.lightText,
                       ),
                     ),
                     IconButton(

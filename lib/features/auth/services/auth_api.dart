@@ -1,4 +1,5 @@
 import '../../../shared/services/api_client.dart';
+import '../../../shared/models/location_sample.dart';
 
 class AuthApi {
   AuthApi(this._client);
@@ -8,10 +9,16 @@ class AuthApi {
   Future<EmailLoginResult> loginWithEmail({
     required String email,
     required String password,
+    LocationSample? location,
   }) async {
+    final payload = <String, dynamic>{
+      'email': email,
+      'password': password,
+      if (location != null) ...location.toApiJson(),
+    };
     final res = await _client.post<Map<String, dynamic>>(
       '/auth/login',
-      data: {'email': email, 'password': password},
+      data: payload,
       skipAuthLogout: true,
       skipAuthRefresh: true,
     );
@@ -101,8 +108,7 @@ class AuthApi {
     if (access is String && access.isNotEmpty) {
       return AuthTokens(
         accessToken: access,
-        refreshToken:
-            refresh is String && refresh.isNotEmpty ? refresh : null,
+        refreshToken: refresh is String && refresh.isNotEmpty ? refresh : null,
       );
     }
 
@@ -165,11 +171,7 @@ class EmailLoginResult {
   final String? refreshToken;
   final bool otpSent;
 
-  EmailLoginResult({
-    this.accessToken,
-    this.refreshToken,
-    this.otpSent = false,
-  });
+  EmailLoginResult({this.accessToken, this.refreshToken, this.otpSent = false});
 }
 
 class EmailRegisterResult {

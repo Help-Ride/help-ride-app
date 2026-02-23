@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/features/bookings/controllers/my_rides_controller.dart';
@@ -8,6 +10,7 @@ import 'package:help_ride/features/driver/controllers/driver_my_rides_controller
 import 'package:help_ride/features/driver/views/driver_my_rides_view.dart';
 import '../../core/theme/theme_controller.dart';
 import '../controllers/session_controller.dart';
+import '../services/location_sync_service.dart';
 import '../../core/constants/app_constants.dart';
 import '../../features/auth/routes/auth_routes.dart';
 
@@ -23,13 +26,14 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int index = 0;
   late final Worker _roleWorker;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _applyNavigationArgs(Get.arguments);
     Get.lazyPut<DriverMyRidesController>(
       () => DriverMyRidesController(),
@@ -50,12 +54,22 @@ class _AppShellState extends State<AppShell> {
       if (!mounted) return;
       setState(() => index = 0);
     });
+
+    unawaited(_syncLocationOnAppActive());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _roleWorker.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_syncLocationOnAppActive());
+    }
   }
 
   void _applyNavigationArgs(dynamic argsRaw) {
@@ -84,6 +98,21 @@ class _AppShellState extends State<AppShell> {
         return 3;
       default:
         return int.tryParse(normalized);
+    }
+  }
+
+  Future<void> _syncLocationOnAppActive() async {
+    if (!Get.isRegistered<SessionController>()) return;
+    final session = Get.find<SessionController>();
+    if (session.status.value != SessionStatus.authenticated) return;
+    if (session.requiresEmailVerification) return;
+
+    try {
+      await LocationSyncService.instance.syncMyLocation(
+        requestPermission: false,
+      );
+    } catch (_) {
+      // Best-effort sync on open/resume.
     }
   }
 

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 import 'package:help_ride/shared/models/user.dart';
 import '../services/token_storage.dart';
 import '../../features/auth/services/auth_api.dart';
 import '../services/api_client.dart';
+import '../services/location_sync_service.dart';
 import '../services/push_notification_service.dart';
 
 enum SessionStatus { unknown, authenticated, unauthenticated }
@@ -57,6 +60,9 @@ class SessionController extends GetxController {
       } catch (_) {
         // Best-effort token registration.
       }
+      unawaited(
+        LocationSyncService.instance.syncMyLocation(requestPermission: false),
+      );
     } catch (_) {
       await _tokenStorage.clear();
       user.value = null;
