@@ -102,6 +102,28 @@ class AuthApi {
     );
   }
 
+  Future<void> sendPasswordResetOtp({required String email}) async {
+    await _client.post<Map<String, dynamic>>(
+      '/auth/password-reset/send-otp',
+      skipAuthLogout: true,
+      skipAuthRefresh: true,
+      data: {'email': email},
+    );
+  }
+
+  Future<void> verifyPasswordResetOtp({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    await _client.post<Map<String, dynamic>>(
+      '/auth/password-reset/verify-otp',
+      skipAuthLogout: true,
+      skipAuthRefresh: true,
+      data: {'email': email, 'otp': otp, 'newPassword': newPassword},
+    );
+  }
+
   AuthTokens? _parseTokens(Map<String, dynamic> data) {
     final access = data['accessToken'];
     final refresh = data['refreshToken'];

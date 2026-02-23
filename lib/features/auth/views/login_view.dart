@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/constants/app_constants.dart';
 import '../controllers/auth_controller.dart';
+import '../routes/auth_routes.dart';
 import '../widgets/auth_text_field.dart';
 
 class LoginView extends GetView<AuthController> {
@@ -109,7 +110,7 @@ class LoginView extends GetView<AuthController> {
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           onPressed: () {
-                            // TODO: forgot password
+                            Get.toNamed(AuthRoutes.passwordReset);
                           },
                           child: const Text("Forgot password?"),
                         ),
