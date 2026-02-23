@@ -69,8 +69,26 @@ class ProfileController extends GetxController {
     required String fileName,
     required String mimeType,
   }) async {
+    return uploadDriverDocument(
+      type: 'license',
+      filePath: filePath,
+      fileName: fileName,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<void> uploadDriverDocument({
+    required String type,
+    required String filePath,
+    required String fileName,
+    required String mimeType,
+  }) async {
     final userId = _session.user.value?.id ?? '';
     if (userId.isEmpty) return;
+    final docType = type.trim().toLowerCase();
+    if (docType.isEmpty) {
+      throw Exception('Document type is required.');
+    }
     docsUploading.value = true;
     docsError.value = null;
     try {
@@ -82,7 +100,7 @@ class ProfileController extends GetxController {
 
       final presign = await _api.getDriverDocumentPresign(
         userId,
-        type: 'license',
+        type: docType,
         fileName: fileName,
         mimeType: mimeType,
       );

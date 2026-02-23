@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
-import 'package:email_validator/email_validator.dart';
 import 'package:help_ride/core/routes/app_routes.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_exception.dart';
 import 'package:help_ride/shared/services/location_sync_service.dart';
+import 'package:help_ride/shared/utils/input_validators.dart';
 import '../routes/auth_routes.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/token_storage.dart';
@@ -29,17 +29,18 @@ class AuthController extends GetxController {
   late final OAuthApi _oauthApi;
   late final GoogleOAuthService _googleOAuth;
 
-  bool get isEmailValid => EmailValidator.validate(email.value.trim());
-  bool get isPasswordValid => password.value.trim().length >= 8;
+  String? get emailError => InputValidators.email(email.value);
+  String? get passwordError => InputValidators.password(password.value);
+  String? get nameError => InputValidators.optionalName(name.value);
 
   bool get canSubmit =>
       isReady.value &&
-      isEmailValid &&
-      isPasswordValid &&
+      emailError == null &&
+      passwordError == null &&
       !isLoading.value &&
       !oauthLoading.value;
 
-  bool get canRegister => canSubmit;
+  bool get canRegister => canSubmit && nameError == null;
 
   @override
   void onInit() {
@@ -73,7 +74,8 @@ class AuthController extends GetxController {
 
   Future<void> loginWithEmail() async {
     if (!canSubmit) {
-      error.value = 'Enter a valid email + password (8+ chars).';
+      error.value =
+          emailError ?? passwordError ?? 'Please fix highlighted fields.';
       return;
     }
 
@@ -169,7 +171,11 @@ class AuthController extends GetxController {
 
   Future<void> registerWithEmail() async {
     if (!canRegister) {
-      error.value = 'Enter a valid email + password (8+ chars).';
+      error.value =
+          nameError ??
+          emailError ??
+          passwordError ??
+          'Please fix highlighted fields.';
       return;
     }
 

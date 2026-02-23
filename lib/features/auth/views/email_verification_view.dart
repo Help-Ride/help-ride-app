@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -27,6 +28,7 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
@@ -36,8 +38,9 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                     color: surface,
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(
-                      color:
-                          isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
+                      color: isDark
+                          ? const Color(0xFF232836)
+                          : const Color(0xFFE6EAF2),
                     ),
                     boxShadow: isDark
                         ? []
@@ -57,14 +60,18 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
-                          color: isDark ? AppColors.darkText : AppColors.lightText,
+                          color: isDark
+                              ? AppColors.darkText
+                              : AppColors.lightText,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'We sent a 6-digit code to ${controller.email}.',
                         style: TextStyle(
-                          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                          color: isDark
+                              ? AppColors.darkMuted
+                              : AppColors.lightMuted,
                           fontSize: 14,
                         ),
                       ),
@@ -76,6 +83,14 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                         onChanged: controller.setOtp,
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => controller.verifyOtp(),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(6),
+                        ],
+                        maxLength: 6,
+                        errorText: controller.otp.value.trim().isEmpty
+                            ? null
+                            : controller.otpError,
                       ),
                       const SizedBox(height: 12),
                       Obx(() {
@@ -83,10 +98,7 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                         if (msg == null) return const SizedBox(height: 0);
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            msg,
-                            style: TextStyle(color: primary),
-                          ),
+                          child: Text(msg, style: TextStyle(color: primary)),
                         );
                       }),
                       Obx(() {
@@ -108,8 +120,7 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                           width: double.infinity,
                           height: 52,
                           child: ElevatedButton(
-                            onPressed:
-                                enabled ? controller.verifyOtp : null,
+                            onPressed: enabled ? controller.verifyOtp : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primary,
                               foregroundColor: Colors.white,
@@ -134,8 +145,9 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                                   )
                                 : const Text(
                                     'Verify Email',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.w700),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                           ),
                         );
@@ -145,8 +157,7 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                         final sending = controller.isSending.value;
                         return Center(
                           child: TextButton(
-                            onPressed:
-                                sending ? null : controller.sendOtp,
+                            onPressed: sending ? null : controller.sendOtp,
                             child: sending
                                 ? const Text('Sending...')
                                 : const Text('Resend code'),
@@ -155,8 +166,7 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                       }),
                       Center(
                         child: TextButton(
-                          onPressed: () =>
-                              Get.offAllNamed(AuthRoutes.login),
+                          onPressed: () => Get.offAllNamed(AuthRoutes.login),
                           child: const Text('Back to login'),
                         ),
                       ),

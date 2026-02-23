@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/place_picker_field.dart';
@@ -34,6 +35,7 @@ class CreateRideView extends GetView<CreateRideController> {
       body: SafeArea(
         child: Obx(() {
           return ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 90),
             children: [
               Text(
@@ -49,6 +51,7 @@ class CreateRideView extends GetView<CreateRideController> {
                 icon: Icons.place_outlined,
                 controller: controller.fromCtrl,
                 onPicked: (p) => controller.fromPick.value = p,
+                errorText: controller.fromError,
               ),
               const SizedBox(height: 12),
               PlacePickerField(
@@ -58,6 +61,7 @@ class CreateRideView extends GetView<CreateRideController> {
                 iconColor: primary,
                 controller: controller.toCtrl,
                 onPicked: (p) => controller.toPick.value = p,
+                errorText: controller.toError,
               ),
               const SizedBox(height: 12),
               ExoTextField(
@@ -114,6 +118,14 @@ class CreateRideView extends GetView<CreateRideController> {
                   ),
                 ],
               ),
+              if (controller.dateError != null || controller.timeError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    controller.dateError ?? controller.timeError!,
+                    style: const TextStyle(color: AppColors.error),
+                  ),
+                ),
 
               const SizedBox(height: 18),
               const SectionTitle('CAPACITY & PRICING'),
@@ -128,6 +140,11 @@ class CreateRideView extends GetView<CreateRideController> {
                       keyboardType: TextInputType.number,
                       prefixIcon: Icons.event_seat_outlined,
                       onChanged: (_) {},
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(2),
+                      ],
+                      errorText: controller.seatsError,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -141,6 +158,10 @@ class CreateRideView extends GetView<CreateRideController> {
                       ),
                       prefixIcon: Icons.attach_money,
                       onChanged: (_) {},
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                      ],
+                      errorText: controller.priceError,
                     ),
                   ),
                 ],

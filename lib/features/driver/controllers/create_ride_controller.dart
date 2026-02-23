@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../shared/services/api_client.dart';
+import '../../../shared/utils/input_validators.dart';
 import '../../../shared/widgets/place_picker_field.dart';
 import '../services/driver_rides_api.dart';
 import '../utils/ride_price_policy.dart';
@@ -24,6 +25,7 @@ class CreateRideController extends GetxController {
   final date = Rxn<DateTime>();
   final time = Rxn<TimeOfDay>();
   final canPublishFlag = false.obs;
+  final submitAttempted = false.obs;
   final pricingPreview = Rxn<RidePriceResolution>();
   final _workers = <Worker>[];
 
@@ -103,16 +105,65 @@ class CreateRideController extends GetxController {
     return canPublishFlag.value;
   }
 
-  bool _computeCanPublish() {
-    final seats = int.tryParse(seatsCtrl.text.trim()) ?? 0;
-    final price = double.tryParse(priceCtrl.text.trim()) ?? -1;
+  String? get fromError {
+    if (!submitAttempted.value) return null;
+    if (fromPick.value?.latLng != null) return null;
+    return 'Select a departure location from search.';
+  }
 
+  String? get toError {
+    if (!submitAttempted.value) return null;
+    if (toPick.value?.latLng != null) return null;
+    return 'Select a destination from search.';
+  }
+
+  String? get dateError {
+    if (!submitAttempted.value || date.value != null) return null;
+    return 'Date is required.';
+  }
+
+  String? get timeError {
+    if (!submitAttempted.value || time.value != null) return null;
+    return 'Time is required.';
+  }
+
+  String? get seatsError {
+    final value = seatsCtrl.text.trim();
+    final raw = InputValidators.positiveInt(
+      value,
+      fieldLabel: 'Available seats',
+      min: 1,
+    );
+    if (raw == null) return null;
+    return submitAttempted.value || value.isNotEmpty ? raw : null;
+  }
+
+  String? get priceError {
+    final value = priceCtrl.text.trim();
+    final raw = InputValidators.nonNegativeDecimal(
+      value,
+      fieldLabel: 'Price per seat',
+    );
+    if (raw == null) return null;
+    return submitAttempted.value || value.isNotEmpty ? raw : null;
+  }
+
+  bool _computeCanPublish() {
     return fromPick.value?.latLng != null &&
         toPick.value?.latLng != null &&
         date.value != null &&
         time.value != null &&
-        seats > 0 &&
-        price >= 0;
+        InputValidators.positiveInt(
+              seatsCtrl.text,
+              fieldLabel: 'Available seats',
+              min: 1,
+            ) ==
+            null &&
+        InputValidators.nonNegativeDecimal(
+              priceCtrl.text,
+              fieldLabel: 'Price per seat',
+            ) ==
+            null;
   }
 
   void _recomputeCanPublish() {
@@ -122,6 +173,9 @@ class CreateRideController extends GetxController {
   void _refreshComputedState() {
     _recomputeCanPublish();
     pricingPreview.value = _buildPricingPreview();
+    if (submitAttempted.value && canPublish) {
+      error.value = null;
+    }
   }
 
   RidePriceResolution? _buildPricingPreview() {
@@ -181,10 +235,11 @@ class CreateRideController extends GetxController {
   }
 
   Future<void> publish() async {
+    submitAttempted.value = true;
     error.value = null;
 
     if (!_computeCanPublish()) {
-      error.value = 'Fill route, date/time, seats and price.';
+      error.value = 'Please fix highlighted fields.';
       return;
     }
 

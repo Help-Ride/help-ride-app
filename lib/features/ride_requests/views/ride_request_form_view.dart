@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/place_picker_field.dart';
@@ -31,6 +32,7 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
       body: SafeArea(
         child: Obx(() {
           return ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 90),
             children: [
               Text(
@@ -54,6 +56,7 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
                   icon: Icons.place_outlined,
                   controller: controller.fromCtrl,
                   onPicked: controller.setPickupPlace,
+                  errorText: controller.pickupError,
                 ),
                 const SizedBox(height: 12),
                 PlacePickerField(
@@ -63,6 +66,7 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
                   iconColor: primary,
                   controller: controller.toCtrl,
                   onPicked: controller.setDropoffPlace,
+                  errorText: controller.dropoffError,
                 ),
               ],
 
@@ -109,6 +113,14 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
                   ),
                 ],
               ),
+              if (controller.dateError != null || controller.timeError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    controller.dateError ?? controller.timeError!,
+                    style: const TextStyle(color: AppColors.error),
+                  ),
+                ),
               const SizedBox(height: 12),
               PickerTile(
                 label: 'Arrival Time (Optional)',
@@ -135,6 +147,11 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
                 controller: controller.seatsCtrl,
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.event_seat_outlined,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(2),
+                ],
+                errorText: controller.seatsError,
               ),
               const SizedBox(height: 12),
 

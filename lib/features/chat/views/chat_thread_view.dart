@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../shared/widgets/app_input_decoration.dart';
 import '../controllers/chat_thread_controller.dart';
 import '../controllers/chat_conversations_controller.dart';
 import '../models/chat_conversation.dart';
@@ -40,15 +41,14 @@ class _ChatThreadViewState extends State<ChatThreadView> {
 
     if (Get.isRegistered<ChatConversationsController>()) {
       final list = Get.find<ChatConversationsController>().conversations;
-      _headerConversation.value =
-          _findConversation(list, widget.conversation.id);
-      _conversationWorker = ever<List<ChatConversation>>(
+      _headerConversation.value = _findConversation(
         list,
-        (_) {
-          final updated = _findConversation(list, widget.conversation.id);
-          _headerConversation.value = updated;
-        },
+        widget.conversation.id,
       );
+      _conversationWorker = ever<List<ChatConversation>>(list, (_) {
+        final updated = _findConversation(list, widget.conversation.id);
+        _headerConversation.value = updated;
+      });
     }
   }
 
@@ -113,7 +113,9 @@ class _ChatThreadViewState extends State<ChatThreadView> {
                     child: Text(
                       'Say hello to start the chat.',
                       style: TextStyle(
-                        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                        color: isDark
+                            ? AppColors.darkMuted
+                            : AppColors.lightMuted,
                       ),
                     ),
                   );
@@ -173,10 +175,7 @@ class _ChatThreadViewState extends State<ChatThreadView> {
     });
   }
 
-  ChatConversation? _findConversation(
-    List<ChatConversation> list,
-    String id,
-  ) {
+  ChatConversation? _findConversation(List<ChatConversation> list, String id) {
     for (final c in list) {
       if (c.id == id) return c;
     }
@@ -216,10 +215,7 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
               conversation.participant.name.isNotEmpty
                   ? conversation.participant.name[0].toUpperCase()
                   : 'U',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: accentColor,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w700, color: accentColor),
             ),
           ),
           const SizedBox(width: 10),
@@ -292,7 +288,9 @@ class _TripSummaryCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: accentColor.withOpacity(isDark ? 0.16 : 0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: accentColor.withOpacity(isDark ? 0.35 : 0.2)),
+          border: Border.all(
+            color: accentColor.withOpacity(isDark ? 0.35 : 0.2),
+          ),
         ),
         child: Row(
           children: [
@@ -323,7 +321,9 @@ class _TripSummaryCard extends StatelessWidget {
                       child: Text(
                         summary,
                         style: TextStyle(
-                          color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                          color: isDark
+                              ? AppColors.darkMuted
+                              : AppColors.lightMuted,
                         ),
                       ),
                     ),
@@ -342,7 +342,9 @@ class _TripSummaryCard extends StatelessWidget {
                   Text(
                     time,
                     style: TextStyle(
-                      color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      color: isDark
+                          ? AppColors.darkMuted
+                          : AppColors.lightMuted,
                     ),
                   ),
                 ],
@@ -385,8 +387,8 @@ class _StatusPill extends StatelessWidget {
               color: isOnline
                   ? const Color(0xFF1BC47D)
                   : (isDark
-                      ? const Color(0xFF9AA3B2)
-                      : const Color(0xFF6B7280)),
+                        ? const Color(0xFF9AA3B2)
+                        : const Color(0xFF6B7280)),
               shape: BoxShape.circle,
             ),
           ),
@@ -441,16 +443,13 @@ class _Composer extends StatelessWidget {
                 controller: controller,
                 onChanged: onChanged,
                 onSubmitted: (_) => onSend(),
-                decoration: InputDecoration(
+                decoration: appInputDecoration(
+                  context,
                   hintText: 'Type a message...',
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  filled: true,
-                  fillColor:
-                      isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F9),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
+                  radius: 24,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
                   ),
                 ),
               ),

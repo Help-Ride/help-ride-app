@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_input_decoration.dart';
 import '../models/place_result.dart';
 import '../services/places_service.dart';
 import '../widgets/place_tile.dart';
@@ -113,7 +114,9 @@ class _LocationSearchSheetState extends State<LocationSearchSheet> {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF232836) : const Color(0xFFE5E7EB),
+                color: isDark
+                    ? const Color(0xFF232836)
+                    : const Color(0xFFE5E7EB),
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
@@ -128,7 +131,9 @@ class _LocationSearchSheetState extends State<LocationSearchSheet> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
-                        color: isDark ? AppColors.darkText : AppColors.lightText,
+                        color: isDark
+                            ? AppColors.darkText
+                            : AppColors.lightText,
                       ),
                     ),
                   ),
@@ -146,18 +151,13 @@ class _LocationSearchSheetState extends State<LocationSearchSheet> {
                 controller: _ctrl,
                 autofocus: true,
                 onChanged: _onQueryChanged,
-                decoration: InputDecoration(
+                decoration: appInputDecoration(
+                  context,
                   hintText: "Search a place...",
+                  radius: 14,
                   prefixIcon: Icon(
                     Icons.search,
                     color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                  ),
-                  filled: true,
-                  fillColor:
-                      isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
                   ),
                 ),
               ),
@@ -183,7 +183,9 @@ class _LocationSearchSheetState extends State<LocationSearchSheet> {
                 itemCount: _results.length,
                 separatorBuilder: (_, __) => Divider(
                   height: 1,
-                  color: isDark ? const Color(0xFF232836) : const Color(0xFFE5E7EB),
+                  color: isDark
+                      ? const Color(0xFF232836)
+                      : const Color(0xFFE5E7EB),
                 ),
                 itemBuilder: (_, i) => PlaceTile(
                   place: _results[i],

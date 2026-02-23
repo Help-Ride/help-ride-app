@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_input_decoration.dart';
 
 class AuthTextField extends StatelessWidget {
   const AuthTextField({
@@ -12,6 +14,10 @@ class AuthTextField extends StatelessWidget {
     this.controller,
     this.textInputAction,
     this.onSubmitted,
+    this.errorText,
+    this.inputFormatters,
+    this.autofocus = false,
+    this.maxLength,
   });
 
   final String label;
@@ -23,6 +29,10 @@ class AuthTextField extends StatelessWidget {
   final TextEditingController? controller;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
+  final String? errorText;
+  final List<TextInputFormatter>? inputFormatters;
+  final bool autofocus;
+  final int? maxLength;
 
   @override
   Widget build(BuildContext context) {
@@ -48,32 +58,16 @@ class AuthTextField extends StatelessWidget {
           onChanged: onChanged,
           textInputAction: textInputAction,
           onSubmitted: onSubmitted,
+          inputFormatters: inputFormatters,
+          autofocus: autofocus,
+          maxLength: maxLength,
           cursorColor: primary,
-          decoration: InputDecoration(
+          decoration: appInputDecoration(
+            context,
             hintText: hint,
-            hintStyle: TextStyle(
-              color: isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
-              fontWeight: FontWeight.w500,
-            ),
-            filled: true,
-            fillColor: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 16,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: primary, width: 1.4),
-            ),
-          ),
+            errorText: errorText,
+            radius: 14,
+          ).copyWith(counterText: maxLength == null ? null : ''),
         ),
       ],
     );

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../shared/widgets/app_input_decoration.dart';
 import '../controllers/chat_conversations_controller.dart';
 import '../models/chat_conversation.dart';
 import '../widgets/chat_conversation_tile.dart';
@@ -53,7 +54,9 @@ class _MessagesViewState extends State<MessagesView> {
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
-                        color: isDark ? AppColors.darkText : AppColors.lightText,
+                        color: isDark
+                            ? AppColors.darkText
+                            : AppColors.lightText,
                       ),
                     ),
                   ),
@@ -65,10 +68,7 @@ class _MessagesViewState extends State<MessagesView> {
                 ],
               ),
               const SizedBox(height: 16),
-              _SearchField(
-                onChanged: _controller.setQuery,
-                isDark: isDark,
-              ),
+              _SearchField(onChanged: _controller.setQuery, isDark: isDark),
               const SizedBox(height: 12),
               Expanded(
                 child: Obx(() {
@@ -79,7 +79,8 @@ class _MessagesViewState extends State<MessagesView> {
                       _controller.conversations.isEmpty) {
                     return _EmptyState(
                       title: 'No conversations yet',
-                      subtitle: 'Start a ride to connect with riders and drivers.',
+                      subtitle:
+                          'Start a ride to connect with riders and drivers.',
                       onRetry: _controller.fetch,
                     );
                   }
@@ -152,26 +153,17 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       onChanged: onChanged,
-      decoration: InputDecoration(
+      decoration: appInputDecoration(
+        context,
         hintText: 'Search conversations...',
+        radius: 24,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
         prefixIcon: Icon(
           Icons.search_rounded,
           color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-        ),
-        filled: true,
-        fillColor: isDark ? AppColors.darkSurface : Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide(
-            color: isDark ? const Color(0xFF232836) : const Color(0xFFE3E8F2),
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide(
-            color: isDark ? const Color(0xFF232836) : const Color(0xFFE3E8F2),
-          ),
         ),
       ),
     );
@@ -227,10 +219,7 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            TextButton(
-              onPressed: onRetry,
-              child: const Text('Refresh'),
-            ),
+            TextButton(onPressed: onRetry, child: const Text('Refresh')),
           ],
         ),
       ),

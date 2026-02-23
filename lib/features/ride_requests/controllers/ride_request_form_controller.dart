@@ -3,6 +3,7 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:get/get.dart';
 import 'dart:math' as math;
 import '../../../shared/services/api_client.dart';
+import '../../../shared/utils/input_validators.dart';
 import '../../../shared/widgets/place_picker_field.dart';
 import '../models/ride_request.dart';
 import '../services/ride_requests_api.dart';
@@ -34,6 +35,7 @@ class RideRequestFormController extends GetxController {
   final tripType = 'one-way'.obs;
 
   final canSubmitFlag = false.obs;
+  final submitAttempted = false.obs;
   final _workers = <Worker>[];
 
   RideRequest? _editing;
@@ -156,16 +158,59 @@ class RideRequestFormController extends GetxController {
 
   void _recomputeCanSubmit() {
     canSubmitFlag.value = _computeCanSubmit();
+    if (submitAttempted.value && canSubmitFlag.value) {
+      error.value = null;
+    }
   }
 
   bool _computeCanSubmit() {
-    final seats = int.tryParse(seatsCtrl.text.trim()) ?? 0;
+    final seatsErrorRaw = InputValidators.positiveInt(
+      seatsCtrl.text,
+      fieldLabel: 'Seats needed',
+      min: 1,
+    );
 
     final hasRoute = isEditing
         ? fromCtrl.text.trim().isNotEmpty && toCtrl.text.trim().isNotEmpty
         : pickupLocation.value != null && dropoffLocation.value != null;
 
-    return hasRoute && date.value != null && time.value != null && seats > 0;
+    return hasRoute &&
+        date.value != null &&
+        time.value != null &&
+        seatsErrorRaw == null;
+  }
+
+  String? get pickupError {
+    if (isEditing || !submitAttempted.value) return null;
+    if (pickupLocation.value != null) return null;
+    return 'Select a pickup location from search.';
+  }
+
+  String? get dropoffError {
+    if (isEditing || !submitAttempted.value) return null;
+    if (dropoffLocation.value != null) return null;
+    return 'Select a destination from search.';
+  }
+
+  String? get dateError {
+    if (!submitAttempted.value || date.value != null) return null;
+    return 'Date is required.';
+  }
+
+  String? get timeError {
+    if (!submitAttempted.value || time.value != null) return null;
+    return 'Time is required.';
+  }
+
+  String? get seatsError {
+    final value = seatsCtrl.text.trim();
+    final raw = InputValidators.positiveInt(
+      value,
+      fieldLabel: 'Seats needed',
+      min: 1,
+    );
+    if (raw == null) return null;
+    return submitAttempted.value || value.isNotEmpty ? raw : null;
   }
 
   DateTime? get preferredDateTimeLocal {
@@ -199,9 +244,10 @@ class RideRequestFormController extends GetxController {
   }
 
   Future<void> submit() async {
+    submitAttempted.value = true;
     error.value = null;
     if (!_computeCanSubmit()) {
-      error.value = 'Fill route, date/time, and seats needed.';
+      error.value = 'Please fix highlighted fields.';
       return;
     }
 

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/app_input_decoration.dart';
 import '../../controllers/recent_searches_controller.dart';
 import '../common/app_card.dart';
 
@@ -53,9 +53,6 @@ class _WhereToCardState extends State<WhereToCard> {
     final apiKey = dotenv.env['GMS_API_KEY'];
     return apiKey?.trim().isNotEmpty ?? false;
   }
-
-  bool get _canSearch =>
-      _pickupCtrl.text.trim().isNotEmpty && _destCtrl.text.trim().isNotEmpty;
 
   Future<void> _openAutocomplete({
     required TextEditingController controller,
@@ -144,8 +141,8 @@ class _WhereToCardState extends State<WhereToCard> {
                       ? () {
                           final from = _pickupCtrl.text.trim();
                           final to = _destCtrl.text.trim();
-                          final recent = Get.isRegistered<
-                                  RecentSearchesController>()
+                          final recent =
+                              Get.isRegistered<RecentSearchesController>()
                               ? Get.find<RecentSearchesController>()
                               : Get.put(RecentSearchesController());
                           recent.addSearch(
@@ -155,7 +152,8 @@ class _WhereToCardState extends State<WhereToCard> {
                             fromLng: _pickupLatLng?.lng,
                             toLat: _destLatLng?.lat,
                             toLng: _destLatLng?.lng,
-                            radiusKm: _pickupLatLng != null || _destLatLng != null
+                            radiusKm:
+                                _pickupLatLng != null || _destLatLng != null
                                 ? _defaultRadiusKm
                                 : null,
                             seats: 1,
@@ -175,8 +173,7 @@ class _WhereToCardState extends State<WhereToCard> {
                                 'toLat': _destLatLng!.lat,
                                 'toLng': _destLatLng!.lng,
                               },
-                              if (_pickupLatLng != null ||
-                                  _destLatLng != null)
+                              if (_pickupLatLng != null || _destLatLng != null)
                                 'radiusKm': _defaultRadiusKm,
                             },
                           );
@@ -185,10 +182,12 @@ class _WhereToCardState extends State<WhereToCard> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.passengerPrimary,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor:
-                        isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
-                    disabledForegroundColor:
-                        isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
+                    disabledBackgroundColor: isDark
+                        ? const Color(0xFF1C2331)
+                        : const Color(0xFFE9EEF6),
+                    disabledForegroundColor: isDark
+                        ? AppColors.darkMuted
+                        : const Color(0xFF9AA3B2),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -247,7 +246,8 @@ class _TextFieldTile extends StatelessWidget {
                 children: [
                   Icon(
                     icon,
-                    color: iconColor ??
+                    color:
+                        iconColor ??
                         (isDark ? AppColors.darkMuted : AppColors.lightMuted),
                   ),
                   const SizedBox(width: 10),
@@ -258,8 +258,12 @@ class _TextFieldTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: isEmpty
-                            ? (isDark ? AppColors.darkMuted : AppColors.lightMuted)
-                            : (isDark ? AppColors.darkText : AppColors.lightText),
+                            ? (isDark
+                                  ? AppColors.darkMuted
+                                  : AppColors.lightMuted)
+                            : (isDark
+                                  ? AppColors.darkText
+                                  : AppColors.lightText),
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -427,7 +431,9 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
+                color: isDark
+                    ? const Color(0xFF232836)
+                    : const Color(0xFFE6EAF2),
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
@@ -459,18 +465,13 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
               child: TextField(
                 controller: _queryCtrl,
                 autofocus: true,
-                decoration: InputDecoration(
+                decoration: appInputDecoration(
+                  context,
                   hintText: "Search address / place",
+                  radius: 16,
                   prefixIcon: Icon(
                     Icons.search,
                     color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                  ),
-                  filled: true,
-                  fillColor:
-                      isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
                   ),
                 ),
               ),

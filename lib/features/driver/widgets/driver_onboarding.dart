@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/features/driver/controllers/driver_onboarding_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/controllers/session_controller.dart';
+import '../../../shared/widgets/app_input_decoration.dart';
 
 class DriverOnboarding extends StatelessWidget {
   const DriverOnboarding({super.key});
@@ -36,17 +38,21 @@ class DriverOnboarding extends StatelessWidget {
 
               Expanded(
                 child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   children: [
                     _Field(
                       label: 'Car Make',
                       hint: 'Toyota',
                       onChanged: c.setCarMake,
+                      errorText: c.fieldError('carMake'),
                     ),
                     const SizedBox(height: 12),
                     _Field(
                       label: 'Car Model',
                       hint: 'Camry',
                       onChanged: c.setCarModel,
+                      errorText: c.fieldError('carModel'),
                     ),
                     const SizedBox(height: 12),
                     _Field(
@@ -54,30 +60,39 @@ class DriverOnboarding extends StatelessWidget {
                       hint: '2022',
                       keyboardType: TextInputType.number,
                       onChanged: c.setCarYear,
+                      errorText: c.fieldError('carYear'),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(4),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     _Field(
                       label: 'Car Color',
                       hint: 'Silver',
                       onChanged: c.setCarColor,
+                      errorText: c.fieldError('carColor'),
                     ),
                     const SizedBox(height: 12),
                     _Field(
                       label: 'Plate Number',
                       hint: 'ABC-1234',
                       onChanged: c.setPlateNumber,
+                      errorText: c.fieldError('plateNumber'),
                     ),
                     const SizedBox(height: 12),
                     _Field(
                       label: 'License Number',
                       hint: 'LIC-987654',
                       onChanged: c.setLicenseNumber,
+                      errorText: c.fieldError('licenseNumber'),
                     ),
                     const SizedBox(height: 12),
                     _Field(
                       label: 'Insurance Info (optional)',
                       hint: 'Provider / policy',
                       onChanged: c.setInsuranceInfo,
+                      errorText: c.fieldError('insuranceInfo'),
                     ),
 
                     const SizedBox(height: 14),
@@ -113,10 +128,12 @@ class DriverOnboarding extends StatelessWidget {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primary,
                             foregroundColor: Colors.white,
-                            disabledBackgroundColor:
-                                isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
-                            disabledForegroundColor:
-                                isDark ? AppColors.darkMuted : const Color(0xFF9AA3B2),
+                            disabledBackgroundColor: isDark
+                                ? const Color(0xFF1C2331)
+                                : const Color(0xFFE9EEF6),
+                            disabledForegroundColor: isDark
+                                ? AppColors.darkMuted
+                                : const Color(0xFF9AA3B2),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
@@ -141,10 +158,7 @@ class DriverOnboarding extends StatelessWidget {
                     const SizedBox(height: 10),
                     Text(
                       'Note: Verification may be required later.',
-                      style: TextStyle(
-                        color: muted,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: muted, fontSize: 12),
                     ),
                   ],
                 ),
@@ -163,12 +177,16 @@ class _Field extends StatelessWidget {
     required this.hint,
     required this.onChanged,
     this.keyboardType,
+    this.errorText,
+    this.inputFormatters,
   });
 
   final String label;
   final String hint;
   final ValueChanged<String> onChanged;
   final TextInputType? keyboardType;
+  final String? errorText;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -187,14 +205,12 @@ class _Field extends StatelessWidget {
         TextField(
           keyboardType: keyboardType,
           onChanged: onChanged,
-          decoration: InputDecoration(
+          inputFormatters: inputFormatters,
+          decoration: appInputDecoration(
+            context,
             hintText: hint,
-            filled: true,
-            fillColor: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
+            errorText: errorText,
+            radius: 14,
           ),
         ),
       ],

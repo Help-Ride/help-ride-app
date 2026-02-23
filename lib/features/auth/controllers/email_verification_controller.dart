@@ -10,6 +10,7 @@ import '../../../shared/services/token_storage.dart';
 import '../../../shared/models/user.dart';
 import '../../../shared/services/location_sync_service.dart';
 import '../../../shared/services/push_notification_service.dart';
+import '../../../shared/utils/input_validators.dart';
 import '../routes/auth_routes.dart';
 import '../services/auth_api.dart';
 
@@ -27,7 +28,8 @@ class EmailVerificationController extends GetxController {
   late final AuthApi _authApi;
 
   String get email => _email.value;
-  bool get canVerify => otp.value.trim().length == 6 && !isVerifying.value;
+  String? get otpError => InputValidators.otpCode(otp.value);
+  bool get canVerify => otpError == null && !isVerifying.value;
 
   @override
   void onInit() {
@@ -88,7 +90,7 @@ class EmailVerificationController extends GetxController {
 
   Future<void> verifyOtp() async {
     if (!canVerify) {
-      error.value = 'Enter the 6-digit code.';
+      error.value = otpError ?? 'Please fix highlighted fields.';
       return;
     }
 

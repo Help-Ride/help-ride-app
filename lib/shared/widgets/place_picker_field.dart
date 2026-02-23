@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'app_input_decoration.dart';
 
 class PlacePick {
   final String fullText;
@@ -28,6 +29,7 @@ class PlacePickerField extends StatefulWidget {
     required this.controller,
     this.iconColor,
     this.onPicked,
+    this.errorText,
   });
 
   final String label;
@@ -36,6 +38,7 @@ class PlacePickerField extends StatefulWidget {
   final Color? iconColor;
   final TextEditingController controller;
   final ValueChanged<PlacePick>? onPicked;
+  final String? errorText;
 
   @override
   State<PlacePickerField> createState() => _PlacePickerFieldState();
@@ -96,6 +99,11 @@ class _PlacePickerFieldState extends State<PlacePickerField> {
         final value = widget.controller.text.trim();
         final isEmpty = value.isEmpty;
         final isDark = Theme.of(context).brightness == Brightness.dark;
+        final hasError =
+            widget.errorText != null && widget.errorText!.trim().isNotEmpty;
+        final borderColor = hasError
+            ? AppColors.error
+            : (isDark ? const Color(0xFF2B3345) : const Color(0xFFDCE3EF));
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,7 +118,10 @@ class _PlacePickerFieldState extends State<PlacePickerField> {
             const SizedBox(height: 8),
             Material(
               color: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
-              borderRadius: BorderRadius.circular(16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: borderColor, width: hasError ? 1.2 : 1),
+              ),
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
                 onTap: _openAutocomplete,
@@ -121,8 +132,11 @@ class _PlacePickerFieldState extends State<PlacePickerField> {
                     children: [
                       Icon(
                         widget.icon,
-                        color: widget.iconColor ??
-                            (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                        color:
+                            widget.iconColor ??
+                            (isDark
+                                ? AppColors.darkMuted
+                                : AppColors.lightMuted),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -132,8 +146,12 @@ class _PlacePickerFieldState extends State<PlacePickerField> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: isEmpty
-                                ? (isDark ? AppColors.darkMuted : AppColors.lightMuted)
-                                : (isDark ? AppColors.darkText : AppColors.lightText),
+                                ? (isDark
+                                      ? AppColors.darkMuted
+                                      : AppColors.lightMuted)
+                                : (isDark
+                                      ? AppColors.darkText
+                                      : AppColors.lightText),
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
@@ -141,13 +159,27 @@ class _PlacePickerFieldState extends State<PlacePickerField> {
                       ),
                       Icon(
                         Icons.chevron_right,
-                        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                        color: isDark
+                            ? AppColors.darkMuted
+                            : AppColors.lightMuted,
                       ),
                     ],
                   ),
                 ),
               ),
             ),
+            if (hasError)
+              Padding(
+                padding: const EdgeInsets.only(top: 6, left: 4),
+                child: Text(
+                  widget.errorText!,
+                  style: const TextStyle(
+                    color: AppColors.error,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
           ],
         );
       },
@@ -293,7 +325,9 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
+                color: isDark
+                    ? const Color(0xFF232836)
+                    : const Color(0xFFE6EAF2),
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
@@ -325,18 +359,13 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
               child: TextField(
                 controller: _queryCtrl,
                 autofocus: true,
-                decoration: InputDecoration(
+                decoration: appInputDecoration(
+                  context,
                   hintText: "Search address / place",
+                  radius: 16,
                   prefixIcon: Icon(
                     Icons.search,
                     color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                  ),
-                  filled: true,
-                  fillColor:
-                      isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
                   ),
                 ),
               ),

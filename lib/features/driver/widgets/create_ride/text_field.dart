@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/app_input_decoration.dart';
 
 class ExoTextField extends StatelessWidget {
   const ExoTextField({
@@ -10,6 +12,8 @@ class ExoTextField extends StatelessWidget {
     this.keyboardType,
     this.prefixIcon,
     this.onChanged,
+    this.errorText,
+    this.inputFormatters,
   });
 
   final String label;
@@ -18,6 +22,8 @@ class ExoTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final IconData? prefixIcon;
   final ValueChanged<String>? onChanged;
+  final String? errorText;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -37,24 +43,18 @@ class ExoTextField extends StatelessWidget {
           controller: controller,
           keyboardType: keyboardType,
           onChanged: onChanged,
-          decoration: InputDecoration(
+          inputFormatters: inputFormatters,
+          decoration: appInputDecoration(
+            context,
             hintText: hint,
+            errorText: errorText,
+            radius: 16,
             prefixIcon: prefixIcon == null
                 ? null
                 : Icon(
                     prefixIcon,
                     color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
                   ),
-            filled: true,
-            fillColor: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 16,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
           ),
         ),
       ],

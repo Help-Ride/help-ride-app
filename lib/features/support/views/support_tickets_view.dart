@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/core/theme/app_colors.dart';
 import 'package:help_ride/core/theme/theme_controller.dart';
+import 'package:help_ride/shared/utils/input_validators.dart';
+import 'package:help_ride/shared/widgets/app_input_decoration.dart';
 import '../controllers/support_tickets_controller.dart';
 import '../models/support_ticket.dart';
 import '../routes/support_routes.dart';
@@ -79,7 +81,8 @@ class _SupportTicketsViewState extends State<SupportTicketsView> {
                 onRefresh: () => _controller.fetchTickets(reset: true),
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-                  itemCount: tickets.length +
+                  itemCount:
+                      tickets.length +
                       (_controller.nextCursor.value != null ? 1 : 0),
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
@@ -112,6 +115,7 @@ class _SupportTicketsViewState extends State<SupportTicketsView> {
   Future<void> _openCreateSheet(BuildContext context) async {
     final subjectCtrl = TextEditingController();
     final descriptionCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
     final isDark = Get.find<ThemeController>().isDark.value;
 
     await showModalBottomSheet<void>(
@@ -129,110 +133,118 @@ class _SupportTicketsViewState extends State<SupportTicketsView> {
             18,
             16 + MediaQuery.of(sheetContext).viewInsets.bottom,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: _divider(isDark),
-                  borderRadius: BorderRadius.circular(99),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: _divider(isDark),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'New support ticket',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: _textPrimary(isDark),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'New support ticket',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: _textPrimary(isDark),
+                        ),
                       ),
                     ),
+                    IconButton(
+                      onPressed: () {
+                        if (Navigator.of(sheetContext).canPop()) {
+                          Navigator.of(sheetContext).pop();
+                        }
+                      },
+                      icon: const Icon(Icons.close),
+                      color: _mutedText(isDark),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _InputField(
+                  controller: subjectCtrl,
+                  label: 'Subject',
+                  validator: (value) => InputValidators.minLength(
+                    value ?? '',
+                    fieldLabel: 'Subject',
+                    minChars: 3,
                   ),
-                  IconButton(
-                    onPressed: () {
-                      if (Navigator.of(sheetContext).canPop()) {
-                        Navigator.of(sheetContext).pop();
-                      }
-                    },
-                    icon: const Icon(Icons.close),
-                    color: _mutedText(isDark),
+                ),
+                const SizedBox(height: 12),
+                _InputField(
+                  controller: descriptionCtrl,
+                  label: 'Describe the issue',
+                  maxLines: 4,
+                  validator: (value) => InputValidators.minLength(
+                    value ?? '',
+                    fieldLabel: 'Description',
+                    minChars: 10,
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _InputField(
-                controller: subjectCtrl,
-                label: 'Subject',
-                isDark: isDark,
-              ),
-              const SizedBox(height: 12),
-              _InputField(
-                controller: descriptionCtrl,
-                label: 'Describe the issue',
-                isDark: isDark,
-                maxLines: 4,
-              ),
-              const SizedBox(height: 16),
-              Obx(() {
-                final saving = _controller.creating.value;
-                return SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: saving
-                        ? null
-                        : () async {
-                            final subject = subjectCtrl.text.trim();
-                            final description = descriptionCtrl.text.trim();
-                            if (subject.isEmpty || description.isEmpty) {
-                              _showSnack(
-                                context,
-                                'Please add a subject and description.',
-                              );
-                              return;
-                            }
-                            try {
-                              await _controller.createTicket(
-                                subject: subject,
-                                description: description,
-                              );
-                              if (Navigator.of(sheetContext).canPop()) {
-                                Navigator.of(sheetContext).pop();
+                ),
+                const SizedBox(height: 16),
+                Obx(() {
+                  final saving = _controller.creating.value;
+                  return SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              if (!(formKey.currentState?.validate() ??
+                                  false)) {
+                                return;
                               }
-                            } catch (e) {
-                              _showSnack(context, e.toString());
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.passengerPrimary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                              final subject = subjectCtrl.text.trim();
+                              final description = descriptionCtrl.text.trim();
+                              try {
+                                await _controller.createTicket(
+                                  subject: subject,
+                                  description: description,
+                                );
+                                if (Navigator.of(sheetContext).canPop()) {
+                                  Navigator.of(sheetContext).pop();
+                                }
+                              } catch (e) {
+                                _showSnack(context, e.toString());
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.passengerPrimary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
                       ),
-                      elevation: 0,
-                    ),
-                    child: saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                      child: saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Submit ticket',
+                              style: TextStyle(fontWeight: FontWeight.w700),
                             ),
-                          )
-                        : const Text(
-                            'Submit ticket',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                  ),
-                );
-              }),
-            ],
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
         );
       },
@@ -240,9 +252,9 @@ class _SupportTicketsViewState extends State<SupportTicketsView> {
   }
 
   void _showSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -328,7 +340,9 @@ class _TicketCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    ticket.subject.isNotEmpty ? ticket.subject : 'Support ticket',
+                    ticket.subject.isNotEmpty
+                        ? ticket.subject
+                        : 'Support ticket',
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       color: _textPrimary(isDark),
@@ -476,30 +490,23 @@ class _InputField extends StatelessWidget {
   const _InputField({
     required this.controller,
     required this.label,
-    required this.isDark,
     this.maxLines = 1,
+    this.validator,
   });
 
   final TextEditingController controller;
   final String label;
-  final bool isDark;
   final int maxLines;
+  final String? Function(String?)? validator;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: _mutedText(isDark)),
-        filled: true,
-        fillColor: _fieldFill(isDark),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-      ),
+      validator: validator,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      decoration: appInputDecoration(context, labelText: label, radius: 14),
     );
   }
 }
@@ -563,6 +570,3 @@ Color _textPrimary(bool isDark) =>
 
 Color _chipNeutralBg(bool isDark) =>
     isDark ? const Color(0xFF1E222D) : const Color(0xFFF1F3F7);
-
-Color _fieldFill(bool isDark) =>
-    isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8);

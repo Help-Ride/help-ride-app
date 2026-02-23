@@ -4,6 +4,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/routes/app_routes.dart';
 import 'shared/controllers/session_controller.dart';
+import 'shared/widgets/dismiss_keyboard.dart';
 
 class HelpRideApp extends StatelessWidget {
   const HelpRideApp({super.key});
@@ -24,7 +25,8 @@ class HelpRideApp extends StatelessWidget {
         themeMode: theme.themeMode,
         initialRoute: AppRoutes.gate,
         getPages: AppRoutes.pages,
-        builder: (context, child) => child ?? const SizedBox.shrink(),
+        builder: (context, child) =>
+            DismissKeyboard(child: child ?? const SizedBox.shrink()),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/app_input_decoration.dart';
 
 class ExoTextArea extends StatelessWidget {
   const ExoTextArea({
@@ -7,11 +8,13 @@ class ExoTextArea extends StatelessWidget {
     required this.label,
     required this.hint,
     required this.controller,
+    this.errorText,
   });
 
   final String label;
   final String hint;
   final TextEditingController controller;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -31,17 +34,14 @@ class ExoTextArea extends StatelessWidget {
           controller: controller,
           minLines: 4,
           maxLines: 6,
-          decoration: InputDecoration(
+          decoration: appInputDecoration(
+            context,
             hintText: hint,
-            filled: true,
-            fillColor: isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8),
+            errorText: errorText,
+            radius: 16,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
             ),
           ),
         ),

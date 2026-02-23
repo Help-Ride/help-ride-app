@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/features/home/controllers/home_controller.dart';
 import 'package:help_ride/core/routes/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_input_decoration.dart';
 import '../controllers/driver_onboarding_controller.dart';
 
 class DriverOnboardingView extends StatefulWidget {
@@ -230,12 +232,16 @@ class ExoField extends StatelessWidget {
     required this.hint,
     required this.onChanged,
     this.keyboardType,
+    this.errorText,
+    this.inputFormatters,
   });
 
   final String label;
   final String hint;
   final ValueChanged<String> onChanged;
   final TextInputType? keyboardType;
+  final String? errorText;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -254,20 +260,12 @@ class ExoField extends StatelessWidget {
         TextField(
           keyboardType: keyboardType,
           onChanged: onChanged,
-          decoration: InputDecoration(
+          inputFormatters: inputFormatters,
+          decoration: appInputDecoration(
+            context,
             hintText: hint,
-            filled: true,
-            fillColor: isDark
-                ? const Color(0xFF1C2331)
-                : const Color(0xFFF3F5F8),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 16,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
+            errorText: errorText,
+            radius: 16,
           ),
         ),
       ],
@@ -291,17 +289,20 @@ class _DriverForm extends GetView<DriverOnboardingController> {
       children: [
         Expanded(
           child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             children: [
               ExoField(
                 label: 'Car Make',
                 hint: 'Toyota',
                 onChanged: controller.setCarMake,
+                errorText: controller.fieldError('carMake'),
               ),
               const SizedBox(height: 12),
               ExoField(
                 label: 'Car Model',
                 hint: 'Camry',
                 onChanged: controller.setCarModel,
+                errorText: controller.fieldError('carModel'),
               ),
               const SizedBox(height: 12),
               ExoField(
@@ -309,30 +310,39 @@ class _DriverForm extends GetView<DriverOnboardingController> {
                 hint: '2022',
                 keyboardType: TextInputType.number,
                 onChanged: controller.setCarYear,
+                errorText: controller.fieldError('carYear'),
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(4),
+                ],
               ),
               const SizedBox(height: 12),
               ExoField(
                 label: 'Car Color',
                 hint: 'Silver',
                 onChanged: controller.setCarColor,
+                errorText: controller.fieldError('carColor'),
               ),
               const SizedBox(height: 12),
               ExoField(
                 label: 'Plate Number',
                 hint: 'ABC-1234',
                 onChanged: controller.setPlateNumber,
+                errorText: controller.fieldError('plateNumber'),
               ),
               const SizedBox(height: 12),
               ExoField(
                 label: 'License Number',
                 hint: 'LIC-987654',
                 onChanged: controller.setLicenseNumber,
+                errorText: controller.fieldError('licenseNumber'),
               ),
               const SizedBox(height: 12),
               ExoField(
                 label: 'Insurance Info (optional)',
                 hint: 'Provider / policy',
                 onChanged: controller.setInsuranceInfo,
+                errorText: controller.fieldError('insuranceInfo'),
               ),
 
               const SizedBox(height: 14),

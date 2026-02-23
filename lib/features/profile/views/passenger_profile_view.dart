@@ -8,6 +8,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/controllers/session_controller.dart';
 import '../../../shared/models/user.dart';
+import '../../../shared/utils/input_validators.dart';
+import '../../../shared/widgets/app_input_decoration.dart';
 import '../models/driver_document.dart';
 import '../../support/routes/support_routes.dart';
 import '../routes/profile_routes.dart';
@@ -182,13 +184,23 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
     final nameCtrl = TextEditingController(text: user.name);
     final phoneCtrl = TextEditingController(text: user.phone ?? '');
     final avatarCtrl = TextEditingController(text: user.avatarUrl ?? '');
+    final formKey = GlobalKey<FormState>();
 
     await _showEditSheet(
       context,
       title: 'Edit Profile',
+      formKey: formKey,
       child: Column(
         children: [
-          _EditField(controller: nameCtrl, label: 'Full name'),
+          _EditField(
+            controller: nameCtrl,
+            label: 'Full name',
+            validator: (value) => InputValidators.minLength(
+              value ?? '',
+              fieldLabel: 'Full name',
+              minChars: 2,
+            ),
+          ),
           const SizedBox(height: 12),
           _EditField(
             controller: phoneCtrl,
@@ -197,12 +209,14 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-()\s]')),
             ],
+            validator: (value) => InputValidators.optionalPhone(value ?? ''),
           ),
           const SizedBox(height: 12),
           _EditField(
             controller: avatarCtrl,
             label: 'Avatar URL',
             keyboardType: TextInputType.url,
+            validator: (value) => InputValidators.optionalUrl(value ?? ''),
           ),
         ],
       ),
@@ -239,28 +253,71 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
       text: profile?.insuranceInfo ?? '',
     );
     _controller.refreshDriverDocuments();
+    final formKey = GlobalKey<FormState>();
 
     await _showEditSheet(
       context,
       title: profile == null ? 'Create Driver Profile' : 'Edit Driver Profile',
+      formKey: formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _EditField(controller: makeCtrl, label: 'Car make'),
+          _SheetSectionTitle(
+            title: 'Vehicle Information',
+            subtitle: 'Keep these details aligned with your onboarding info.',
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
           const SizedBox(height: 12),
-          _EditField(controller: modelCtrl, label: 'Car model'),
+          _EditField(
+            controller: makeCtrl,
+            label: 'Car make',
+            validator: (value) => InputValidators.requiredText(
+              value ?? '',
+              fieldLabel: 'Car make',
+            ),
+          ),
+          const SizedBox(height: 12),
+          _EditField(
+            controller: modelCtrl,
+            label: 'Car model',
+            validator: (value) => InputValidators.requiredText(
+              value ?? '',
+              fieldLabel: 'Car model',
+            ),
+          ),
           const SizedBox(height: 12),
           _EditField(
             controller: yearCtrl,
             label: 'Car year',
             keyboardType: TextInputType.number,
+            validator: (value) => InputValidators.optionalYear(value ?? ''),
           ),
           const SizedBox(height: 12),
           _EditField(controller: colorCtrl, label: 'Car color'),
           const SizedBox(height: 12),
-          _EditField(controller: plateCtrl, label: 'Plate number'),
+          _EditField(
+            controller: plateCtrl,
+            label: 'Plate number',
+            validator: (value) => InputValidators.requiredText(
+              value ?? '',
+              fieldLabel: 'Plate number',
+            ),
+          ),
           const SizedBox(height: 12),
-          _EditField(controller: licenseCtrl, label: 'License number'),
+          _EditField(
+            controller: licenseCtrl,
+            label: 'License number',
+            validator: (value) => InputValidators.requiredText(
+              value ?? '',
+              fieldLabel: 'License number',
+            ),
+          ),
+          const SizedBox(height: 18),
+          _SheetSectionTitle(
+            title: 'Required Documents',
+            subtitle: 'Upload each required file separately for verification.',
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
           const SizedBox(height: 12),
           _DriverDocumentUploadSection(
             controller: _controller,
@@ -297,6 +354,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
     required Widget child,
     required Future<bool> Function() onSave,
     required RxBool isSaving,
+    GlobalKey<FormState>? formKey,
   }) {
     final isDark = Get.find<ThemeController>().isDark.value;
     return showModalBottomSheet<void>(
@@ -353,7 +411,15 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Flexible(child: SingleChildScrollView(child: child)),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: formKey == null
+                          ? child
+                          : Form(key: formKey, child: child),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Obx(() {
                     final saving = isSaving.value;
@@ -364,6 +430,11 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                         onPressed: saving
                             ? null
                             : () async {
+                                if (formKey != null &&
+                                    !(formKey.currentState?.validate() ??
+                                        false)) {
+                                  return;
+                                }
                                 final ok = await onSave();
                                 if (!ok) return;
                                 if (Navigator.of(sheetContext).canPop()) {
@@ -870,12 +941,16 @@ class _DriverDocumentUploadSection extends StatefulWidget {
 
 class _DriverDocumentUploadSectionState
     extends State<_DriverDocumentUploadSection> {
-  bool _pickingFile = false;
+  String? _uploadingType;
+  final _typeErrors = <String, String?>{};
 
-  Future<void> _pickAndUpload() async {
-    if (_pickingFile || widget.controller.docsUploading.value) return;
+  Future<void> _pickAndUpload(_DriverDocumentRequirement requirement) async {
+    if (_uploadingType != null || widget.controller.docsUploading.value) return;
 
-    setState(() => _pickingFile = true);
+    setState(() {
+      _uploadingType = requirement.type;
+      _typeErrors[requirement.type] = null;
+    });
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -888,7 +963,7 @@ class _DriverDocumentUploadSectionState
       final file = result.files.single;
       final path = file.path;
       if (path == null || path.trim().isEmpty) {
-        _showSnack('Could not read the selected file.');
+        _setTypeError(requirement.type, 'Could not read the selected file.');
         return;
       }
 
@@ -899,19 +974,23 @@ class _DriverDocumentUploadSectionState
           lookupMimeType(path, headerBytes: file.bytes) ??
           _mimeTypeForExt(file.extension);
 
-      await widget.controller.uploadDriverLicenseDocument(
+      await widget.controller.uploadDriverDocument(
+        type: requirement.type,
         filePath: path,
         fileName: fileName,
         mimeType: mimeType,
       );
       if (!mounted) return;
-      _showSnack('License document uploaded successfully.');
+      _showSnack('${requirement.title} uploaded successfully.');
+      _setTypeError(requirement.type, null);
     } catch (e) {
       if (!mounted) return;
-      _showSnack(_friendlyError(e));
+      final message = _friendlyError(e);
+      _setTypeError(requirement.type, message);
+      _showSnack(message);
     } finally {
       if (mounted) {
-        setState(() => _pickingFile = false);
+        setState(() => _uploadingType = null);
       }
     }
   }
@@ -951,16 +1030,7 @@ class _DriverDocumentUploadSectionState
     return Obx(() {
       final loading = widget.controller.docsLoading.value;
       final uploading = widget.controller.docsUploading.value;
-      final error = widget.controller.docsError.value;
-      final licenseDocs =
-          widget.controller.driverDocuments
-              .where((doc) => doc.type.toLowerCase() == 'license')
-              .toList()
-            ..sort(
-              (a, b) => _sortKey(
-                b.updatedAt ?? b.createdAt,
-              ).compareTo(_sortKey(a.updatedAt ?? a.createdAt)),
-            );
+      final allDocs = widget.controller.driverDocuments;
 
       return Container(
         width: double.infinity,
@@ -973,99 +1043,245 @@ class _DriverDocumentUploadSectionState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'License Verification',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: _textPrimary(widget.isDark),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Upload a clear photo or PDF of your license.',
-              style: TextStyle(fontSize: 12, color: _mutedText(widget.isDark)),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: uploading || _pickingFile ? null : _pickAndUpload,
-                icon: uploading || _pickingFile
-                    ? SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: _textPrimary(widget.isDark),
-                        ),
-                      )
-                    : const Icon(Icons.upload_file_outlined, size: 18),
-                label: Text(
-                  uploading || _pickingFile
-                      ? 'Uploading...'
-                      : licenseDocs.isEmpty
-                      ? 'Upload license document'
-                      : 'Replace license document',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _textPrimary(widget.isDark),
-                  side: BorderSide(color: _cardBorder(widget.isDark)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
             if (loading) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 2),
               const LinearProgressIndicator(minHeight: 2),
-            ],
-            if (error != null && error.trim().isNotEmpty) ...[
               const SizedBox(height: 10),
-              Text(
-                error.replaceFirst('Exception: ', ''),
-                style: const TextStyle(
-                  color: Colors.redAccent,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
             ],
-            const SizedBox(height: 10),
-            if (licenseDocs.isEmpty)
-              Text(
-                'No license document uploaded yet.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _mutedText(widget.isDark),
-                ),
-              )
-            else
-              Column(
-                children: [
-                  for (final doc in licenseDocs)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _DriverDocumentTile(
-                        isDark: widget.isDark,
-                        document: doc,
-                      ),
+            for (int i = 0; i < _driverDocumentRequirements.length; i++) ...[
+              Builder(
+                builder: (_) {
+                  final requirement = _driverDocumentRequirements[i];
+                  final docs = _documentsForRequirement(allDocs, requirement)
+                    ..sort(
+                      (a, b) => _sortKey(
+                        b.updatedAt ?? b.createdAt,
+                      ).compareTo(_sortKey(a.updatedAt ?? a.createdAt)),
+                    );
+                  final isThisUploading =
+                      uploading && _uploadingType == requirement.type;
+                  final busy = uploading || _uploadingType != null;
+
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _fieldFill(widget.isDark),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _cardBorder(widget.isDark)),
                     ),
-                ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          requirement.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: _textPrimary(widget.isDark),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          requirement.description,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _mutedText(widget.isDark),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: busy
+                                ? null
+                                : () => _pickAndUpload(requirement),
+                            icon: isThisUploading
+                                ? SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: _textPrimary(widget.isDark),
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.upload_file_outlined,
+                                    size: 18,
+                                  ),
+                            label: Text(
+                              isThisUploading
+                                  ? 'Uploading...'
+                                  : docs.isEmpty
+                                  ? 'Upload ${requirement.buttonLabel}'
+                                  : 'Replace ${requirement.buttonLabel}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _textPrimary(widget.isDark),
+                              side: BorderSide(
+                                color: _cardBorder(widget.isDark),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if ((_typeErrors[requirement.type] ?? '')
+                            .trim()
+                            .isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _typeErrors[requirement.type]!,
+                            style: const TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        if (docs.isEmpty)
+                          Text(
+                            'No ${requirement.buttonLabel} uploaded yet.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _mutedText(widget.isDark),
+                            ),
+                          )
+                        else
+                          Column(
+                            children: [
+                              for (final doc in docs)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: _DriverDocumentTile(
+                                    isDark: widget.isDark,
+                                    document: doc,
+                                  ),
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
+              if (i != _driverDocumentRequirements.length - 1)
+                const SizedBox(height: 12),
+            ],
           ],
         ),
       );
     });
   }
 
+  void _setTypeError(String type, String? message) {
+    if (!mounted) return;
+    setState(() => _typeErrors[type] = message);
+  }
+
+  List<DriverDocument> _documentsForRequirement(
+    List<DriverDocument> docs,
+    _DriverDocumentRequirement requirement,
+  ) {
+    return docs.where((doc) {
+      final docType = _normalizeDocType(doc.type);
+      if (docType == requirement.type) return true;
+      return requirement.aliases.contains(docType);
+    }).toList();
+  }
+
+  String _normalizeDocType(String raw) {
+    return raw.trim().toLowerCase().replaceAll(RegExp(r'[\s\-]'), '_');
+  }
+
   int _sortKey(String? raw) {
     final dt = DateTime.tryParse(raw ?? '');
     if (dt == null) return 0;
     return dt.millisecondsSinceEpoch;
+  }
+}
+
+class _DriverDocumentRequirement {
+  const _DriverDocumentRequirement({
+    required this.type,
+    required this.title,
+    required this.buttonLabel,
+    required this.description,
+    this.aliases = const [],
+  });
+
+  final String type;
+  final String title;
+  final String buttonLabel;
+  final String description;
+  final List<String> aliases;
+}
+
+const _driverDocumentRequirements = <_DriverDocumentRequirement>[
+  _DriverDocumentRequirement(
+    type: 'license',
+    title: 'Driver License',
+    buttonLabel: 'license document',
+    description: 'Upload a clear image or PDF of your valid driver license.',
+    aliases: ['driver_license'],
+  ),
+  _DriverDocumentRequirement(
+    type: 'registration',
+    title: 'Vehicle Registration',
+    buttonLabel: 'registration document',
+    description: 'Upload your current vehicle registration document.',
+    aliases: ['vehicle_registration', 'car_registration'],
+  ),
+  _DriverDocumentRequirement(
+    type: 'insurance',
+    title: 'Insurance Proof',
+    buttonLabel: 'insurance document',
+    description: 'Upload active insurance proof for this vehicle.',
+    aliases: ['insurance_proof', 'proof_of_insurance'],
+  ),
+];
+
+class _SheetSectionTitle extends StatelessWidget {
+  const _SheetSectionTitle({
+    required this.title,
+    required this.subtitle,
+    required this.isDark,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: _textPrimary(isDark),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 12,
+            color: _mutedText(isDark),
+            height: 1.35,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -1078,7 +1294,7 @@ class _DriverDocumentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = (document.fileName ?? '').trim().isEmpty
-        ? 'License document'
+        ? '${_driverDocTypeLabel(document.type)} document'
         : document.fileName!.trim();
     final status = _docStatusLabel(document.status);
     final statusColor = _docStatusColor(status);
@@ -1145,32 +1361,45 @@ class _EditField extends StatelessWidget {
     required this.label,
     this.keyboardType,
     this.inputFormatters,
+    this.validator,
   });
 
   final TextEditingController controller;
   final String label;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
+  final String? Function(String?)? validator;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(
-          color: _mutedText(Get.find<ThemeController>().isDark.value),
-        ),
-        filled: true,
-        fillColor: _fieldFill(Get.find<ThemeController>().isDark.value),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-      ),
+      validator: validator,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      decoration: appInputDecoration(context, labelText: label, radius: 14),
     );
+  }
+}
+
+String _driverDocTypeLabel(String raw) {
+  final value = raw.trim().toLowerCase().replaceAll(RegExp(r'[\s\-]'), '_');
+  switch (value) {
+    case 'license':
+    case 'driver_license':
+      return 'License';
+    case 'registration':
+    case 'vehicle_registration':
+    case 'car_registration':
+      return 'Registration';
+    case 'insurance':
+    case 'insurance_proof':
+    case 'proof_of_insurance':
+      return 'Insurance';
+    default:
+      if (value.isEmpty) return 'Driver';
+      return '${value[0].toUpperCase()}${value.substring(1)}';
   }
 }
 
