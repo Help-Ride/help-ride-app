@@ -3,9 +3,7 @@ import 'package:get/get.dart';
 import 'package:help_ride/features/driver/controllers/driver_gate_controller.dart';
 import 'package:help_ride/features/driver/views/driver_home_gate_view.dart';
 import 'package:help_ride/features/driver/views/driver_onboarding_view.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/role_toggle.dart';
-import '../../../shared/controllers/session_controller.dart';
 import '../controllers/home_controller.dart';
 import '../widgets/passenger/passenger_home.dart';
 
@@ -29,18 +27,12 @@ class HomeView extends GetView<HomeController> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
             child: Column(
               children: [
                 _HomeHeader(controller: c),
-                const SizedBox(height: 18),
-                Expanded(
-                  child: Obx(() {
-                    return c.role.value == HomeRole.passenger
-                        ? const PassengerHome()
-                        : const DriverHomeGateView();
-                  }),
-                ),
+                const SizedBox(height: 12),
+                Expanded(child: _RoleHomeContent(controller: c)),
               ],
             ),
           ),
@@ -57,100 +49,74 @@ class _HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = Get.isRegistered<SessionController>()
-        ? Get.find<SessionController>()
-        : null;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return LayoutBuilder(
       builder: (context, constraints) {
-        // ✅ Option A: fixed toggle width so text never becomes "Passe..."
-        // Tune this number if needed (210–240 is usually safe).
-        const double toggleWidth = 230;
+        final narrow = constraints.maxWidth < 430;
+        final toggleWidth = constraints.maxWidth < 680 ? 220.0 : 232.0;
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Left header: flexible area for greeting/title
-            Expanded(
-              child: Obx(() {
-                final isPassenger = controller.role.value == HomeRole.passenger;
-
-                final fullName = (session?.user.value?.name ?? 'User')
-                    .toString()
-                    .trim();
-                final name = fullName.isEmpty
-                    ? 'User'
-                    : fullName.split(' ').first;
-
-                if (isPassenger) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Hello,",
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          color: isDark
-                              ? AppColors.darkText
-                              : AppColors.lightText,
-                          height: 1.0,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w900,
-                          color: isDark
-                              ? AppColors.darkText
-                              : AppColors.lightText,
-                          height: 1.0,
-                        ),
-                      ),
-                    ],
-                  );
-                }
-
-                return Text(
-                  "Driver Dashboard",
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    color: isDark ? AppColors.darkText : AppColors.lightText,
-                    height: 1.05,
-                  ),
-                );
-              }),
-            ),
-
-            const SizedBox(width: 12),
-
-            // Right: role toggle with fixed width
-            SizedBox(
-              width: toggleWidth,
-              child: Align(
-                alignment: Alignment.topRight,
-                child: Obx(() {
-                  return RoleToggle(
-                    role: controller.role.value,
-                    onPassenger: () => controller.setRole(HomeRole.passenger),
-                    onDriver: () => controller.setRole(HomeRole.driver),
-                  );
-                }),
-              ),
-            ),
-          ],
-        );
+        return Obx(() {
+          final roleToggle = RoleToggle(
+            role: controller.role.value,
+            onPassenger: () => controller.setRole(HomeRole.passenger),
+            onDriver: () => controller.setRole(HomeRole.driver),
+          );
+          if (narrow) {
+            return SizedBox(width: double.infinity, child: roleToggle);
+          }
+          return Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(width: toggleWidth, child: roleToggle),
+          );
+        });
       },
     );
+  }
+}
+
+class _RoleHomeContent extends StatelessWidget {
+  const _RoleHomeContent({required this.controller});
+
+  final HomeController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final isPassenger = controller.role.value == HomeRole.passenger;
+      const duration = Duration(milliseconds: 280);
+
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          IgnorePointer(
+            ignoring: !isPassenger,
+            child: AnimatedOpacity(
+              duration: duration,
+              curve: Curves.easeOutCubic,
+              opacity: isPassenger ? 1 : 0,
+              child: AnimatedSlide(
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                offset: isPassenger ? Offset.zero : const Offset(-0.04, 0),
+                child: const PassengerHome(),
+              ),
+            ),
+          ),
+          IgnorePointer(
+            ignoring: isPassenger,
+            child: AnimatedOpacity(
+              duration: duration,
+              curve: Curves.easeOutCubic,
+              opacity: isPassenger ? 0 : 1,
+              child: AnimatedSlide(
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                offset: isPassenger ? const Offset(0.04, 0) : Offset.zero,
+                child: const DriverHomeGateView(),
+              ),
+            ),
+          ),
+        ],
+      );
+    });
   }
 }

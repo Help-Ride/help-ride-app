@@ -585,20 +585,20 @@ Future<void> _openOfferSheet(
   if (!context.mounted) return;
   final matches = controller.matchingRidesFor(request);
   if (matches.isEmpty) {
-    final goCreate = await showDialog<bool>(
+    final goCreate = await showAdaptiveDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         title: const Text('No matching rides'),
         content: const Text(
           'Create a ride that matches this request before sending an offer.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Get.back(result: false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () => Get.back(result: true),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Create Ride'),
           ),
         ],

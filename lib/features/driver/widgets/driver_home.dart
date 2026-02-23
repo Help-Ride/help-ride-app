@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../home/widgets/common/app_card.dart';
 import '../controllers/driver_home_controller.dart';
+import '../routes/driver_routes.dart';
 import '../services/driver_earnings_api.dart';
 
 class DriverHomeView extends GetView<DriverHomeController> {
@@ -24,6 +25,7 @@ class DriverHomeView extends GetView<DriverHomeController> {
       final earningsLoading = controller.earningsLoading.value;
       final earningsError = controller.earningsError.value;
       final loadingMore = controller.loadingMore.value;
+      final bottomSafeArea = MediaQuery.of(context).padding.bottom;
 
       final openRidesRaw = summary.ridesTotal - summary.ridesCompleted;
       final openRides = openRidesRaw < 0 ? 0 : openRidesRaw;
@@ -32,27 +34,75 @@ class DriverHomeView extends GetView<DriverHomeController> {
         onRefresh: controller.refreshAll,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 16),
+          padding: EdgeInsets.only(bottom: 28 + bottomSafeArea),
           children: [
-            SizedBox(
-              height: 54,
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => Get.toNamed('/driver/create-ride'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.driverPrimary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 420;
+                final buttonHeight = compact ? 52.0 : 54.0;
+                final createButton = SizedBox(
+                  height: buttonHeight,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Get.toNamed(DriverRoutes.createRide),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.driverPrimary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text(
+                      'Create a Ride',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
                   ),
-                  elevation: 0,
-                ),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text(
-                  'Create a Ride',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
+                );
+
+                final searchButton = SizedBox(
+                  height: buttonHeight,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Get.toNamed(DriverRoutes.rideRequests),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: isDark
+                          ? const Color(0xFF111827)
+                          : const Color(0xFFF3F8FF),
+                      foregroundColor: AppColors.driverPrimary,
+                      side: const BorderSide(
+                        color: AppColors.driverPrimary,
+                        width: 1.2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.search, size: 18),
+                    label: const Text(
+                      'Search Ride',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                );
+
+                if (compact) {
+                  return Column(
+                    children: [
+                      SizedBox(width: double.infinity, child: createButton),
+                      const SizedBox(height: 10),
+                      SizedBox(width: double.infinity, child: searchButton),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: createButton),
+                    const SizedBox(width: 10),
+                    Expanded(child: searchButton),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 14),
             LayoutBuilder(
@@ -60,9 +110,10 @@ class DriverHomeView extends GetView<DriverHomeController> {
                 final width = constraints.maxWidth;
                 final cardWidth = width >= 760
                     ? (width - 24) / 3
-                    : width >= 520
+                    : width >= 340
                     ? (width - 12) / 2
                     : width;
+                final compactCard = cardWidth < 210;
 
                 return Wrap(
                   spacing: 12,
@@ -79,6 +130,7 @@ class DriverHomeView extends GetView<DriverHomeController> {
                             ? 'Loading rides...'
                             : '${summary.ridesCompleted} completed',
                         badgeText: summaryLoading ? null : '$openRides open',
+                        compact: compactCard,
                       ),
                     ),
                     SizedBox(
@@ -94,6 +146,7 @@ class DriverHomeView extends GetView<DriverHomeController> {
                         badgeText: summaryLoading
                             ? null
                             : '${summary.pending.paymentsCount} pending',
+                        compact: compactCard,
                       ),
                     ),
                     if (width >= 760)
@@ -113,6 +166,7 @@ class DriverHomeView extends GetView<DriverHomeController> {
                                   summary.refunded.amountCents +
                                       summary.failed.amountCents,
                                 ),
+                          compact: compactCard,
                         ),
                       ),
                   ],
@@ -128,27 +182,36 @@ class DriverHomeView extends GetView<DriverHomeController> {
             ],
             if (!summaryLoading) ...[
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _AmountChip(
-                    label: 'Paid',
-                    amount: _formatCents(summary.paid.amountCents),
-                  ),
-                  _AmountChip(
-                    label: 'Pending',
-                    amount: _formatCents(summary.pending.amountCents),
-                  ),
-                  _AmountChip(
-                    label: 'Refunded',
-                    amount: _formatCents(summary.refunded.amountCents),
-                  ),
-                  _AmountChip(
-                    label: 'Failed',
-                    amount: _formatCents(summary.failed.amountCents),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 390;
+                  final chipWidth = compact
+                      ? (constraints.maxWidth - 8) / 2
+                      : null;
+
+                  Widget chip(String label, String amount) {
+                    final item = _AmountChip(label: label, amount: amount);
+                    if (chipWidth == null) return item;
+                    return SizedBox(width: chipWidth, child: item);
+                  }
+
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      chip('Paid', _formatCents(summary.paid.amountCents)),
+                      chip(
+                        'Pending',
+                        _formatCents(summary.pending.amountCents),
+                      ),
+                      chip(
+                        'Refunded',
+                        _formatCents(summary.refunded.amountCents),
+                      ),
+                      chip('Failed', _formatCents(summary.failed.amountCents)),
+                    ],
+                  );
+                },
               ),
             ],
             const SizedBox(height: 16),
@@ -252,12 +315,14 @@ class _SummaryCard extends StatelessWidget {
     required this.value,
     required this.hint,
     this.badgeText,
+    this.compact = false,
   });
 
   final String title;
   final String value;
   final String hint;
   final String? badgeText;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -279,10 +344,10 @@ class _SummaryCard extends StatelessWidget {
             style: TextStyle(
               color: textPrimary,
               fontWeight: FontWeight.w900,
-              fontSize: 16,
+              fontSize: compact ? 15 : 16,
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: compact ? 8 : 10),
           Text(
             value,
             maxLines: 1,
@@ -290,29 +355,38 @@ class _SummaryCard extends StatelessWidget {
             style: TextStyle(
               color: textPrimary,
               fontWeight: FontWeight.w900,
-              fontSize: 34,
+              fontSize: compact ? 28 : 34,
               height: 1,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: compact ? 6 : 8),
           Text(
             hint,
-            style: TextStyle(color: muted, fontWeight: FontWeight.w700),
+            maxLines: compact ? 2 : 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: muted,
+              fontWeight: FontWeight.w700,
+              fontSize: compact ? 13 : 14,
+            ),
           ),
           if (badgeText != null && badgeText!.trim().isNotEmpty) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: compact ? 10 : 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? 8 : 10,
+                vertical: compact ? 5 : 6,
+              ),
               decoration: BoxDecoration(
                 color: badgeBg,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 badgeText!,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.driverPrimary,
                   fontWeight: FontWeight.w800,
-                  fontSize: 12,
+                  fontSize: compact ? 11 : 12,
                 ),
               ),
             ),
@@ -422,7 +496,9 @@ class _EarningTile extends StatelessWidget {
                       _RouteLine(
                         icon: Icons.trip_origin,
                         iconColor: muted,
-                        text: fromLine.isEmpty ? 'Pickup unavailable' : fromLine,
+                        text: fromLine.isEmpty
+                            ? 'Pickup unavailable'
+                            : fromLine,
                         textColor: textPrimary,
                         fontWeight: FontWeight.w800,
                         fontSize: 15,
