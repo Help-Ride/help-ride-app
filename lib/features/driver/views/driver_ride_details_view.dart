@@ -5,8 +5,11 @@ import 'package:help_ride/features/driver/widgets/my_rides/ride_formatters.dart'
 import 'package:help_ride/features/driver/widgets/requests/driver_request_card.dart';
 import 'package:help_ride/features/driver/widgets/requests/driver_ride_requests_tabs.dart';
 import 'package:help_ride/features/rides/models/ride.dart';
+import 'package:help_ride/features/rides/widgets/ride_details/ride_additional_notes_card.dart';
+import 'package:help_ride/features/rides/widgets/ride_details/ride_amenities_card.dart';
 import 'package:help_ride/features/rides/widgets/ride_details/ride_trip_details_card.dart';
 import 'package:help_ride/features/rides/widgets/ride_details/ride_info_card.dart';
+import 'package:help_ride/features/rides/widgets/ride_details/ride_stops_card.dart';
 import 'package:help_ride/features/rides/widgets/ride_details/ride_ui.dart';
 import '../../../core/theme/app_colors.dart';
 
@@ -75,6 +78,18 @@ class DriverRideDetailsView extends GetView<DriverRideDetailsController> {
 
               const SectionTitle('Ride Info'),
               RideInfoCard(ride: ride),
+              const SizedBox(height: 14),
+
+              const SectionTitle('Stops'),
+              RideStopsCard(ride: ride),
+              const SizedBox(height: 14),
+
+              const SectionTitle('Amenities'),
+              RideAmenitiesCard(ride: ride),
+              const SizedBox(height: 14),
+
+              const SectionTitle('Additional Notes'),
+              RideAdditionalNotesCard(ride: ride),
               const SizedBox(height: 14),
 
               const SectionTitle('Seats'),
@@ -223,9 +238,8 @@ class _DriverRideSummaryCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${compactAddress(ride.fromCity)}  →  ${compactAddress(ride.toCity, maxParts: 4)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  '${ride.fromCity}  →  ${ride.toCity}',
+                  softWrap: true,
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,

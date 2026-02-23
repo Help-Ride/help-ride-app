@@ -61,8 +61,7 @@ class DriverRideCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '${ride.from}  →  ${ride.to}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 16,

@@ -15,7 +15,20 @@ class DriverRidesApi {
     required int seatsTotal,
     required double pricePerSeat,
     DateTime? arrivalTimeUtc,
+    required List<String> stops,
+    required List<String> amenities,
+    String? additionalNotes,
   }) async {
+    final cleanedStops = stops
+        .map((stop) => stop.trim())
+        .where((stop) => stop.isNotEmpty)
+        .toList();
+    final cleanedAmenities = amenities
+        .map((amenity) => amenity.trim())
+        .where((amenity) => amenity.isNotEmpty)
+        .toList();
+    final notes = additionalNotes?.trim();
+
     final res = await _client.post<Map<String, dynamic>>(
       '/rides',
       data: {
@@ -29,9 +42,9 @@ class DriverRidesApi {
         'arrivalTime': arrivalTimeUtc?.toIso8601String(),
         'seatsTotal': seatsTotal,
         'pricePerSeat': pricePerSeat,
-        // keep backend happy (your API expects these currently)
-        'rideType': 'one-time',
-        'tripType': 'one-way',
+        'stops': cleanedStops,
+        'amenities': cleanedAmenities,
+        'additionalNotes': notes?.isEmpty ?? true ? null : notes,
       },
     );
     return res.data ?? {};
@@ -48,11 +61,25 @@ class DriverRidesApi {
     required DateTime startTimeUtc,
     required int seatsTotal,
     required double pricePerSeat,
+    DateTime? arrivalTimeUtc,
+    required List<String> stops,
+    required List<String> amenities,
+    String? additionalNotes,
   }) async {
     final id = rideId.trim();
     if (id.isEmpty) {
       throw ArgumentError('ride id can not be empty');
     }
+
+    final cleanedStops = stops
+        .map((stop) => stop.trim())
+        .where((stop) => stop.isNotEmpty)
+        .toList();
+    final cleanedAmenities = amenities
+        .map((amenity) => amenity.trim())
+        .where((amenity) => amenity.isNotEmpty)
+        .toList();
+    final notes = additionalNotes?.trim();
 
     final res = await _client.put<Map<String, dynamic>>(
       '/rides/$id',
@@ -64,8 +91,12 @@ class DriverRidesApi {
         'toLat': toLat,
         'toLng': toLng,
         'startTime': startTimeUtc.toIso8601String(),
+        'arrivalTime': arrivalTimeUtc?.toIso8601String(),
         'pricePerSeat': pricePerSeat,
         'seatsTotal': seatsTotal,
+        'stops': cleanedStops,
+        'amenities': cleanedAmenities,
+        'additionalNotes': notes?.isEmpty ?? true ? null : notes,
       },
     );
     return res.data ?? {};

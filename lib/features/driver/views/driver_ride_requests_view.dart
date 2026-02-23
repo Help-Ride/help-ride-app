@@ -727,12 +727,17 @@ Future<void> _openOfferSheet(
                     child: DropdownButton<String>(
                       value: selectedRideId,
                       isExpanded: true,
+                      itemHeight: null,
                       items: rides.map((r) {
                         return DropdownMenuItem(
                           value: r.id,
-                          child: Text(
-                            '${r.from} → ${r.to} (${formatDateTime(r.startTime)})',
-                            overflow: TextOverflow.ellipsis,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Text(
+                              '${r.from} → ${r.to} (${formatDateTime(r.startTime)})',
+                              maxLines: 2,
+                              softWrap: true,
+                            ),
                           ),
                         );
                       }).toList(),

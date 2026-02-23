@@ -458,9 +458,11 @@ class _EarningTile extends StatelessWidget {
 
     final fromCity = (ride?.fromCity ?? '').trim();
     final toCity = (ride?.toCity ?? '').trim();
-    final fromLine = _compactAddress(fromCity);
-    final toLine = _compactAddress(toCity);
-    final shortRoute = _routeLabel(from: fromLine, to: toLine);
+    final compactFromLine = _compactAddress(fromCity);
+    final compactToLine = _compactAddress(toCity);
+    final fromLine = fromCity.isEmpty ? compactFromLine : fromCity;
+    final toLine = toCity.isEmpty ? compactToLine : toCity;
+    final shortRoute = _routeLabel(from: compactFromLine, to: compactToLine);
     final longRoute = _routeLabel(from: fromCity, to: toCity);
 
     final amount = _formatCents(
@@ -502,7 +504,7 @@ class _EarningTile extends StatelessWidget {
                         textColor: textPrimary,
                         fontWeight: FontWeight.w800,
                         fontSize: 15,
-                        maxLines: 1,
+                        maxLines: null,
                       ),
                       const SizedBox(height: 2),
                       _RouteLine(
@@ -512,7 +514,7 @@ class _EarningTile extends StatelessWidget {
                         textColor: textPrimary,
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
-                        maxLines: 2,
+                        maxLines: null,
                       ),
                     ],
                   ),
@@ -597,7 +599,7 @@ class _RouteLine extends StatelessWidget {
   final Color textColor;
   final FontWeight fontWeight;
   final double fontSize;
-  final int maxLines;
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -613,7 +615,7 @@ class _RouteLine extends StatelessWidget {
           child: Text(
             text,
             maxLines: maxLines,
-            overflow: TextOverflow.ellipsis,
+            softWrap: true,
             style: TextStyle(
               color: textColor,
               fontWeight: fontWeight,

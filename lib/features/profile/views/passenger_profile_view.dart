@@ -85,6 +85,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                     : AppColors.passengerPrimary,
                 isVerified: isVerified,
                 isDark: isDark,
+                onEdit: () => _openUserEditSheet(context, user),
               ),
               const SizedBox(height: 16),
               if (isDriver || _controller.driverProfile.value != null) ...[
@@ -99,44 +100,6 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
                 ),
                 const SizedBox(height: 20),
               ],
-              _SectionLabel(label: 'ACCOUNT', isDark: isDark),
-              const SizedBox(height: 8),
-              _ActionGroup(
-                items: [
-                  _ActionItem(
-                    icon: Icons.person_outline,
-                    label: 'Personal Information',
-                    onTap: () => _openUserEditSheet(context, user),
-                  ),
-                  const _ActionItem(
-                    icon: Icons.lock_outline,
-                    label: 'Email & Password',
-                  ),
-                  const _ActionItem(
-                    icon: Icons.phone_outlined,
-                    label: 'Phone Number',
-                  ),
-                  const _ActionItem(
-                    icon: Icons.verified_user_outlined,
-                    label: 'Verification',
-                  ),
-                ],
-                isDark: isDark,
-              ),
-              const SizedBox(height: 16),
-              _SectionLabel(label: 'PREFERENCES', isDark: isDark),
-              const SizedBox(height: 8),
-              _ActionGroup(
-                items: const [
-                  _ActionItem(icon: Icons.settings_outlined, label: 'Settings'),
-                  _ActionItem(
-                    icon: Icons.notifications_outlined,
-                    label: 'Notifications',
-                  ),
-                ],
-                isDark: isDark,
-              ),
-              const SizedBox(height: 16),
               _SectionLabel(label: 'SUPPORT', isDark: isDark),
               const SizedBox(height: 8),
               _ActionGroup(
@@ -223,13 +186,6 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
               FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-()\s]')),
             ],
             validator: (value) => InputValidators.optionalPhone(value ?? ''),
-          ),
-          const SizedBox(height: 12),
-          _EditField(
-            controller: avatarCtrl,
-            label: 'Photo URL or key',
-            keyboardType: TextInputType.url,
-            validator: (value) => _avatarValueValidator(value ?? ''),
           ),
         ],
       ),
@@ -501,6 +457,7 @@ class _UserCard extends StatelessWidget {
     required this.roleColor,
     required this.isVerified,
     required this.isDark,
+    required this.onEdit,
   });
 
   final User user;
@@ -508,6 +465,7 @@ class _UserCard extends StatelessWidget {
   final Color roleColor;
   final bool isVerified;
   final bool isDark;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -546,13 +504,26 @@ class _UserCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  user.name.isNotEmpty ? user.name : 'User',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: _textPrimary(isDark),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        user.name.isNotEmpty ? user.name : 'User',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: _textPrimary(isDark),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: onEdit,
+                      splashRadius: 20,
+                      tooltip: 'Edit personal information',
+                      icon: const Icon(Icons.edit_outlined),
+                      color: AppColors.passengerPrimary,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -1592,21 +1563,6 @@ class _EditField extends StatelessWidget {
       decoration: appInputDecoration(context, labelText: label, radius: 14),
     );
   }
-}
-
-String? _avatarValueValidator(String value) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty) return null;
-
-  final uri = Uri.tryParse(trimmed);
-  final isUrl = uri != null && uri.hasScheme && uri.host.trim().isNotEmpty;
-  if (isUrl) return null;
-
-  // Allow non-URL object keys returned by upload endpoints.
-  final isStorageKey = RegExp(r'^[A-Za-z0-9/_\-.]{3,}$').hasMatch(trimmed);
-  if (isStorageKey) return null;
-
-  return 'Enter a valid image URL or uploaded image key.';
 }
 
 String _driverDocTypeLabel(String raw) {

@@ -126,14 +126,15 @@ class DriverMyRidesController extends GetxController {
 
     return DriverRideItem(
       id: (j['id'] ?? '').toString(),
-      from: (j['fromCity'] ?? '').toString(),
-      to: (j['toCity'] ?? '').toString(),
-      startTime: parseDate(j['startTime']),
-      createdAt: readDate(j['createdAt']),
-      updatedAt: readDate(j['updatedAt']),
-      seatsTotal: (j['seatsTotal'] as num?)?.toInt() ?? 0,
-      seatsAvailable: (j['seatsAvailable'] as num?)?.toInt() ?? 0,
-      pricePerSeat: toDouble(j['pricePerSeat']),
+      from: (j['fromCity'] ?? j['from_city'] ?? '').toString(),
+      to: (j['toCity'] ?? j['to_city'] ?? '').toString(),
+      startTime: parseDate(j['startTime'] ?? j['start_time']),
+      createdAt: readDate(j['createdAt'] ?? j['created_at']),
+      updatedAt: readDate(j['updatedAt'] ?? j['updated_at']),
+      seatsTotal: ((j['seatsTotal'] ?? j['seats_total']) as num?)?.toInt() ?? 0,
+      seatsAvailable:
+          ((j['seatsAvailable'] ?? j['seats_available']) as num?)?.toInt() ?? 0,
+      pricePerSeat: toDouble(j['pricePerSeat'] ?? j['price_per_seat']),
       status: (j['status'] ?? 'open').toString(),
     );
   }

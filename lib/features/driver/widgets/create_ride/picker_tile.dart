@@ -38,8 +38,8 @@ class PickerTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             onTap: onTap,
             child: Container(
-              height: 56,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              constraints: const BoxConstraints(minHeight: 56),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Row(
                 children: [
                   Icon(
@@ -50,12 +50,16 @@ class PickerTile extends StatelessWidget {
                   Expanded(
                     child: Text(
                       isEmpty ? 'Select' : value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                      softWrap: true,
                       style: TextStyle(
                         color: isEmpty
-                            ? (isDark ? AppColors.darkMuted : AppColors.lightMuted)
-                            : (isDark ? AppColors.darkText : AppColors.lightText),
+                            ? (isDark
+                                  ? AppColors.darkMuted
+                                  : AppColors.lightMuted)
+                            : (isDark
+                                  ? AppColors.darkText
+                                  : AppColors.lightText),
                         fontWeight: FontWeight.w700,
                       ),
                     ),

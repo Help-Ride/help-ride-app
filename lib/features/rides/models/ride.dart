@@ -51,7 +51,9 @@ class RideDriver {
       email: json['email']?.toString(),
       avatarUrl: json['providerAvatarUrl']?.toString(),
       rating: _readDouble(json['rating'] ?? json['avgRating']),
-      ridesCount: _readInt(json['ridesCount'] ?? json['trips'] ?? json['rides']),
+      ridesCount: _readInt(
+        json['ridesCount'] ?? json['trips'] ?? json['rides'],
+      ),
       sinceYear: _readInt(json['sinceYear'] ?? json['memberSinceYear']),
       isVerified: _readBool(json['isVerified'] ?? json['verified']),
     );
@@ -75,6 +77,7 @@ class Ride {
   final String status;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final List<String> stops;
   final List<String> amenities;
   final String? pickupInstructions;
   final String? notes;
@@ -97,6 +100,7 @@ class Ride {
     required this.status,
     this.createdAt,
     this.updatedAt,
+    this.stops = const [],
     this.amenities = const [],
     this.pickupInstructions,
     this.notes,
@@ -143,10 +147,8 @@ class Ride {
       if (v is Map) {
         final list = <String>[];
         v.forEach((key, value) {
-          final isOn = value == true ||
-              value == 1 ||
-              value == '1' ||
-              value == 'true';
+          final isOn =
+              value == true || value == 1 || value == '1' || value == 'true';
           if (isOn) list.add(key.toString());
         });
         return list;
@@ -163,32 +165,44 @@ class Ride {
 
     return Ride(
       id: (json['id'] ?? '').toString(),
-      driverId: (json['driverId'] ?? '').toString(),
-      fromCity: (json['fromCity'] ?? '').toString(),
-      fromLat: _toDouble(json['fromLat']),
-      fromLng: _toDouble(json['fromLng']),
-      toCity: (json['toCity'] ?? '').toString(),
-      toLat: _toDouble(json['toLat']),
-      toLng: _toDouble(json['toLng']),
-      startTime: _toDate(json['startTime']).toLocal(),
-      arrivalTime: json['arrivalTime'] == null
+      driverId: (json['driverId'] ?? json['driver_id'] ?? '').toString(),
+      fromCity: (json['fromCity'] ?? json['from_city'] ?? '').toString(),
+      fromLat: _toDouble(json['fromLat'] ?? json['from_lat']),
+      fromLng: _toDouble(json['fromLng'] ?? json['from_lng']),
+      toCity: (json['toCity'] ?? json['to_city'] ?? '').toString(),
+      toLat: _toDouble(json['toLat'] ?? json['to_lat']),
+      toLng: _toDouble(json['toLng'] ?? json['to_lng']),
+      startTime: _toDate(json['startTime'] ?? json['start_time']).toLocal(),
+      arrivalTime: (json['arrivalTime'] ?? json['arrival_time']) == null
           ? null
-          : _toDate(json['arrivalTime']).toLocal(),
-      pricePerSeat: _toDouble(json['pricePerSeat']),
-      seatsTotal: _toInt(json['seatsTotal']),
-      seatsAvailable: _toInt(json['seatsAvailable']),
-      status: (json['status'] ?? 'open').toString(),
-      createdAt: _readDate(json['createdAt']),
-      updatedAt: _readDate(json['updatedAt']),
+          : _toDate(json['arrivalTime'] ?? json['arrival_time']).toLocal(),
+      pricePerSeat: _toDouble(json['pricePerSeat'] ?? json['price_per_seat']),
+      seatsTotal: _toInt(json['seatsTotal'] ?? json['seats_total']),
+      seatsAvailable: _toInt(json['seatsAvailable'] ?? json['seats_available']),
+      status: (json['status'] ?? json['ride_status'] ?? 'open').toString(),
+      createdAt: _readDate(json['createdAt'] ?? json['created_at']),
+      updatedAt: _readDate(json['updatedAt'] ?? json['updated_at']),
+      stops: _readStringList(
+        json['stops'] ?? json['stopList'] ?? json['stop_list'],
+      ),
       amenities: _readStringList(
-        json['amenities'] ?? json['rideAmenities'] ?? json['amenityList'],
+        json['amenities'] ??
+            json['rideAmenities'] ??
+            json['amenityList'] ??
+            json['ride_amenities'],
       ),
       pickupInstructions: _readString(
         json['pickupInstructions'] ??
             json['pickupNotes'] ??
+            json['pickup_instructions'] ??
             json['instructions'],
       ),
-      notes: _readString(json['notes'] ?? json['rideNotes']),
+      notes: _readString(
+        json['additionalNotes'] ??
+            json['additional_notes'] ??
+            json['notes'] ??
+            json['rideNotes'],
+      ),
       driver: json['driver'] is Map<String, dynamic>
           ? RideDriver.fromJson(json['driver'] as Map<String, dynamic>)
           : null,

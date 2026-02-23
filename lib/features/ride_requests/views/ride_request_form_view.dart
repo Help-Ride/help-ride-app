@@ -314,8 +314,7 @@ class _RouteSummary extends StatelessWidget {
           Expanded(
             child: Text(
               '$from  →  $to',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              softWrap: true,
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 color: isDark ? AppColors.darkText : AppColors.lightText,

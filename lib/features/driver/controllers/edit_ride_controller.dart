@@ -6,6 +6,7 @@ import '../../../shared/services/api_client.dart';
 import '../../../shared/utils/input_validators.dart';
 import '../../../shared/widgets/place_picker_field.dart';
 import '../services/driver_rides_api.dart';
+import '../utils/ride_payload_utils.dart';
 import '../utils/ride_price_policy.dart';
 
 class EditRideController extends GetxController {
@@ -226,6 +227,8 @@ class EditRideController extends GetxController {
     toCtrl.text = r.toCity;
     seatsCtrl.text = r.seatsTotal.toString();
     priceCtrl.text = r.pricePerSeat.toString();
+    stopsCtrl.text = r.stops.join(', ');
+    notesCtrl.text = r.notes ?? '';
 
     fromPick.value = PlacePick(
       fullText: r.fromCity,
@@ -239,6 +242,9 @@ class EditRideController extends GetxController {
     final local = r.startTime.toLocal();
     date.value = DateTime(local.year, local.month, local.day);
     time.value = TimeOfDay(hour: local.hour, minute: local.minute);
+
+    applyRideAmenitiesFromApi(amenities, r.amenities);
+    amenities.refresh();
   }
 
   void toggleAmenity(String k) {
@@ -286,6 +292,9 @@ class EditRideController extends GetxController {
     if (pricing.adjusted) {
       priceCtrl.text = _formatPrice(finalPrice);
     }
+    final stops = parseRideStopsCsv(stopsCtrl.text);
+    final selectedAmenities = selectedRideAmenitiesForApi(amenities);
+    final additionalNotes = normalizeRideAdditionalNotes(notesCtrl.text);
 
     loading.value = true;
     try {
@@ -300,6 +309,10 @@ class EditRideController extends GetxController {
         startTimeUtc: startLocal.toUtc(),
         seatsTotal: seats,
         pricePerSeat: finalPrice,
+        arrivalTimeUtc: ride.value?.arrivalTime?.toUtc(),
+        stops: stops,
+        amenities: selectedAmenities,
+        additionalNotes: additionalNotes,
       );
 
       Get.back();

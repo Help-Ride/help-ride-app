@@ -269,8 +269,7 @@ class _Row extends StatelessWidget {
         Expanded(
           child: Text(
             value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+            softWrap: true,
             textAlign: TextAlign.right,
             style: TextStyle(
               fontWeight: bold ? FontWeight.w900 : FontWeight.w800,

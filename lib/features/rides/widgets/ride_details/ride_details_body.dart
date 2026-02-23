@@ -8,6 +8,9 @@ import 'ride_trip_details_card.dart';
 import 'ride_seats_card.dart';
 import 'ride_amenities_card.dart';
 import 'ride_pickup_instructions_card.dart';
+import 'ride_stops_card.dart';
+import 'ride_additional_notes_card.dart';
+import 'ride_timing_card.dart';
 
 class RideDetailsBody extends GetView<RideDetailsController> {
   const RideDetailsBody({super.key});
@@ -67,16 +70,30 @@ class RideDetailsBody extends GetView<RideDetailsController> {
           ),
           const SizedBox(height: 14),
 
+          const SectionTitle('Timing'),
+          RideTimingCard(ride: ride),
+          const SizedBox(height: 14),
+
+          const SectionTitle('Stops'),
+          RideStopsCard(ride: ride),
+          const SizedBox(height: 14),
+
           const SectionTitle('Select Seats'),
           RideSeatsCard(ride: ride),
           const SizedBox(height: 14),
 
           const SectionTitle('Amenities'),
           RideAmenitiesCard(ride: ride),
-          const SizedBox(height: 14),
 
-          const SectionTitle('Pickup Instructions'),
-          RidePickupInstructionsCard(ride: ride),
+          if ((ride.pickupInstructions ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
+            const SectionTitle('Pickup Instructions'),
+            RidePickupInstructionsCard(ride: ride),
+          ],
+
+          const SizedBox(height: 14),
+          const SectionTitle('Additional Notes'),
+          RideAdditionalNotesCard(ride: ride),
         ],
       );
     });

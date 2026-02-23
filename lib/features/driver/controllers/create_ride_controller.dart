@@ -4,6 +4,7 @@ import '../../../shared/services/api_client.dart';
 import '../../../shared/utils/input_validators.dart';
 import '../../../shared/widgets/place_picker_field.dart';
 import '../services/driver_rides_api.dart';
+import '../utils/ride_payload_utils.dart';
 import '../utils/ride_price_policy.dart';
 
 class CreateRideController extends GetxController {
@@ -273,6 +274,9 @@ class CreateRideController extends GetxController {
     if (pricing.adjusted) {
       priceCtrl.text = _formatPrice(finalPrice);
     }
+    final stops = parseRideStopsCsv(stopsCtrl.text);
+    final selectedAmenities = selectedRideAmenitiesForApi(amenities);
+    final additionalNotes = normalizeRideAdditionalNotes(notesCtrl.text);
 
     loading.value = true;
     try {
@@ -286,6 +290,9 @@ class CreateRideController extends GetxController {
         startTimeUtc: startLocal.toUtc(),
         seatsTotal: seats,
         pricePerSeat: finalPrice,
+        stops: stops,
+        amenities: selectedAmenities,
+        additionalNotes: additionalNotes,
       );
 
       Get.back();

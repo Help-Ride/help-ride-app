@@ -404,15 +404,15 @@ class DriverRideRequestsController extends GetxController {
 
     return DriverRideItemLite(
       id: (j['id'] ?? '').toString(),
-      from: (j['fromCity'] ?? '').toString(),
-      to: (j['toCity'] ?? '').toString(),
-      fromLat: toDouble(j['fromLat']),
-      fromLng: toDouble(j['fromLng']),
-      toLat: toDouble(j['toLat']),
-      toLng: toDouble(j['toLng']),
-      startTime: toDate(j['startTime']),
-      seatsAvailable: toInt(j['seatsAvailable']),
-      pricePerSeat: toDouble(j['pricePerSeat']),
+      from: (j['fromCity'] ?? j['from_city'] ?? '').toString(),
+      to: (j['toCity'] ?? j['to_city'] ?? '').toString(),
+      fromLat: toDouble(j['fromLat'] ?? j['from_lat']),
+      fromLng: toDouble(j['fromLng'] ?? j['from_lng']),
+      toLat: toDouble(j['toLat'] ?? j['to_lat']),
+      toLng: toDouble(j['toLng'] ?? j['to_lng']),
+      startTime: toDate(j['startTime'] ?? j['start_time']),
+      seatsAvailable: toInt(j['seatsAvailable'] ?? j['seats_available']),
+      pricePerSeat: toDouble(j['pricePerSeat'] ?? j['price_per_seat']),
     );
   }
 

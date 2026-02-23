@@ -126,8 +126,11 @@ class _PlacePickerFieldState extends State<PlacePickerField> {
                 borderRadius: BorderRadius.circular(16),
                 onTap: _openAutocomplete,
                 child: Container(
-                  height: 56,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  constraints: const BoxConstraints(minHeight: 56),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   child: Row(
                     children: [
                       Icon(
@@ -142,8 +145,8 @@ class _PlacePickerFieldState extends State<PlacePickerField> {
                       Expanded(
                         child: Text(
                           isEmpty ? widget.hintText : value,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                          softWrap: true,
                           style: TextStyle(
                             color: isEmpty
                                 ? (isDark
@@ -403,14 +406,14 @@ class _PlacesBottomSheetState extends State<_PlacesBottomSheet> {
                     leading: const Icon(Icons.place_outlined),
                     title: Text(
                       p.structuredMainText ?? p.description,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                      softWrap: true,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                     subtitle: Text(
                       p.structuredSecondaryText ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                      softWrap: true,
                     ),
                     onTap: () => _pick(p),
                   );

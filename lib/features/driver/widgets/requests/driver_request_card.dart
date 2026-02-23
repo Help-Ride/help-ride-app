@@ -505,8 +505,7 @@ class _PassengerLocationRow extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 value,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
+                softWrap: true,
                 style: TextStyle(
                   color: textPrimary,
                   fontWeight: FontWeight.w800,

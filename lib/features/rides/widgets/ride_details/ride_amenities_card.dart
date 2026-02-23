@@ -10,7 +10,10 @@ class RideAmenitiesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final amenities = ride.amenities;
+    final amenities = ride.amenities
+        .map(_amenityLabel)
+        .where((item) => item.isNotEmpty)
+        .toList();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (amenities.isEmpty) {
@@ -32,5 +35,34 @@ class RideAmenitiesCard extends StatelessWidget {
         children: amenities.map((item) => Tag(item)).toList(),
       ),
     );
+  }
+}
+
+String _amenityLabel(String value) {
+  final token = value.trim().toLowerCase();
+  if (token.isEmpty) return '';
+  switch (token) {
+    case 'ac':
+      return 'AC';
+    case 'wifi':
+      return 'WiFi';
+    case 'pet_friendly':
+    case 'pet-friendly':
+      return 'Pet-friendly';
+    case 'luggage_space':
+    case 'luggage-space':
+      return 'Luggage space';
+    case 'child_seat':
+    case 'child-seat':
+      return 'Child seat';
+    default:
+      final words = token
+          .replaceAll(RegExp(r'[_\-]+'), ' ')
+          .split(' ')
+          .where((w) => w.trim().isNotEmpty)
+          .toList();
+      return words
+          .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
+          .join(' ');
   }
 }

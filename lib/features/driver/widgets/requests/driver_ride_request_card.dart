@@ -58,8 +58,7 @@ class DriverRideRequestCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '${request.fromCity}  →  ${request.toCity}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     color: textPrimary,

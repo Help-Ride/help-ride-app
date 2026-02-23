@@ -3,18 +3,16 @@ import 'package:help_ride/features/rides/models/ride.dart';
 import '../../../../../core/theme/app_colors.dart';
 import 'ride_ui.dart';
 
-class RidePickupInstructionsCard extends StatelessWidget {
-  const RidePickupInstructionsCard({super.key, required this.ride});
+class RideAdditionalNotesCard extends StatelessWidget {
+  const RideAdditionalNotesCard({super.key, required this.ride});
 
   final Ride ride;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final instructions = (ride.pickupInstructions ?? '').trim();
-    final text = instructions.isEmpty
-        ? 'No pickup instructions provided.'
-        : instructions;
+    final notes = (ride.notes ?? '').trim();
+    final text = notes.isEmpty ? 'No additional notes provided.' : notes;
 
     return AppCard(
       child: Text(
