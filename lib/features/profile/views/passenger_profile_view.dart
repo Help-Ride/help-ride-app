@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 import 'package:mime/mime.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
@@ -16,7 +17,12 @@ import '../routes/profile_routes.dart';
 import '../controllers/profile_controller.dart';
 
 class PassengerProfileView extends StatefulWidget {
-  const PassengerProfileView({super.key});
+  const PassengerProfileView({
+    super.key,
+    this.openDriverEditorOnLoad = false,
+  });
+
+  final bool openDriverEditorOnLoad;
 
   @override
   State<PassengerProfileView> createState() => _PassengerProfileViewState();
@@ -24,6 +30,7 @@ class PassengerProfileView extends StatefulWidget {
 
 class _PassengerProfileViewState extends State<PassengerProfileView> {
   late final ProfileController _controller;
+  bool _didAutoOpenDriverEditor = false;
 
   @override
   void initState() {
@@ -31,6 +38,12 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
     _controller = Get.isRegistered<ProfileController>()
         ? Get.find<ProfileController>()
         : Get.put(ProfileController());
+    if (widget.openDriverEditorOnLoad) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _autoOpenDriverEditorIfNeeded();
+      });
+    }
   }
 
   @override
@@ -57,7 +70,9 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
       }
 
       final isDriver =
-          user.driverProfile != null || user.roleDefault == 'driver';
+          user.driverProfile != null ||
+          user.roleDefault == 'driver' ||
+          theme.role.value == AppRole.driver;
       final roleLabel = isDriver ? 'Driver' : 'Passenger';
       final isVerified =
           user.emailVerified || user.driverProfile?.isVerified == true;
@@ -141,6 +156,12 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
         ),
       );
     });
+  }
+
+  Future<void> _autoOpenDriverEditorIfNeeded() async {
+    if (_didAutoOpenDriverEditor || !widget.openDriverEditorOnLoad) return;
+    _didAutoOpenDriverEditor = true;
+    await _openDriverEditSheet(context, _controller.driverProfile.value);
   }
 
   Future<void> _openUserEditSheet(BuildContext context, User user) async {

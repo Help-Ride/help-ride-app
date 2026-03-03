@@ -72,7 +72,13 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
                 : _DriverCta(
                     key: const ValueKey('cta'),
                     primary: primary,
-                    onStart: () => setState(() => showForm = true),
+                    onStart: () => Get.offAllNamed(
+                      AppRoutes.shell,
+                      arguments: {
+                        'tab': 'profile',
+                        'openDriverEditorOnLoad': true,
+                      },
+                    ),
                   ),
           ),
         ),

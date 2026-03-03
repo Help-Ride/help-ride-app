@@ -46,18 +46,27 @@ class DriverMyRidesView extends GetView<DriverMyRidesController> {
                 final err = controller.error.value;
                 if (err != null) {
                   return Expanded(
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                    child: RefreshIndicator(
+                      onRefresh: controller.refreshAll,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
                         children: [
-                          Text(
-                            err,
-                            style: const TextStyle(color: AppColors.error),
-                          ),
-                          const SizedBox(height: 10),
-                          ElevatedButton(
-                            onPressed: controller.refreshAll,
-                            child: const Text('Retry'),
+                          const SizedBox(height: 140),
+                          Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  err,
+                                  style: const TextStyle(color: AppColors.error),
+                                ),
+                                const SizedBox(height: 10),
+                                ElevatedButton(
+                                  onPressed: controller.refreshAll,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -68,11 +77,20 @@ class DriverMyRidesView extends GetView<DriverMyRidesController> {
                 final list = controller.filtered;
                 if (list.isEmpty) {
                   return Expanded(
-                    child: Center(
-                      child: Text(
-                        'No rides yet. Use “Create a Ride” from Home.',
-                        style: TextStyle(color: muted),
-                        textAlign: TextAlign.center,
+                    child: RefreshIndicator(
+                      onRefresh: controller.refreshAll,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          const SizedBox(height: 220),
+                          Center(
+                            child: Text(
+                              'No rides yet. Use “Create a Ride” from Home.',
+                              style: TextStyle(color: muted),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );

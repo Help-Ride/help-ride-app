@@ -27,6 +27,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int index = 0;
+  bool _openDriverEditorOnLoad = false;
   late final Worker _roleWorker;
 
   @override
@@ -77,6 +78,15 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final parsed = _parseTabIndex(args['tab']);
     if (parsed == null || parsed < 0) return;
     index = parsed;
+    _openDriverEditorOnLoad = _parseBool(args['openDriverEditorOnLoad']);
+  }
+
+  bool _parseBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value == null) return false;
+    final normalized = value.toString().trim().toLowerCase();
+    return normalized == 'true' || normalized == '1' || normalized == 'yes';
   }
 
   int? _parseTabIndex(dynamic value) {
@@ -126,14 +136,26 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
       final uiRole = theme.role.value;
       final driverGate = Get.find<DriverGateController>();
+      final allowDriverProfileTabWithoutProfile =
+          uiRole == AppRole.driver &&
+          !driverGate.hasDriverProfile &&
+          index == 3;
       final hideBottomNavForDriverOnboarding =
-          uiRole == AppRole.driver && !driverGate.hasDriverProfile;
+          uiRole == AppRole.driver &&
+          !driverGate.hasDriverProfile &&
+          !allowDriverProfileTabWithoutProfile;
       final config = uiRole == AppRole.driver
-          ? _driverConfig()
-          : _passengerConfig();
+          ? _driverConfig(openDriverEditorOnLoad: _openDriverEditorOnLoad)
+          : _passengerConfig(openDriverEditorOnLoad: _openDriverEditorOnLoad);
 
       if (index >= config.items.length) index = 0;
       final activeIndex = hideBottomNavForDriverOnboarding ? 0 : index;
+      if (activeIndex == 3 && _openDriverEditorOnLoad) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_openDriverEditorOnLoad) return;
+          setState(() => _openDriverEditorOnLoad = false);
+        });
+      }
 
       final isDark = Theme.of(context).brightness == Brightness.dark;
       return Scaffold(
@@ -159,12 +181,12 @@ class _NavConfig {
   _NavConfig(this.items, this.pages);
 }
 
-_NavConfig _passengerConfig() {
-  final pages = const [
-    HomeView(),
-    MyRidesView(),
-    MessagesView(),
-    PassengerProfileView(),
+_NavConfig _passengerConfig({required bool openDriverEditorOnLoad}) {
+  final pages = [
+    const HomeView(),
+    const MyRidesView(),
+    const MessagesView(),
+    PassengerProfileView(openDriverEditorOnLoad: openDriverEditorOnLoad),
   ];
 
   final items = const [
@@ -193,12 +215,12 @@ _NavConfig _passengerConfig() {
   return _NavConfig(items, pages);
 }
 
-_NavConfig _driverConfig() {
-  final pages = const [
-    HomeView(),
-    DriverMyRidesView(),
-    MessagesView(),
-    PassengerProfileView(),
+_NavConfig _driverConfig({required bool openDriverEditorOnLoad}) {
+  final pages = [
+    const HomeView(),
+    const DriverMyRidesView(),
+    const MessagesView(),
+    PassengerProfileView(openDriverEditorOnLoad: openDriverEditorOnLoad),
   ];
 
   final items = const [
