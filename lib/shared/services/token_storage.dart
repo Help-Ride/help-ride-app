@@ -6,6 +6,7 @@ class TokenStorage {
   static const _providerKey = 'auth_provider';
   static const _deviceTokenKey = 'device_token_registered';
   static const _deviceTokenCachedKey = 'device_token_cached';
+  static const _deviceTokenRegisteredAtKey = 'device_token_registered_at';
   final _storage = const FlutterSecureStorage();
 
   Future<void> saveAccessToken(String token) =>
@@ -34,6 +35,22 @@ class TokenStorage {
 
   Future<void> deleteDeviceToken() => _storage.delete(key: _deviceTokenKey);
 
+  Future<void> saveDeviceTokenRegisteredAt(DateTime dateTime) => _storage.write(
+    key: _deviceTokenRegisteredAtKey,
+    value: dateTime.toUtc().toIso8601String(),
+  );
+
+  Future<DateTime?> getDeviceTokenRegisteredAt() async {
+    final raw = await _storage.read(key: _deviceTokenRegisteredAtKey);
+    if (raw == null || raw.trim().isEmpty) return null;
+    final parsed = DateTime.tryParse(raw.trim());
+    if (parsed == null) return null;
+    return parsed.toUtc();
+  }
+
+  Future<void> deleteDeviceTokenRegisteredAt() =>
+      _storage.delete(key: _deviceTokenRegisteredAtKey);
+
   Future<void> saveCachedDeviceToken(String token) =>
       _storage.write(key: _deviceTokenCachedKey, value: token);
 
@@ -49,5 +66,6 @@ class TokenStorage {
     await _storage.delete(key: _providerKey);
     await _storage.delete(key: _deviceTokenKey);
     await _storage.delete(key: _deviceTokenCachedKey);
+    await _storage.delete(key: _deviceTokenRegisteredAtKey);
   }
 }

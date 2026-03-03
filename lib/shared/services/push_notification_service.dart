@@ -36,6 +36,7 @@ class PushNotificationService {
   bool _localNotificationReady = false;
   int _retryAttempts = 0;
   static const int _maxRetryAttempts = 5;
+  static const Duration _tokenRefreshInterval = Duration(days: 1);
 
   static const AndroidNotificationChannel _offersChannel =
       AndroidNotificationChannel(
@@ -100,9 +101,14 @@ class PushNotificationService {
     }
 
     final registered = await _tokenStorage.getDeviceToken();
-    if (registered != null && registered.trim() == token.trim()) {
+    final registeredAt = await _tokenStorage.getDeviceTokenRegisteredAt();
+    final sameToken = registered != null && registered.trim() == token.trim();
+    if (sameToken && !_isRegistrationStale(registeredAt)) {
       _log('FCM token already registered.');
       return;
+    }
+    if (sameToken) {
+      _log('FCM token unchanged but registration refresh is due.');
     }
 
     try {
@@ -118,6 +124,7 @@ class PushNotificationService {
     final accessToken = await _tokenStorage.getAccessToken();
     if (accessToken == null || accessToken.trim().isEmpty) {
       await _tokenStorage.deleteDeviceToken();
+      await _tokenStorage.deleteDeviceTokenRegisteredAt();
       await _tokenStorage.deleteCachedDeviceToken();
       return;
     }
@@ -319,6 +326,7 @@ class PushNotificationService {
       final api = await _getApi();
       await api.registerToken(token: token, platform: _platform());
       await _tokenStorage.saveDeviceToken(token);
+      await _tokenStorage.saveDeviceTokenRegisteredAt(DateTime.now().toUtc());
       _log('FCM token registered with backend.');
     } finally {
       _registering = false;
@@ -333,6 +341,7 @@ class PushNotificationService {
       // Best-effort unregister; don't block logout flows.
     }
     await _tokenStorage.deleteDeviceToken();
+    await _tokenStorage.deleteDeviceTokenRegisteredAt();
     await _tokenStorage.deleteCachedDeviceToken();
     try {
       await _messaging.deleteToken();
@@ -362,6 +371,13 @@ class PushNotificationService {
     final cached = await _tokenStorage.getCachedDeviceToken();
     if (cached != null && cached.trim().isNotEmpty) return cached.trim();
     return null;
+  }
+
+  bool _isRegistrationStale(DateTime? registeredAt) {
+    if (registeredAt == null) return true;
+    final elapsed = DateTime.now().toUtc().difference(registeredAt);
+    if (elapsed.isNegative) return true;
+    return elapsed >= _tokenRefreshInterval;
   }
 
   void _scheduleRetry() {
