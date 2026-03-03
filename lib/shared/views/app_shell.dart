@@ -12,7 +12,6 @@ import '../../core/theme/theme_controller.dart';
 import '../controllers/session_controller.dart';
 import '../services/location_sync_service.dart';
 import '../../core/constants/app_constants.dart';
-import '../../features/auth/routes/auth_routes.dart';
 
 // pages
 import '../../features/home/views/home_view.dart';
@@ -105,7 +104,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (!Get.isRegistered<SessionController>()) return;
     final session = Get.find<SessionController>();
     if (session.status.value != SessionStatus.authenticated) return;
-    if (session.requiresEmailVerification) return;
 
     try {
       await LocationSyncService.instance.syncMyLocation(
@@ -123,11 +121,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     return Obx(() {
       if (session.status.value != SessionStatus.authenticated) {
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
-      }
-
-      if (session.requiresEmailVerification) {
-        Future.microtask(() => Get.offAllNamed(AuthRoutes.verifyEmail));
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
 

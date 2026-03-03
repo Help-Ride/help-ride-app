@@ -15,11 +15,7 @@ class SplashGate extends StatelessWidget {
       final s = session.status.value;
 
       if (s == SessionStatus.authenticated) {
-        if (!session.requiresEmailVerification) {
-          Future.microtask(() => Get.offAllNamed(AppRoutes.shell));
-        } else {
-          Future.microtask(() => Get.offAllNamed(AuthRoutes.verifyEmail));
-        }
+        Future.microtask(() => Get.offAllNamed(AppRoutes.shell));
       } else if (s == SessionStatus.unauthenticated) {
         Future.microtask(() => Get.offAllNamed(AuthRoutes.login));
       }

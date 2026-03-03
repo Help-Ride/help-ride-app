@@ -5,7 +5,6 @@ import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_exception.dart';
 import 'package:help_ride/shared/services/location_sync_service.dart';
 import 'package:help_ride/shared/utils/input_validators.dart';
-import '../routes/auth_routes.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/token_storage.dart';
 import '../services/auth_api.dart';
@@ -91,36 +90,18 @@ class AuthController extends GetxController {
         location: authLocation,
       );
 
-      if (result.accessToken != null && result.accessToken!.trim().isNotEmpty) {
-        await _tokenStorage.saveAccessToken(result.accessToken!.trim());
-        await _tokenStorage.saveAuthProvider('email');
-        if (result.refreshToken != null &&
-            result.refreshToken!.trim().isNotEmpty) {
-          await _tokenStorage.saveRefreshToken(result.refreshToken!.trim());
-        } else {
-          await _tokenStorage.deleteRefreshToken();
-        }
-      }
-
-      if (result.otpSent || result.accessToken == null) {
-        Get.offAllNamed(
-          AuthRoutes.verifyEmail,
-          arguments: {'email': email.value.trim()},
-        );
-        return;
+      await _tokenStorage.saveAccessToken(result.accessToken.trim());
+      await _tokenStorage.saveAuthProvider('email');
+      if (result.refreshToken != null &&
+          result.refreshToken!.trim().isNotEmpty) {
+        await _tokenStorage.saveRefreshToken(result.refreshToken!.trim());
+      } else {
+        await _tokenStorage.deleteRefreshToken();
       }
 
       final session = Get.find<SessionController>();
       await session.bootstrap();
-
-      if (!session.requiresEmailVerification) {
-        Get.offAllNamed(AppRoutes.shell);
-      } else {
-        Get.offAllNamed(
-          AuthRoutes.verifyEmail,
-          arguments: {'email': email.value.trim()},
-        );
-      }
+      Get.offAllNamed(AppRoutes.shell);
     } catch (e) {
       error.value = _prettyError(e);
     } finally {
@@ -189,36 +170,18 @@ class AuthController extends GetxController {
         name: name.value.trim().isEmpty ? null : name.value.trim(),
       );
 
-      if (result.accessToken != null && result.accessToken!.trim().isNotEmpty) {
-        await _tokenStorage.saveAccessToken(result.accessToken!.trim());
-        await _tokenStorage.saveAuthProvider('email');
-        if (result.refreshToken != null &&
-            result.refreshToken!.trim().isNotEmpty) {
-          await _tokenStorage.saveRefreshToken(result.refreshToken!.trim());
-        } else {
-          await _tokenStorage.deleteRefreshToken();
-        }
-      }
-
-      if (result.otpSent || result.accessToken == null) {
-        Get.offAllNamed(
-          AuthRoutes.verifyEmail,
-          arguments: {'email': email.value.trim()},
-        );
-        return;
+      await _tokenStorage.saveAccessToken(result.accessToken.trim());
+      await _tokenStorage.saveAuthProvider('email');
+      if (result.refreshToken != null &&
+          result.refreshToken!.trim().isNotEmpty) {
+        await _tokenStorage.saveRefreshToken(result.refreshToken!.trim());
+      } else {
+        await _tokenStorage.deleteRefreshToken();
       }
 
       final session = Get.find<SessionController>();
       await session.bootstrap();
-
-      if (!session.requiresEmailVerification) {
-        Get.offAllNamed(AppRoutes.shell);
-      } else {
-        Get.offAllNamed(
-          AuthRoutes.verifyEmail,
-          arguments: {'email': email.value.trim()},
-        );
-      }
+      Get.offAllNamed(AppRoutes.shell);
     } catch (e) {
       error.value = _prettyError(e);
     } finally {

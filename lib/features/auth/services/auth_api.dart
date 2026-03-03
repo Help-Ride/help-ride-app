@@ -24,9 +24,6 @@ class AuthApi {
     );
 
     final data = res.data ?? {};
-    if (data['user'] is Map) {
-      return EmailLoginResult(otpSent: true);
-    }
     final tokens = _parseTokens(data);
     if (tokens == null) {
       throw Exception('Missing accessToken in response');
@@ -61,9 +58,6 @@ class AuthApi {
     );
 
     final data = res.data ?? {};
-    if (data['user'] is Map) {
-      return EmailRegisterResult(otpSent: true);
-    }
     final tokens = _parseTokens(data);
     if (tokens == null) {
       throw Exception('Missing accessToken in response');
@@ -189,21 +183,15 @@ class VerifyEmailResult {
 }
 
 class EmailLoginResult {
-  final String? accessToken;
+  final String accessToken;
   final String? refreshToken;
-  final bool otpSent;
 
-  EmailLoginResult({this.accessToken, this.refreshToken, this.otpSent = false});
+  EmailLoginResult({required this.accessToken, this.refreshToken});
 }
 
 class EmailRegisterResult {
-  final String? accessToken;
+  final String accessToken;
   final String? refreshToken;
-  final bool otpSent;
 
-  EmailRegisterResult({
-    this.accessToken,
-    this.refreshToken,
-    this.otpSent = false,
-  });
+  EmailRegisterResult({required this.accessToken, this.refreshToken});
 }

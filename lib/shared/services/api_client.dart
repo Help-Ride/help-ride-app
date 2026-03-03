@@ -19,9 +19,12 @@ class ApiClient {
   static const _skipAuthLogoutKey = 'skipAuthLogout';
   static const _skipAuthRefreshKey = 'skipAuthRefresh';
   static const _authRetryKey = 'authRetry';
+  static const _emailNotVerifiedCode = 'EMAIL_NOT_VERIFIED';
+  static const _verifyEmailRoute = '/verify-email';
   static const _redacted = '[REDACTED]';
 
   Future<bool>? _refreshFuture;
+  bool _isRedirectingToVerifyEmail = false;
 
   static Future<ApiClient> create() async {
     final baseUrl = dotenv.env['API_BASE_URL'];
@@ -69,8 +72,7 @@ class ApiClient {
           final skipLogout = e.requestOptions.extra[_skipAuthLogoutKey] == true;
           final skipRefresh =
               e.requestOptions.extra[_skipAuthRefreshKey] == true;
-          final alreadyRetried =
-              e.requestOptions.extra[_authRetryKey] == true;
+          final alreadyRetried = e.requestOptions.extra[_authRetryKey] == true;
 
           if (status == 401 && !skipLogout && !skipRefresh && !alreadyRetried) {
             final refreshed = await _refreshAccessToken();
@@ -85,6 +87,8 @@ class ApiClient {
             }
             Get.offAllNamed('/login');
           }
+
+          _redirectToVerifyEmailIfNeeded(e);
 
           // ✅ Convert to a clean exception the UI can show
           final apiEx = _toApiException(e);
@@ -122,10 +126,7 @@ class ApiClient {
         '/auth/refresh',
         data: {'refreshToken': refreshToken.trim()},
         options: Options(
-          extra: {
-            _skipAuthLogoutKey: true,
-            _skipAuthRefreshKey: true,
-          },
+          extra: {_skipAuthLogoutKey: true, _skipAuthRefreshKey: true},
         ),
       );
       final data = res.data ?? {};
@@ -269,8 +270,7 @@ class ApiClient {
     if (access is String && access.isNotEmpty) {
       return _Tokens(
         accessToken: access,
-        refreshToken:
-            refresh is String && refresh.isNotEmpty ? refresh : null,
+        refreshToken: refresh is String && refresh.isNotEmpty ? refresh : null,
       );
     }
 
@@ -402,9 +402,7 @@ class ApiClient {
     final body = _sanitize(response.data);
 
     final buffer = StringBuffer()
-      ..writeln(
-        'API Response: ${response.requestOptions.method} $endpoint',
-      )
+      ..writeln('API Response: ${response.requestOptions.method} $endpoint')
       ..writeln('Status: $status');
     if (body != null) {
       buffer.writeln('Body: $body');
@@ -452,10 +450,9 @@ class ApiClient {
           ),
         ),
         'files': data.files
-            .map((entry) => {
-                  'field': entry.key,
-                  'filename': entry.value.filename,
-                })
+            .map(
+              (entry) => {'field': entry.key, 'filename': entry.value.filename},
+            )
             .toList(),
       };
     }
@@ -519,6 +516,54 @@ class ApiClient {
     return parts.every(
       (part) => part.isNotEmpty && RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(part),
     );
+  }
+
+  void _redirectToVerifyEmailIfNeeded(DioException error) {
+    if (!_isEmailNotVerifiedResponse(error)) return;
+    if (_isRedirectingToVerifyEmail || Get.currentRoute == _verifyEmailRoute) {
+      return;
+    }
+
+    _isRedirectingToVerifyEmail = true;
+    final email =
+        _extractEmail(error.response?.data) ??
+        _extractEmail(error.requestOptions.data);
+    Future.microtask(() {
+      try {
+        if (Get.currentRoute == _verifyEmailRoute) return;
+        if (email != null) {
+          Get.offAllNamed(_verifyEmailRoute, arguments: {'email': email});
+        } else {
+          Get.offAllNamed(_verifyEmailRoute);
+        }
+      } finally {
+        _isRedirectingToVerifyEmail = false;
+      }
+    });
+  }
+
+  bool _isEmailNotVerifiedResponse(DioException error) {
+    if (error.response?.statusCode != 403) return false;
+    final data = error.response?.data;
+    if (data is! Map) return false;
+    final code = data['code']?.toString().trim().toUpperCase();
+    return code == _emailNotVerifiedCode;
+  }
+
+  String? _extractEmail(Object? payload) {
+    if (payload is! Map) return null;
+    final directEmail = payload['email']?.toString().trim();
+    if (directEmail != null && directEmail.isNotEmpty) {
+      return directEmail;
+    }
+    final userPayload = payload['user'];
+    if (userPayload is Map) {
+      final userEmail = userPayload['email']?.toString().trim();
+      if (userEmail != null && userEmail.isNotEmpty) {
+        return userEmail;
+      }
+    }
+    return null;
   }
 
   void _safeLog(String message) {

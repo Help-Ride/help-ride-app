@@ -19,10 +19,6 @@ class DriverAccessMiddleware extends GetMiddleware {
       return const RouteSettings(name: AuthRoutes.login);
     }
 
-    if (session.requiresEmailVerification) {
-      return const RouteSettings(name: AuthRoutes.verifyEmail);
-    }
-
     if (session.isDriver) {
       return null;
     }
