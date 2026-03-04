@@ -72,7 +72,10 @@ class DriverOnboardingController extends GetxController {
     _api = DriversApi(client);
   }
 
-  Future<void> submit() async {
+  Future<void> submit({
+    bool refreshSession = true,
+    bool closeOnRoute = true,
+  }) async {
     error.value = null;
 
     if (!_validateFields(showErrors: true)) {
@@ -92,11 +95,14 @@ class DriverOnboardingController extends GetxController {
         insuranceInfo: insuranceInfo.isEmpty ? null : insuranceInfo,
       );
 
-      // ✅ refresh session so driverProfile becomes available
-      await _session.bootstrap();
+      if (refreshSession) {
+        // Refresh session so driverProfile becomes available.
+        await _session.bootstrap();
+      }
 
       // Close only when opened as a dedicated onboarding route.
-      if (Get.currentRoute == DriverRoutes.onboarding &&
+      if (closeOnRoute &&
+          Get.currentRoute == DriverRoutes.onboarding &&
           (Get.key.currentState?.canPop() ?? false)) {
         Get.back();
       }

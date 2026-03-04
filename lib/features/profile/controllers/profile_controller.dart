@@ -6,10 +6,13 @@ import 'package:help_ride/shared/models/user.dart';
 import '../../../shared/services/api_client.dart';
 import '../models/driver_document.dart';
 import '../services/profile_api.dart';
+import '../services/stripe_connect_api.dart';
 
 class ProfileController extends GetxController {
   late final ProfileApi _api;
+  late final StripeConnectApi _stripeConnectApi;
   late final SessionController _session;
+  bool _servicesReady = false;
 
   final driverProfile = Rxn<DriverProfile>();
   final driverDocuments = <DriverDocument>[].obs;
@@ -20,6 +23,12 @@ class ProfileController extends GetxController {
   final docsError = RxnString();
   final avatarUploading = false.obs;
   final avatarUploadError = RxnString();
+  final stripeConnectStatus = const StripeConnectStatus.empty().obs;
+  final stripeStatusLoading = false.obs;
+  final stripeOnboardingLoading = false.obs;
+  final stripeDashboardLoading = false.obs;
+  final stripeResetLoading = false.obs;
+  final stripeConnectError = RxnString();
 
   @override
   Future<void> onInit() async {
@@ -27,9 +36,12 @@ class ProfileController extends GetxController {
     _session = Get.find<SessionController>();
     final client = await ApiClient.create();
     _api = ProfileApi(client);
+    _stripeConnectApi = StripeConnectApi(client);
+    _servicesReady = true;
     driverProfile.value = _session.user.value?.driverProfile;
     await refreshDriverProfile();
     await refreshDriverDocuments();
+    await refreshStripeConnectStatus();
   }
 
   Future<void> refreshDriverProfile() async {
@@ -226,8 +238,121 @@ class ProfileController extends GetxController {
       }
       await refreshDriverProfile();
       await _session.bootstrap();
+      await refreshStripeConnectStatus(silent: true);
     } finally {
       driverLoading.value = false;
     }
+  }
+
+  Future<void> refreshStripeConnectStatus({bool silent = false}) async {
+    if (!_servicesReady) return;
+
+    if (!_canManageStripeConnect) {
+      stripeConnectStatus.value = const StripeConnectStatus.empty();
+      stripeConnectError.value = null;
+      stripeStatusLoading.value = false;
+      return;
+    }
+
+    if (!silent) {
+      stripeStatusLoading.value = true;
+    }
+    stripeConnectError.value = null;
+    try {
+      stripeConnectStatus.value = await _stripeConnectApi.getConnectStatus();
+    } catch (e) {
+      final normalized = _normalizeError(e);
+      stripeConnectError.value = normalized;
+    } finally {
+      stripeStatusLoading.value = false;
+    }
+  }
+
+  Future<Uri> createStripeOnboardingUri() async {
+    if (!_servicesReady) {
+      throw Exception('Profile service is still initializing.');
+    }
+
+    if (!_canManageStripeConnect) {
+      throw Exception('Stripe Connect is only available for driver accounts.');
+    }
+
+    stripeOnboardingLoading.value = true;
+    stripeConnectError.value = null;
+    try {
+      final link = await _stripeConnectApi.createOnboardLink();
+      final uri = Uri.tryParse(link.onboardingUrl.trim());
+      if (uri == null) {
+        throw Exception('Invalid Stripe onboarding URL.');
+      }
+      return uri;
+    } catch (e) {
+      stripeConnectError.value = _normalizeError(e);
+      rethrow;
+    } finally {
+      stripeOnboardingLoading.value = false;
+    }
+  }
+
+  Future<Uri> createStripeDashboardUri() async {
+    if (!_servicesReady) {
+      throw Exception('Profile service is still initializing.');
+    }
+
+    if (!_canManageStripeConnect) {
+      throw Exception('Stripe Connect is only available for driver accounts.');
+    }
+
+    stripeDashboardLoading.value = true;
+    stripeConnectError.value = null;
+    try {
+      final link = await _stripeConnectApi.getDashboardLink();
+      final uri = Uri.tryParse(link.url.trim());
+      if (uri == null) {
+        throw Exception('Invalid Stripe dashboard URL.');
+      }
+      return uri;
+    } catch (e) {
+      stripeConnectError.value = _normalizeError(e);
+      rethrow;
+    } finally {
+      stripeDashboardLoading.value = false;
+    }
+  }
+
+  Future<Uri> resetStripeConnectUri() async {
+    if (!_servicesReady) {
+      throw Exception('Profile service is still initializing.');
+    }
+
+    if (!_canManageStripeConnect) {
+      throw Exception('Stripe Connect is only available for driver accounts.');
+    }
+
+    stripeResetLoading.value = true;
+    stripeConnectError.value = null;
+    try {
+      final link = await _stripeConnectApi.resetConnect();
+      final uri = Uri.tryParse(link.onboardingUrl.trim());
+      if (uri == null) {
+        throw Exception('Invalid Stripe onboarding URL.');
+      }
+      return uri;
+    } catch (e) {
+      stripeConnectError.value = _normalizeError(e);
+      rethrow;
+    } finally {
+      stripeResetLoading.value = false;
+    }
+  }
+
+  bool get _canManageStripeConnect {
+    final user = _session.user.value;
+    if (user == null) return false;
+    return user.driverProfile != null || user.roleDefault == 'driver';
+  }
+
+  String _normalizeError(Object error) {
+    return error.toString().replaceFirst('Exception: ', '').trim();
   }
 }

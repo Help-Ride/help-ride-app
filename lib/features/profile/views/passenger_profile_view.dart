@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 import 'package:mime/mime.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
@@ -15,12 +19,10 @@ import '../models/driver_document.dart';
 import '../../support/routes/support_routes.dart';
 import '../routes/profile_routes.dart';
 import '../controllers/profile_controller.dart';
+import '../services/stripe_connect_api.dart';
 
 class PassengerProfileView extends StatefulWidget {
-  const PassengerProfileView({
-    super.key,
-    this.openDriverEditorOnLoad = false,
-  });
+  const PassengerProfileView({super.key, this.openDriverEditorOnLoad = false});
 
   final bool openDriverEditorOnLoad;
 
@@ -28,21 +30,46 @@ class PassengerProfileView extends StatefulWidget {
   State<PassengerProfileView> createState() => _PassengerProfileViewState();
 }
 
-class _PassengerProfileViewState extends State<PassengerProfileView> {
+class _PassengerProfileViewState extends State<PassengerProfileView>
+    with WidgetsBindingObserver {
   late final ProfileController _controller;
+  late final AppLinks _appLinks;
+  StreamSubscription<Uri>? _stripeLinkSub;
+  bool _closingBrowserView = false;
   bool _didAutoOpenDriverEditor = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = Get.isRegistered<ProfileController>()
         ? Get.find<ProfileController>()
         : Get.put(ProfileController());
+    _appLinks = AppLinks();
+    unawaited(_listenForStripeReturnLinks());
     if (widget.openDriverEditorOnLoad) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _autoOpenDriverEditorIfNeeded();
       });
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    final linkSub = _stripeLinkSub;
+    if (linkSub != null) {
+      unawaited(linkSub.cancel());
+    }
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_closeInAppBrowserViewIfOpen());
+      unawaited(_controller.refreshStripeConnectStatus(silent: true));
     }
   }
 
@@ -105,6 +132,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
               const SizedBox(height: 16),
               if (isDriver || _controller.driverProfile.value != null) ...[
                 _DriverProfileCard(
+                  controller: _controller,
                   profile: _controller.driverProfile.value,
                   loading: _controller.driverLoading.value,
                   isDark: isDark,
@@ -162,6 +190,59 @@ class _PassengerProfileViewState extends State<PassengerProfileView> {
     if (_didAutoOpenDriverEditor || !widget.openDriverEditorOnLoad) return;
     _didAutoOpenDriverEditor = true;
     await _openDriverEditSheet(context, _controller.driverProfile.value);
+  }
+
+  Future<void> _listenForStripeReturnLinks() async {
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        _handleIncomingAppLink(initialUri);
+      }
+    } catch (_) {
+      // Ignore initial deep-link read failures.
+    }
+
+    _stripeLinkSub = _appLinks.uriLinkStream.listen(
+      _handleIncomingAppLink,
+      onError: (_) {
+        // Ignore runtime deep-link stream errors.
+      },
+    );
+  }
+
+  void _handleIncomingAppLink(Uri uri) {
+    if (!_isStripeReturnUri(uri)) return;
+    unawaited(_closeInAppBrowserViewIfOpen());
+    unawaited(_controller.refreshStripeConnectStatus(silent: true));
+  }
+
+  Future<void> _closeInAppBrowserViewIfOpen() async {
+    if (_closingBrowserView) return;
+    _closingBrowserView = true;
+    try {
+      final supportsClose = await supportsCloseForLaunchMode(
+        LaunchMode.inAppBrowserView,
+      );
+      if (!supportsClose) return;
+      await closeInAppWebView();
+    } catch (_) {
+      // Ignore close failures if browser view is not active.
+    } finally {
+      _closingBrowserView = false;
+    }
+  }
+
+  bool _isStripeReturnUri(Uri uri) {
+    final normalizedPath = uri.path.trim().toLowerCase().replaceFirst(
+      RegExp(r'/+$'),
+      '',
+    );
+    if (normalizedPath == ProfileRoutes.stripeConnectReturn) {
+      return true;
+    }
+
+    final normalizedHost = uri.host.trim().toLowerCase();
+    return normalizedHost == 'stripe' && normalizedPath == '/return';
   }
 
   Future<void> _openUserEditSheet(BuildContext context, User user) async {
@@ -600,12 +681,14 @@ class _UserCard extends StatelessWidget {
 
 class _DriverProfileCard extends StatelessWidget {
   const _DriverProfileCard({
+    required this.controller,
     required this.profile,
     required this.loading,
     required this.isDark,
     required this.onEdit,
   });
 
+  final ProfileController controller;
   final DriverProfile? profile;
   final bool loading;
   final bool isDark;
@@ -695,6 +778,8 @@ class _DriverProfileCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          _StripeConnectSection(controller: controller, isDark: isDark),
         ],
       ),
     );
@@ -775,6 +860,469 @@ class _StatusPill extends StatelessWidget {
           fontSize: 12,
           fontWeight: FontWeight.w700,
           color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _StripeConnectSection extends StatelessWidget {
+  const _StripeConnectSection({required this.controller, required this.isDark});
+
+  final ProfileController controller;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _surfaceCard(isDark),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _cardBorder(isDark)),
+      ),
+      child: Obx(() {
+        final status = controller.stripeConnectStatus.value;
+        final loading = controller.stripeStatusLoading.value;
+        final onboardingLoading = controller.stripeOnboardingLoading.value;
+        final dashboardLoading = controller.stripeDashboardLoading.value;
+        final resetLoading = controller.stripeResetLoading.value;
+        final error = controller.stripeConnectError.value;
+        final uiState = _statusUiState(status, loading: loading);
+        final canOpenDashboard = status.hasStripeAccount;
+        final setupLabel = status.hasStripeAccount
+            ? 'Continue onboarding'
+            : 'Set Up Payouts';
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 18,
+                  color: _textPrimary(isDark),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Stripe Connect',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: _textPrimary(isDark),
+                    ),
+                  ),
+                ),
+                _StripeStatusChip(
+                  label: uiState.label,
+                  isReady: uiState.ready,
+                  isDark: isDark,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              uiState.message,
+              style: TextStyle(color: _mutedText(isDark), fontSize: 13),
+            ),
+            if (uiState.requiresInformation &&
+                status.requirementsCurrentlyDue.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ..._buildRequirementRows(
+                status.requirementsCurrentlyDue,
+                isDark: isDark,
+              ),
+            ],
+            if (status.requirementsPendingVerification.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Pending verification',
+                style: TextStyle(
+                  color: _textPrimary(isDark),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              ..._buildRequirementRows(
+                status.requirementsPendingVerification,
+                isDark: isDark,
+              ),
+            ],
+            if (error != null && error.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                error,
+                style: const TextStyle(
+                  color: AppColors.error,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (uiState.showOnboardingButton)
+                  ElevatedButton(
+                    onPressed: onboardingLoading
+                        ? null
+                        : () => _openStripeOnboarding(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.driverPrimary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                    child: onboardingLoading
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            setupLabel,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                  ),
+                if (canOpenDashboard)
+                  OutlinedButton(
+                    onPressed: dashboardLoading
+                        ? null
+                        : () => _openStripeDashboard(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _textPrimary(isDark),
+                      side: BorderSide(color: _cardBorder(isDark)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                    child: dashboardLoading
+                        ? SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _textPrimary(isDark),
+                            ),
+                          )
+                        : const Text(
+                            'Open Dashboard',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                  ),
+                TextButton(
+                  onPressed: resetLoading
+                      ? null
+                      : () => _confirmAndResetStripe(context),
+                  child: resetLoading
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text(
+                          'Reset setup (test)',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                ),
+                TextButton(
+                  onPressed: loading
+                      ? null
+                      : () =>
+                            unawaited(controller.refreshStripeConnectStatus()),
+                  child: const Text(
+                    'Refresh',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  Future<void> _openStripeOnboarding(BuildContext context) async {
+    try {
+      final uri = await controller.createStripeOnboardingUri();
+      await _launchStripeInBrowser(
+        uri,
+        failureMessage: 'Could not open Stripe onboarding.',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      _showSnack(context, _cleanError(e));
+    }
+  }
+
+  Future<void> _openStripeDashboard(BuildContext context) async {
+    try {
+      final uri = await controller.createStripeDashboardUri();
+      await _launchStripeInBrowser(
+        uri,
+        failureMessage: 'Could not open Stripe dashboard.',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      _showSnack(context, _cleanError(e));
+    }
+  }
+
+  Future<void> _confirmAndResetStripe(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Reset Stripe setup?'),
+          content: const Text(
+            'This deletes your current Stripe Connect test account and creates a new one. Continue only if you want to restart onboarding from scratch.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text(
+                'Reset',
+                style: TextStyle(color: AppColors.error),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) return;
+    try {
+      final uri = await controller.resetStripeConnectUri();
+      await _launchStripeInBrowser(
+        uri,
+        failureMessage: 'Could not open Stripe onboarding after reset.',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      _showSnack(context, _cleanError(e));
+    }
+  }
+
+  Future<void> _launchStripeInBrowser(
+    Uri uri, {
+    required String failureMessage,
+  }) async {
+    final openedInExternalBrowser = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (openedInExternalBrowser) return;
+
+    final openedInBrowserView = await launchUrl(
+      uri,
+      mode: LaunchMode.inAppBrowserView,
+    );
+    if (!openedInBrowserView) {
+      throw Exception(failureMessage);
+    }
+  }
+
+  List<Widget> _buildRequirementRows(
+    List<String> rawItems, {
+    required bool isDark,
+    int maxVisible = 3,
+  }) {
+    final items = rawItems
+        .map(_formatRequirement)
+        .where((item) => item.trim().isNotEmpty)
+        .toList(growable: false);
+    if (items.isEmpty) return const <Widget>[];
+
+    final visible = items.take(maxVisible).toList(growable: false);
+    final hasMore = items.length > visible.length;
+    final rows = <Widget>[
+      for (final item in visible)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(Icons.circle, size: 6, color: _mutedText(isDark)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item,
+                  style: TextStyle(color: _mutedText(isDark), fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+    ];
+
+    if (hasMore) {
+      rows.add(
+        Text(
+          '+${items.length - visible.length} more',
+          style: TextStyle(
+            color: _mutedText(isDark),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
+    return rows;
+  }
+
+  _StripeConnectUiState _statusUiState(
+    StripeConnectStatus status, {
+    required bool loading,
+  }) {
+    if (loading) {
+      return const _StripeConnectUiState(
+        label: 'Checking',
+        message: 'Checking Stripe Connect status...',
+        ready: false,
+        requiresInformation: false,
+        showOnboardingButton: false,
+      );
+    }
+
+    if (!status.hasStripeAccount) {
+      return const _StripeConnectUiState(
+        label: 'Not set up',
+        message:
+            'Set up Stripe Connect to receive payouts in your bank account.',
+        ready: false,
+        requiresInformation: false,
+        showOnboardingButton: true,
+      );
+    }
+
+    switch (status.statusSummary) {
+      case StripeConnectStatusSummary.ready:
+        return const _StripeConnectUiState(
+          label: 'Payouts ready',
+          message: 'You can now receive payouts for completed rides.',
+          ready: true,
+          requiresInformation: false,
+          showOnboardingButton: false,
+        );
+      case StripeConnectStatusSummary.pendingVerification:
+        return const _StripeConnectUiState(
+          label: 'Pending review',
+          message: 'Stripe is reviewing, no action needed yet',
+          ready: false,
+          requiresInformation: false,
+          showOnboardingButton: false,
+        );
+      case StripeConnectStatusSummary.requiresInformation:
+        return const _StripeConnectUiState(
+          label: 'Action required',
+          message: 'Continue onboarding',
+          ready: false,
+          requiresInformation: true,
+          showOnboardingButton: true,
+        );
+      case StripeConnectStatusSummary.unknown:
+        return _StripeConnectUiState(
+          label: status.payoutsReady ? 'Payouts ready' : 'Not set up',
+          message: status.payoutsReady
+              ? 'You can now receive payouts for completed rides.'
+              : 'Set up Stripe Connect to receive payouts in your bank account.',
+          ready: status.payoutsReady,
+          requiresInformation: status.requiresInformation,
+          showOnboardingButton:
+              status.requiresInformation || !status.hasStripeAccount,
+        );
+    }
+  }
+
+  String _formatRequirement(String value) {
+    final normalized = value
+        .replaceAll('.', ' ')
+        .replaceAll('_', ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (normalized.isEmpty) return value;
+    return normalized[0].toUpperCase() + normalized.substring(1);
+  }
+
+  String _cleanError(Object error) {
+    return error.toString().replaceFirst('Exception: ', '').trim();
+  }
+
+  void _showSnack(BuildContext context, String message) {
+    final text = message.isEmpty ? 'Could not open Stripe link.' : message;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+}
+
+class _StripeConnectUiState {
+  const _StripeConnectUiState({
+    required this.label,
+    required this.message,
+    required this.ready,
+    required this.requiresInformation,
+    required this.showOnboardingButton,
+  });
+
+  final String label;
+  final String message;
+  final bool ready;
+  final bool requiresInformation;
+  final bool showOnboardingButton;
+}
+
+class _StripeStatusChip extends StatelessWidget {
+  const _StripeStatusChip({
+    required this.label,
+    required this.isReady,
+    required this.isDark,
+  });
+
+  final String label;
+  final bool isReady;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = isReady
+        ? (isDark ? const Color(0xFF14382B) : const Color(0xFFE8FAF3))
+        : _chipNeutralBg(isDark);
+    final textColor = isReady ? AppColors.passengerPrimary : _mutedText(isDark);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
