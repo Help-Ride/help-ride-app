@@ -11,6 +11,9 @@ import 'package:help_ride/shared/services/api_client.dart';
 enum DriverRideRequestsTab { all, newRequests, offered }
 
 class DriverRideDetailsController extends GetxController {
+  DriverRideDetailsController({String? rideId})
+    : _rideIdOverride = rideId?.trim();
+
   final loading = false.obs;
   final error = RxnString();
   final ride = Rxn<Ride>();
@@ -27,8 +30,20 @@ class DriverRideDetailsController extends GetxController {
   late final RidesApi _ridesApi;
   late final DriverRidesApi _driverRidesApi;
   late final BookingsApi _bookingsApi;
+  final String? _rideIdOverride;
 
-  String get rideId => Get.parameters['id'] ?? '';
+  String get rideId {
+    final override = _rideIdOverride;
+    if (override != null && override.isNotEmpty) return override;
+
+    final args = Get.arguments;
+    if (args is Map) {
+      final fromArgs = (args['rideId'] ?? '').toString().trim();
+      if (fromArgs.isNotEmpty) return fromArgs;
+    }
+
+    return (Get.parameters['id'] ?? '').toString().trim();
+  }
 
   @override
   Future<void> onInit() async {

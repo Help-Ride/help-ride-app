@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../controllers/driver_my_rides_controller.dart';
+import 'driver_ride_bookings_sheet.dart';
 import 'ride_formatters.dart';
 
 class DriverRideCard extends StatelessWidget {
@@ -103,7 +104,10 @@ class DriverRideCard extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => Get.toNamed('/driver/rides/${ride.id}'),
+                  onPressed: () => showDriverRideBookingsSheet(
+                    context,
+                    ride: ride,
+                  ),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                     shape: RoundedRectangleBorder(
