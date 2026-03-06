@@ -3,6 +3,7 @@ class User {
   final String name;
   final String email;
   final String? phone;
+  final bool phoneVerified;
   final bool emailVerified;
   final String? authProvider;
   final String roleDefault;
@@ -16,6 +17,7 @@ class User {
     required this.name,
     required this.email,
     this.phone,
+    required this.phoneVerified,
     required this.emailVerified,
     this.authProvider,
     required this.roleDefault,
@@ -34,17 +36,23 @@ class User {
       name: json['name'],
       email: json['email'],
       phone: json['phone']?.toString(),
+      phoneVerified: _parseBool(
+        json['phoneVerified'] ??
+            json['isPhoneVerified'] ??
+            json['phone_verified'],
+      ),
       emailVerified: _parseBool(
         json['emailVerified'] ??
             json['isEmailVerified'] ??
             json['email_verified'],
       ),
-      authProvider:
-          (json['authProvider'] ?? json['provider'])?.toString().trim(),
+      authProvider: (json['authProvider'] ?? json['provider'])
+          ?.toString()
+          .trim(),
       roleDefault: json['roleDefault'],
       avatarUrl: json['providerAvatarUrl'],
-      stripeAccountId:
-          (json['stripeAccountId'] ?? json['stripe_account_id'])?.toString(),
+      stripeAccountId: (json['stripeAccountId'] ?? json['stripe_account_id'])
+          ?.toString(),
       stripeOnboarded: _parseBool(
         json['stripeOnboarded'] ??
             json['stripe_onboarded'] ??

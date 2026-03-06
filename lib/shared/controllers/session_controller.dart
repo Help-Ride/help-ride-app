@@ -90,6 +90,7 @@ class SessionController extends GetxController {
   // Handy getters
   bool get isDriver => user.value?.driverProfile != null;
   bool get isEmailVerified => user.value?.emailVerified ?? false;
+  bool get isPhoneVerified => user.value?.phoneVerified ?? false;
   String get authProvider => _authProvider.value ?? 'email';
   bool get requiresEmailVerification =>
       authProvider == 'email' && !isEmailVerified;

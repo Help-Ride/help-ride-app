@@ -69,13 +69,13 @@ class ProfileApi {
     );
   }
 
-  Future<void> updateUserProfile(
+  Future<User> updateUserProfile(
     String userId, {
     String? name,
     String? phone,
     String? providerAvatarUrl,
   }) async {
-    await _client.put<Map<String, dynamic>>(
+    final res = await _client.put<Map<String, dynamic>>(
       '/users/$userId',
       data: {
         if (name != null) 'name': name,
@@ -83,6 +83,7 @@ class ProfileApi {
         if (providerAvatarUrl != null) 'providerAvatarUrl': providerAvatarUrl,
       },
     );
+    return User.fromJson(res.data ?? const <String, dynamic>{});
   }
 
   Future<DriverDocumentPresign> getDriverDocumentPresign(

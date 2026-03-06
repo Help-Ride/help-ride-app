@@ -44,6 +44,7 @@ class AuthApi {
   Future<EmailRegisterResult> registerWithEmail({
     required String email,
     required String password,
+    String? phone,
     String? name, // optional if backend supports it
   }) async {
     final res = await _client.post<Map<String, dynamic>>(
@@ -53,6 +54,7 @@ class AuthApi {
       data: {
         'email': email,
         'password': password,
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
         if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
       },
     );
@@ -65,6 +67,7 @@ class AuthApi {
     return EmailRegisterResult(
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+      user: _parseUser(data),
     );
   }
 
@@ -77,7 +80,7 @@ class AuthApi {
     );
   }
 
-  Future<VerifyEmailResult?> verifyEmailOtp({
+  Future<OtpVerificationResult?> verifyEmailOtp({
     required String email,
     required String otp,
   }) async {
@@ -89,11 +92,31 @@ class AuthApi {
     );
     final data = res.data ?? {};
     final tokens = _parseTokens(data);
-    final user = data['user'];
-    return VerifyEmailResult(
-      tokens: tokens,
-      user: user is Map ? Map<String, dynamic>.from(user) : null,
+    return OtpVerificationResult(tokens: tokens, user: _parseUser(data));
+  }
+
+  Future<void> sendVerifyPhoneOtp({required String phone}) async {
+    await _client.post<Map<String, dynamic>>(
+      '/auth/verify-phone/send-otp',
+      skipAuthLogout: true,
+      skipAuthRefresh: true,
+      data: {'phone': phone},
     );
+  }
+
+  Future<OtpVerificationResult?> verifyPhoneOtp({
+    required String phone,
+    required String otp,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/auth/verify-phone/verify-otp',
+      skipAuthLogout: true,
+      skipAuthRefresh: true,
+      data: {'phone': phone, 'otp': otp},
+    );
+    final data = res.data ?? {};
+    final tokens = _parseTokens(data);
+    return OtpVerificationResult(tokens: tokens, user: _parseUser(data));
   }
 
   Future<void> sendPasswordResetOtp({required String email}) async {
@@ -143,6 +166,11 @@ class AuthApi {
     return null;
   }
 
+  Map<String, dynamic>? _parseUser(Map<String, dynamic> data) {
+    final user = data['user'];
+    return user is Map ? Map<String, dynamic>.from(user) : null;
+  }
+
   Future<AuthTokens> refreshToken({required String refreshToken}) async {
     final res = await _client.post<Map<String, dynamic>>(
       '/auth/refresh',
@@ -175,11 +203,11 @@ class AuthTokens {
   AuthTokens({required this.accessToken, this.refreshToken});
 }
 
-class VerifyEmailResult {
+class OtpVerificationResult {
   final AuthTokens? tokens;
   final Map<String, dynamic>? user;
 
-  VerifyEmailResult({this.tokens, this.user});
+  OtpVerificationResult({this.tokens, this.user});
 }
 
 class EmailLoginResult {
@@ -192,6 +220,11 @@ class EmailLoginResult {
 class EmailRegisterResult {
   final String accessToken;
   final String? refreshToken;
+  final Map<String, dynamic>? user;
 
-  EmailRegisterResult({required this.accessToken, this.refreshToken});
+  EmailRegisterResult({
+    required this.accessToken,
+    this.refreshToken,
+    this.user,
+  });
 }

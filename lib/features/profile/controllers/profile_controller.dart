@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/models/user.dart';
 import '../../../shared/services/api_client.dart';
+import '../../../shared/utils/phone_number_utils.dart';
 import '../models/driver_document.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_connect_api.dart';
@@ -179,22 +180,32 @@ class ProfileController extends GetxController {
     }
   }
 
-  Future<void> updateUserProfile({
+  Future<User> updateUserProfile({
     required String name,
     required String phone,
     required String avatarUrl,
   }) async {
     final userId = _session.user.value?.id ?? '';
-    if (userId.isEmpty) return;
+    if (userId.isEmpty) {
+      throw Exception('Missing user session.');
+    }
     loading.value = true;
     try {
-      await _api.updateUserProfile(
+      final normalizedPhone = phone.trim().isEmpty
+          ? null
+          : PhoneNumberUtils.normalizeToE164(phone.trim());
+      if (phone.trim().isNotEmpty && normalizedPhone == null) {
+        throw Exception('Enter a valid mobile number.');
+      }
+
+      final updatedUser = await _api.updateUserProfile(
         userId,
         name: name.trim().isEmpty ? null : name.trim(),
-        phone: phone.trim().isEmpty ? null : phone.trim(),
+        phone: normalizedPhone,
         providerAvatarUrl: avatarUrl.trim().isEmpty ? null : avatarUrl.trim(),
       );
       await _session.bootstrap();
+      return updatedUser;
     } finally {
       loading.value = false;
     }

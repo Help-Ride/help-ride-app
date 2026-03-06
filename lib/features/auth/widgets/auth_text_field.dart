@@ -18,6 +18,7 @@ class AuthTextField extends StatelessWidget {
     this.inputFormatters,
     this.autofocus = false,
     this.maxLength,
+    this.helperText,
   });
 
   final String label;
@@ -33,6 +34,7 @@ class AuthTextField extends StatelessWidget {
   final List<TextInputFormatter>? inputFormatters;
   final bool autofocus;
   final int? maxLength;
+  final String? helperText;
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +69,7 @@ class AuthTextField extends StatelessWidget {
             context,
             hintText: hint,
             errorText: errorText,
+            helperText: helperText,
             radius: 14,
           ).copyWith(counterText: maxLength == null ? null : ''),
         ),

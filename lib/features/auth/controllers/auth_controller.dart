@@ -5,22 +5,34 @@ import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_exception.dart';
 import 'package:help_ride/shared/services/location_sync_service.dart';
 import 'package:help_ride/shared/utils/input_validators.dart';
+import 'package:help_ride/shared/utils/phone_number_utils.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/token_storage.dart';
+import '../routes/auth_routes.dart';
 import '../services/auth_api.dart';
-import '../services/oauth_api.dart';
 import '../services/google_oauth_service.dart';
+import '../services/oauth_api.dart';
+
+enum AuthLoginMethod { password, otp }
 
 class AuthController extends GetxController {
   final email = ''.obs;
   final password = ''.obs;
   final name = ''.obs;
+  final phone = ''.obs;
+  final otpIdentifier = ''.obs;
+  final loginOtp = ''.obs;
 
-  final isLoading = false.obs; // email/password loading
-  final oauthLoading = false.obs; // google loading
+  final loginMethod = AuthLoginMethod.password.obs;
+
+  final isLoading = false.obs;
+  final oauthLoading = false.obs;
+  final isSendingOtp = false.obs;
+  final isVerifyingOtp = false.obs;
+  final otpSent = false.obs;
+
   final error = RxnString();
-
-  // prevents crash if user taps before init completes
+  final message = RxnString();
   final isReady = false.obs;
 
   late final TokenStorage _tokenStorage;
@@ -31,6 +43,19 @@ class AuthController extends GetxController {
   String? get emailError => InputValidators.email(email.value);
   String? get passwordError => InputValidators.password(password.value);
   String? get nameError => InputValidators.optionalName(name.value);
+  String? get registerPhoneError => InputValidators.optionalPhone(phone.value);
+  String? get otpIdentifierError =>
+      InputValidators.emailOrPhone(otpIdentifier.value);
+  String? get loginOtpError => InputValidators.otpCode(loginOtp.value);
+
+  bool get isOtpLogin => loginMethod.value == AuthLoginMethod.otp;
+
+  bool get isOtpPhoneInput =>
+      otpIdentifierError == null && normalizedOtpPhone != null;
+  bool get isOtpEmailInput =>
+      otpIdentifierError == null &&
+      otpIdentifier.value.trim().isNotEmpty &&
+      normalizedOtpPhone == null;
 
   bool get canSubmit =>
       isReady.value &&
@@ -39,12 +64,37 @@ class AuthController extends GetxController {
       !isLoading.value &&
       !oauthLoading.value;
 
-  bool get canRegister => canSubmit && nameError == null;
+  bool get canRegister =>
+      isReady.value &&
+      nameError == null &&
+      emailError == null &&
+      passwordError == null &&
+      registerPhoneError == null &&
+      !isLoading.value &&
+      !oauthLoading.value;
+
+  bool get canSendLoginOtp {
+    if (!isReady.value || isLoading.value || oauthLoading.value) return false;
+    if (isSendingOtp.value || isVerifyingOtp.value) return false;
+    return otpIdentifierError == null;
+  }
+
+  bool get canVerifyLoginOtp {
+    if (!otpSent.value || isVerifyingOtp.value || isSendingOtp.value) {
+      return false;
+    }
+    return otpIdentifierError == null && loginOtpError == null;
+  }
+
+  String? get normalizedPhone => PhoneNumberUtils.normalizeToE164(phone.value);
+  String? get normalizedOtpPhone =>
+      PhoneNumberUtils.normalizeToE164(otpIdentifier.value);
+  String get normalizedOtpEmail => otpIdentifier.value.trim();
 
   @override
   void onInit() {
     super.onInit();
-    _init(); // don’t make onInit async
+    _init();
   }
 
   Future<void> _init() async {
@@ -56,19 +106,45 @@ class AuthController extends GetxController {
     isReady.value = true;
   }
 
-  void setEmail(String v) {
-    email.value = v;
-    error.value = null;
+  void setEmail(String value) {
+    email.value = value;
+    _clearFeedback();
   }
 
-  void setPassword(String v) {
-    password.value = v;
-    error.value = null;
+  void setPassword(String value) {
+    password.value = value;
+    _clearFeedback();
   }
 
-  void setName(String v) {
-    name.value = v;
+  void setName(String value) {
+    name.value = value;
+    _clearFeedback();
+  }
+
+  void setPhone(String value) {
+    phone.value = value;
+    _clearFeedback();
+  }
+
+  void setOtpIdentifier(String value) {
+    otpIdentifier.value = value;
+    _clearFeedback();
+    if (isOtpLogin) {
+      _resetOtpState();
+    }
+  }
+
+  void setLoginOtp(String value) {
+    loginOtp.value = value;
     error.value = null;
+    message.value = null;
+  }
+
+  void selectLoginMethod(AuthLoginMethod method) {
+    if (loginMethod.value == method) return;
+    loginMethod.value = method;
+    _clearFeedback();
+    _resetOtpState();
   }
 
   Future<void> loginWithEmail() async {
@@ -79,7 +155,7 @@ class AuthController extends GetxController {
     }
 
     isLoading.value = true;
-    error.value = null;
+    _clearFeedback();
 
     try {
       final authLocation = await LocationSyncService.instance
@@ -90,18 +166,11 @@ class AuthController extends GetxController {
         location: authLocation,
       );
 
-      await _tokenStorage.saveAccessToken(result.accessToken.trim());
-      await _tokenStorage.saveAuthProvider('email');
-      if (result.refreshToken != null &&
-          result.refreshToken!.trim().isNotEmpty) {
-        await _tokenStorage.saveRefreshToken(result.refreshToken!.trim());
-      } else {
-        await _tokenStorage.deleteRefreshToken();
-      }
-
-      final session = Get.find<SessionController>();
-      await session.bootstrap();
-      Get.offAllNamed(AppRoutes.shell);
+      await _persistTokens(
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      );
+      await _finishAuthenticatedFlow();
     } catch (e) {
       error.value = _prettyError(e);
     } finally {
@@ -109,15 +178,82 @@ class AuthController extends GetxController {
     }
   }
 
+  Future<void> sendLoginOtp() async {
+    if (!canSendLoginOtp) {
+      error.value =
+          otpIdentifierError ??
+          'Please enter a valid email address or mobile number.';
+      return;
+    }
+
+    isSendingOtp.value = true;
+    _clearFeedback();
+
+    try {
+      if (isOtpPhoneInput) {
+        final phoneNumber = normalizedOtpPhone!;
+        await _authApi.sendVerifyPhoneOtp(phone: phoneNumber);
+        message.value =
+            'We texted a 6-digit sign-in code to ${PhoneNumberUtils.maskForDisplay(phoneNumber)}.';
+      } else {
+        await _authApi.sendVerifyEmailOtp(email: normalizedOtpEmail);
+        message.value = 'We sent a 6-digit sign-in code to your email.';
+      }
+      otpSent.value = true;
+    } catch (e) {
+      error.value = _prettyError(e);
+    } finally {
+      isSendingOtp.value = false;
+    }
+  }
+
+  Future<void> verifyLoginOtp() async {
+    if (!canVerifyLoginOtp) {
+      error.value =
+          loginOtpError ?? 'Please enter the 6-digit verification code.';
+      return;
+    }
+
+    isVerifyingOtp.value = true;
+    _clearFeedback();
+
+    try {
+      final result = isOtpPhoneInput
+          ? await _authApi.verifyPhoneOtp(
+              phone: normalizedOtpPhone!,
+              otp: loginOtp.value.trim(),
+            )
+          : await _authApi.verifyEmailOtp(
+              email: normalizedOtpEmail,
+              otp: loginOtp.value.trim(),
+            );
+
+      final tokens = result?.tokens;
+      if (tokens == null) {
+        throw Exception('Missing access token in OTP response');
+      }
+
+      await _persistTokens(
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      );
+      await _finishAuthenticatedFlow();
+    } catch (e) {
+      error.value = _prettyError(e);
+    } finally {
+      isVerifyingOtp.value = false;
+    }
+  }
+
   Future<void> loginWithGoogle() async {
     if (isLoading.value || oauthLoading.value) return;
 
     oauthLoading.value = true;
-    error.value = null;
+    _clearFeedback();
 
     try {
       final acc = await _googleOAuth.signIn();
-      if (acc == null) return; // user cancelled
+      if (acc == null) return;
 
       final authLocation = await LocationSyncService.instance
           .captureCurrentLocation(requestPermission: false);
@@ -131,18 +267,11 @@ class AuthController extends GetxController {
         location: authLocation,
       );
 
-      await _tokenStorage.saveAccessToken(tokens.accessToken);
-      await _tokenStorage.saveAuthProvider('google');
-      if (tokens.refreshToken != null) {
-        await _tokenStorage.saveRefreshToken(tokens.refreshToken!);
-      } else {
-        await _tokenStorage.deleteRefreshToken();
-      }
-
-      final session = Get.find<SessionController>();
-      await session.bootstrap();
-
-      Get.offAllNamed(AppRoutes.shell);
+      await _persistTokens(
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      );
+      await _finishAuthenticatedFlow();
     } catch (e) {
       error.value = _prettyError(e);
     } finally {
@@ -154,6 +283,7 @@ class AuthController extends GetxController {
     if (!canRegister) {
       error.value =
           nameError ??
+          registerPhoneError ??
           emailError ??
           passwordError ??
           'Please fix highlighted fields.';
@@ -161,27 +291,39 @@ class AuthController extends GetxController {
     }
 
     isLoading.value = true;
-    error.value = null;
+    _clearFeedback();
 
     try {
+      final normalized = normalizedPhone;
       final result = await _authApi.registerWithEmail(
         email: email.value.trim(),
         password: password.value.trim(),
+        phone: normalized,
         name: name.value.trim().isEmpty ? null : name.value.trim(),
       );
 
-      await _tokenStorage.saveAccessToken(result.accessToken.trim());
-      await _tokenStorage.saveAuthProvider('email');
-      if (result.refreshToken != null &&
-          result.refreshToken!.trim().isNotEmpty) {
-        await _tokenStorage.saveRefreshToken(result.refreshToken!.trim());
-      } else {
-        await _tokenStorage.deleteRefreshToken();
+      final user = result.user;
+      final userPhone = user?['phone']?.toString().trim();
+      final phoneVerified = _readBool(user?['phoneVerified']);
+
+      if ((userPhone?.isNotEmpty ?? false) && !phoneVerified) {
+        Get.toNamed(
+          AuthRoutes.verifyPhone,
+          arguments: {
+            'phone': userPhone,
+            'email': email.value.trim(),
+            'autoSend': true,
+            'contextLabel': 'register',
+          },
+        );
+        return;
       }
 
-      final session = Get.find<SessionController>();
-      await session.bootstrap();
-      Get.offAllNamed(AppRoutes.shell);
+      await _persistTokens(
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      );
+      await _finishAuthenticatedFlow();
     } catch (e) {
       error.value = _prettyError(e);
     } finally {
@@ -189,13 +331,50 @@ class AuthController extends GetxController {
     }
   }
 
+  Future<void> _persistTokens({
+    required String accessToken,
+    String? refreshToken,
+  }) async {
+    await _tokenStorage.saveAccessToken(accessToken.trim());
+    await _tokenStorage.saveAuthProvider('email');
+    if (refreshToken != null && refreshToken.trim().isNotEmpty) {
+      await _tokenStorage.saveRefreshToken(refreshToken.trim());
+    } else {
+      await _tokenStorage.deleteRefreshToken();
+    }
+  }
+
+  Future<void> _finishAuthenticatedFlow() async {
+    final session = Get.find<SessionController>();
+    await session.bootstrap();
+    Get.offAllNamed(AppRoutes.shell);
+  }
+
+  void _resetOtpState() {
+    otpSent.value = false;
+    loginOtp.value = '';
+  }
+
+  void _clearFeedback() {
+    error.value = null;
+    message.value = null;
+  }
+
+  bool _readBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1';
+    }
+    return false;
+  }
+
   String _prettyError(Object e) {
-    // ✅ Our normalized API error
     if (e is DioException && e.error is ApiException) {
       return (e.error as ApiException).message;
     }
 
-    // ✅ Network / unexpected issues
     if (e is DioException) {
       return 'Network error. Please try again.';
     }

@@ -1,4 +1,5 @@
 import 'package:email_validator/email_validator.dart';
+import 'phone_number_utils.dart';
 
 class InputValidators {
   static String? requiredText(String value, {required String fieldLabel}) {
@@ -73,10 +74,33 @@ class InputValidators {
   static String? optionalPhone(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return null;
-    if (!RegExp(r'^[0-9+\-()\s]{7,20}$').hasMatch(trimmed)) {
+    if (!PhoneNumberUtils.isValid(trimmed)) {
       return 'Enter a valid phone number.';
     }
     return null;
+  }
+
+  static String? phone(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return 'Mobile number is required.';
+    if (!PhoneNumberUtils.isValid(trimmed)) {
+      return 'Enter a valid mobile number.';
+    }
+    return null;
+  }
+
+  static String? emailOrPhone(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return 'Email address or mobile number is required.';
+    }
+    if (EmailValidator.validate(trimmed)) {
+      return null;
+    }
+    if (PhoneNumberUtils.isValid(trimmed)) {
+      return null;
+    }
+    return 'Enter a valid email address or mobile number.';
   }
 
   static String? optionalUrl(String value) {

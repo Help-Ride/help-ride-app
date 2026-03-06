@@ -11,10 +11,12 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../shared/utils/phone_number_utils.dart';
 import '../../../shared/controllers/session_controller.dart';
 import '../../../shared/models/user.dart';
 import '../../../shared/utils/input_validators.dart';
 import '../../../shared/widgets/app_input_decoration.dart';
+import '../../auth/routes/auth_routes.dart';
 import '../models/driver_document.dart';
 import '../../support/routes/support_routes.dart';
 import '../routes/profile_routes.dart';
@@ -102,7 +104,9 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
           theme.role.value == AppRole.driver;
       final roleLabel = isDriver ? 'Driver' : 'Passenger';
       final isVerified =
-          user.emailVerified || user.driverProfile?.isVerified == true;
+          (user.emailVerified &&
+              (user.phone?.trim().isNotEmpty != true || user.phoneVerified)) ||
+          user.driverProfile?.isVerified == true;
 
       return Scaffold(
         backgroundColor: _surfaceBg(isDark),
@@ -128,6 +132,29 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                 isVerified: isVerified,
                 isDark: isDark,
                 onEdit: () => _openUserEditSheet(context, user),
+              ),
+              const SizedBox(height: 12),
+              _ContactMethodsCard(
+                user: user,
+                isDark: isDark,
+                onVerifyEmail: user.emailVerified
+                    ? null
+                    : () => Get.toNamed(
+                        AuthRoutes.verifyEmail,
+                        arguments: {'email': user.email},
+                      ),
+                onVerifyPhone:
+                    (user.phone?.trim().isNotEmpty ?? false) &&
+                        !user.phoneVerified
+                    ? () => Get.toNamed(
+                        AuthRoutes.verifyPhone,
+                        arguments: {
+                          'phone': user.phone,
+                          'email': user.email,
+                          'autoSend': true,
+                        },
+                      )
+                    : null,
               ),
               const SizedBox(height: 16),
               if (isDriver || _controller.driverProfile.value != null) ...[
@@ -247,13 +274,17 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
 
   Future<void> _openUserEditSheet(BuildContext context, User user) async {
     final nameCtrl = TextEditingController(text: user.name);
-    final phoneCtrl = TextEditingController(text: user.phone ?? '');
+    final emailCtrl = TextEditingController(text: user.email);
+    final phoneCtrl = TextEditingController(
+      text: PhoneNumberUtils.formatForDisplay(user.phone),
+    );
     final avatarCtrl = TextEditingController(text: user.avatarUrl ?? '');
     final formKey = GlobalKey<FormState>();
+    Map<String, dynamic>? pendingPhoneVerification;
 
     await _showEditSheet(
       context,
-      title: 'Edit Profile',
+      title: 'Manage Contact & Profile',
       formKey: formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,24 +311,63 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
             ),
           ),
           const SizedBox(height: 12),
+          _SheetSectionTitle(
+            title: 'Contact Methods',
+            subtitle:
+                'Verified contact methods are used for ride alerts, OTP sign-in, and booking communication.',
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
+          const SizedBox(height: 12),
+          _ContactStatusSummary(
+            emailVerified: user.emailVerified,
+            phoneVerified: user.phoneVerified,
+            hasPhone: (user.phone?.trim().isNotEmpty ?? false),
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
+          const SizedBox(height: 12),
+          _EditField(
+            controller: emailCtrl,
+            label: 'Sign-in email',
+            readOnly: true,
+            helperText: user.emailVerified
+                ? 'Verified and stored as your account email.'
+                : 'Unverified. You can verify it from the profile card.',
+          ),
+          const SizedBox(height: 12),
           _EditField(
             controller: phoneCtrl,
-            label: 'Phone number',
+            label: 'Mobile number',
             keyboardType: TextInputType.phone,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-()\s]')),
-            ],
+            inputFormatters: const [PhoneTextInputFormatter()],
+            helperText:
+                'Changing this number will require a new SMS verification code before ride alerts resume.',
             validator: (value) => InputValidators.optionalPhone(value ?? ''),
           ),
         ],
       ),
       onSave: () async {
         try {
-          await _controller.updateUserProfile(
+          final beforePhone = PhoneNumberUtils.normalizeToE164(
+            user.phone ?? '',
+          );
+          final updatedUser = await _controller.updateUserProfile(
             name: nameCtrl.text,
             phone: phoneCtrl.text,
             avatarUrl: avatarCtrl.text,
           );
+          final afterPhone = PhoneNumberUtils.normalizeToE164(
+            updatedUser.phone ?? phoneCtrl.text,
+          );
+          final phoneChanged = beforePhone != afterPhone;
+          if (phoneChanged &&
+              (updatedUser.phone?.trim().isNotEmpty ?? false) &&
+              !updatedUser.phoneVerified) {
+            pendingPhoneVerification = {
+              'phone': updatedUser.phone,
+              'email': updatedUser.email,
+              'autoSend': true,
+            };
+          }
           return true;
         } catch (e) {
           _showError(context, e);
@@ -306,6 +376,10 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
       },
       isSaving: _controller.loading,
     );
+
+    if (pendingPhoneVerification != null) {
+      Get.toNamed(AuthRoutes.verifyPhone, arguments: pendingPhoneVerification);
+    }
   }
 
   Future<void> _openDriverEditSheet(
@@ -573,95 +647,123 @@ class _UserCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final avatarUrl = user.avatarUrl ?? '';
     final initials = _initialsFor(user.name);
+    final formattedPhone = PhoneNumberUtils.formatForDisplay(user.phone);
+    final hasPhone = formattedPhone.trim().isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: _surfaceCard(isDark),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _cardBorder(isDark)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: isDark
-                ? const Color(0xFF1C2331)
-                : const Color(0xFFE9EEF6),
-            backgroundImage: avatarUrl.isNotEmpty
-                ? NetworkImage(avatarUrl)
-                : null,
-            child: avatarUrl.isEmpty
-                ? Text(
-                    initials.toUpperCase(),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.lightText,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        user.name.isNotEmpty ? user.name : 'User',
-                        style: TextStyle(
-                          fontSize: 16,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 26,
+                backgroundColor: isDark
+                    ? const Color(0xFF1C2331)
+                    : const Color(0xFFE9EEF6),
+                backgroundImage: avatarUrl.isNotEmpty
+                    ? NetworkImage(avatarUrl)
+                    : null,
+                child: avatarUrl.isEmpty
+                    ? Text(
+                        initials.toUpperCase(),
+                        style: const TextStyle(
                           fontWeight: FontWeight.w800,
-                          color: _textPrimary(isDark),
+                          color: AppColors.lightText,
                         ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: onEdit,
-                      splashRadius: 20,
-                      tooltip: 'Edit personal information',
-                      icon: const Icon(Icons.edit_outlined),
-                      color: AppColors.passengerPrimary,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  user.email,
-                  style: TextStyle(color: _mutedText(isDark), fontSize: 13),
-                ),
-                if ((user.phone ?? '').isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      user.phone!,
-                      style: TextStyle(color: _mutedText(isDark), fontSize: 13),
-                    ),
-                  ),
-                const SizedBox(height: 10),
-                Row(
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _TagChip(
-                      label: roleLabel,
-                      textColor: roleColor,
-                      background: roleColor.withOpacity(isDark ? 0.22 : 0.12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            user.name.isNotEmpty ? user.name : 'User',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: _textPrimary(isDark),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: onEdit,
+                          splashRadius: 20,
+                          tooltip: 'Edit personal information',
+                          constraints: const BoxConstraints(),
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.edit_outlined),
+                          color: AppColors.passengerPrimary,
+                        ),
+                      ],
                     ),
-                    if (isVerified)
+                    const SizedBox(height: 8),
+                    _HeaderMetaLine(
+                      icon: Icons.mail_outline,
+                      value: user.email,
+                      isDark: isDark,
+                    ),
+                    if (hasPhone)
                       Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: _TagChip(
-                          label: 'Verified',
-                          textColor: _textPrimary(isDark),
-                          background: _chipNeutralBg(isDark),
-                          icon: Icons.verified_outlined,
+                        padding: const EdgeInsets.only(top: 6),
+                        child: _HeaderMetaLine(
+                          icon: Icons.phone_iphone_outlined,
+                          value: formattedPhone,
+                          isDark: isDark,
                         ),
                       ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _TagChip(
+                label: roleLabel,
+                textColor: roleColor,
+                background: roleColor.withValues(alpha: isDark ? 0.22 : 0.12),
+              ),
+              _OutlinedTagChip(
+                label: isVerified ? 'Contact verified' : 'Verification needed',
+                textColor: isVerified
+                    ? AppColors.passengerPrimary
+                    : const Color(0xFF8A5A00),
+                background: isVerified
+                    ? (isDark
+                          ? const Color(0xFF14382B)
+                          : const Color(0xFFE8FAF3))
+                    : (isDark
+                          ? const Color(0xFF3C2E07)
+                          : const Color(0xFFFFF4D6)),
+                borderColor: isVerified
+                    ? (isDark
+                          ? const Color(0xFF1E5B45)
+                          : const Color(0xFFD7F1E4))
+                    : (isDark
+                          ? const Color(0xFF5C4411)
+                          : const Color(0xFFF1D98C)),
+                icon: isVerified
+                    ? Icons.verified_outlined
+                    : Icons.pending_outlined,
+              ),
+            ],
           ),
         ],
       ),
@@ -676,6 +778,99 @@ class _UserCard extends StatelessWidget {
         .toList();
     if (parts.isEmpty) return 'U';
     return parts.take(2).map((part) => part[0]).join();
+  }
+}
+
+class _ContactMethodsCard extends StatelessWidget {
+  const _ContactMethodsCard({
+    required this.user,
+    required this.isDark,
+    this.onVerifyEmail,
+    this.onVerifyPhone,
+  });
+
+  final User user;
+  final bool isDark;
+  final VoidCallback? onVerifyEmail;
+  final VoidCallback? onVerifyPhone;
+
+  @override
+  Widget build(BuildContext context) {
+    final formattedPhone = PhoneNumberUtils.formatForDisplay(user.phone);
+    final hasPhone = formattedPhone.trim().isNotEmpty;
+    final needsEmailVerification = !user.emailVerified;
+    final needsPhoneVerification = hasPhone && !user.phoneVerified;
+    final needsAnyVerification =
+        needsEmailVerification || needsPhoneVerification;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _surfaceCard(isDark),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _cardBorder(isDark)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Contact methods',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: _textPrimary(isDark),
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _ContactMethodRow(
+            icon: Icons.mail_outline,
+            title: 'Email',
+            value: user.email,
+            statusLabel: user.emailVerified ? 'Verified' : 'Pending',
+            verified: user.emailVerified,
+            isDark: isDark,
+            actionLabel: needsEmailVerification ? 'Verify' : null,
+            onAction: needsEmailVerification ? onVerifyEmail : null,
+          ),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: _cardBorder(isDark)),
+          const SizedBox(height: 14),
+          _ContactMethodRow(
+            icon: Icons.phone_iphone_outlined,
+            title: 'Mobile',
+            value: hasPhone
+                ? formattedPhone
+                : 'Add a mobile number from Edit Profile',
+            statusLabel: hasPhone
+                ? (user.phoneVerified ? 'Verified' : 'Pending')
+                : 'Missing',
+            verified: hasPhone && user.phoneVerified,
+            isDark: isDark,
+            actionLabel: needsPhoneVerification ? 'Verify' : null,
+            onAction: needsPhoneVerification ? onVerifyPhone : null,
+          ),
+          if (needsAnyVerification || !hasPhone) ...[
+            const SizedBox(height: 14),
+            Divider(height: 1, color: _cardBorder(isDark)),
+            const SizedBox(height: 14),
+            Text(
+              !hasPhone
+                  ? 'Add and verify a mobile number to receive ride alerts and SMS sign-in codes.'
+                  : needsPhoneVerification
+                  ? 'Ride alerts and SMS sign-in stay paused until this mobile number is verified.'
+                  : 'Email verification is still pending for account recovery and important updates.',
+              style: TextStyle(
+                color: _mutedText(isDark),
+                fontSize: 12,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -834,6 +1029,41 @@ class _DriverInfoRow extends StatelessWidget {
   }
 }
 
+class _HeaderMetaLine extends StatelessWidget {
+  const _HeaderMetaLine({
+    required this.icon,
+    required this.value,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String value;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: _mutedText(isDark)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: _mutedText(isDark),
+              height: 1.2,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _StatusPill extends StatelessWidget {
   const _StatusPill({required this.isActive, required this.isDark});
 
@@ -862,6 +1092,238 @@ class _StatusPill extends StatelessWidget {
           color: color,
         ),
       ),
+    );
+  }
+}
+
+class _ContactMethodRow extends StatelessWidget {
+  const _ContactMethodRow({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.statusLabel,
+    required this.verified,
+    required this.isDark,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final String statusLabel;
+  final bool verified;
+  final bool isDark;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: _surfaceCard(isDark),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _cardBorder(isDark)),
+          ),
+          child: Icon(icon, size: 18, color: _mutedText(isDark)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _mutedText(isDark),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _textPrimary(isDark),
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        if (actionLabel != null && onAction != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.passengerPrimary,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              actionLabel!,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          )
+        else
+          _InlineStatusChip(
+            label: statusLabel,
+            verified: verified,
+            isDark: isDark,
+          ),
+      ],
+    );
+  }
+}
+
+class _InlineStatusChip extends StatelessWidget {
+  const _InlineStatusChip({
+    required this.label,
+    required this.verified,
+    required this.isDark,
+  });
+
+  final String label;
+  final bool verified;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = verified
+        ? (isDark ? const Color(0xFF14382B) : const Color(0xFFF0FBF6))
+        : _chipNeutralBg(isDark);
+    final color = verified ? AppColors.passengerPrimary : _mutedText(isDark);
+    final border = verified
+        ? (isDark ? const Color(0xFF1E5B45) : const Color(0xFFD7F1E4))
+        : _cardBorder(isDark);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactBadge extends StatelessWidget {
+  const _CompactBadge({
+    required this.label,
+    required this.textColor,
+    required this.background,
+    this.borderColor,
+    this.icon,
+  });
+
+  final String label;
+  final Color textColor;
+  final Color background;
+  final Color? borderColor;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        border: borderColor == null ? null : Border.all(color: borderColor!),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 5),
+              child: Icon(icon, size: 14, color: textColor),
+            ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  const _TagChip({
+    required this.label,
+    required this.textColor,
+    required this.background,
+  });
+
+  final String label;
+  final Color textColor;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return _CompactBadge(
+      label: label,
+      textColor: textColor,
+      background: background,
+    );
+  }
+}
+
+class _OutlinedTagChip extends StatelessWidget {
+  const _OutlinedTagChip({
+    required this.label,
+    required this.textColor,
+    required this.background,
+    required this.borderColor,
+    this.icon,
+  });
+
+  final String label;
+  final Color textColor;
+  final Color background;
+  final Color borderColor;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return _CompactBadge(
+      label: label,
+      textColor: textColor,
+      background: background,
+      borderColor: borderColor,
+      icon: icon,
     );
   }
 }
@@ -1324,48 +1786,6 @@ class _StripeStatusChip extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w700,
         ),
-      ),
-    );
-  }
-}
-
-class _TagChip extends StatelessWidget {
-  const _TagChip({
-    required this.label,
-    required this.textColor,
-    required this.background,
-    this.icon,
-  });
-
-  final String label;
-  final Color textColor;
-  final Color background;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        children: [
-          if (icon != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Icon(icon, size: 14, color: textColor),
-            ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: textColor,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -2105,6 +2525,51 @@ class _DriverDocumentTile extends StatelessWidget {
   }
 }
 
+class _ContactStatusSummary extends StatelessWidget {
+  const _ContactStatusSummary({
+    required this.emailVerified,
+    required this.phoneVerified,
+    required this.hasPhone,
+    required this.isDark,
+  });
+
+  final bool emailVerified;
+  final bool phoneVerified;
+  final bool hasPhone;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _surfaceCard(isDark),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _cardBorder(isDark)),
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _InlineStatusChip(
+            label: emailVerified ? 'Email verified' : 'Email pending',
+            verified: emailVerified,
+            isDark: isDark,
+          ),
+          _InlineStatusChip(
+            label: hasPhone
+                ? (phoneVerified ? 'Mobile verified' : 'Mobile pending')
+                : 'Add a mobile number',
+            verified: hasPhone && phoneVerified,
+            isDark: isDark,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EditField extends StatelessWidget {
   const _EditField({
     required this.controller,
@@ -2112,6 +2577,8 @@ class _EditField extends StatelessWidget {
     this.keyboardType,
     this.inputFormatters,
     this.validator,
+    this.readOnly = false,
+    this.helperText,
   });
 
   final TextEditingController controller;
@@ -2119,6 +2586,8 @@ class _EditField extends StatelessWidget {
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final String? Function(String?)? validator;
+  final bool readOnly;
+  final String? helperText;
 
   @override
   Widget build(BuildContext context) {
@@ -2126,10 +2595,16 @@ class _EditField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
+      readOnly: readOnly,
       onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
       validator: validator,
       autovalidateMode: AutovalidateMode.onUserInteraction,
-      decoration: appInputDecoration(context, labelText: label, radius: 14),
+      decoration: appInputDecoration(
+        context,
+        labelText: label,
+        helperText: helperText,
+        radius: 14,
+      ),
     );
   }
 }
@@ -2216,10 +2691,10 @@ Color _chipNeutralBg(bool isDark) =>
     isDark ? const Color(0xFF1E222D) : const Color(0xFFF1F3F7);
 
 Color _driverCardBg(bool isDark) =>
-    isDark ? const Color(0xFF122033) : const Color(0xFFEFF6FF);
+    isDark ? AppColors.darkSurface : const Color(0xFFF8FAFD);
 
 Color _driverCardBorder(bool isDark) =>
-    isDark ? const Color(0xFF1B2C44) : const Color(0xFFD8E6FF);
+    isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2);
 
 Color _fieldFill(bool isDark) =>
     isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8);
