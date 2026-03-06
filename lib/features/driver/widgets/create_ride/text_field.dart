@@ -14,6 +14,8 @@ class ExoTextField extends StatelessWidget {
     this.onChanged,
     this.errorText,
     this.inputFormatters,
+    this.helperText,
+    this.readOnly = false,
   });
 
   final String label;
@@ -24,6 +26,8 @@ class ExoTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final String? errorText;
   final List<TextInputFormatter>? inputFormatters;
+  final String? helperText;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -43,12 +47,14 @@ class ExoTextField extends StatelessWidget {
           controller: controller,
           keyboardType: keyboardType,
           onChanged: onChanged,
+          readOnly: readOnly,
           onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           inputFormatters: inputFormatters,
           decoration: appInputDecoration(
             context,
             hintText: hint,
             errorText: errorText,
+            helperText: helperText,
             radius: 16,
             prefixIcon: prefixIcon == null
                 ? null

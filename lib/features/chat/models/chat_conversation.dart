@@ -13,6 +13,10 @@ class ChatConversation {
   final int unreadCount;
   final String? tripSummary;
   final String? tripTimeLabel;
+  final String? rideReference;
+  final String? rideStatus;
+  final double? ridePricePerSeat;
+  final DateTime? rideStartTime;
 
   ChatConversation({
     required this.id,
@@ -27,6 +31,10 @@ class ChatConversation {
     required this.unreadCount,
     this.tripSummary,
     this.tripTimeLabel,
+    this.rideReference,
+    this.rideStatus,
+    this.ridePricePerSeat,
+    this.rideStartTime,
   });
 
   factory ChatConversation.fromJson(
@@ -34,11 +42,16 @@ class ChatConversation {
     required String currentUserId,
     String? currentRole,
   }) {
+    final rideJson = _readMap(json, ['ride']);
     final passengerJson = _readMap(json, ['passenger']);
     final driverJson = _readMap(json, ['driver']);
 
     final passengerId = _readString(json, ['passengerId', 'passenger_id']);
     final driverId = _readString(json, ['driverId', 'driver_id']);
+    final rideId = _readString(json, [
+      'rideId',
+      'ride_id',
+    ], fallback: _readString(rideJson ?? const <String, dynamic>{}, ['id']));
 
     final passenger = passengerJson != null
         ? ChatParticipant.fromJson(passengerJson).copyWith(role: 'passenger')
@@ -47,11 +60,10 @@ class ChatConversation {
             name: _readString(json, ['passengerName'], fallback: 'Passenger'),
             role: 'passenger',
             rating: _readDouble(json, ['passengerRating']),
-            avatarUrl: _readString(
-              json,
-              ['passengerAvatar', 'passengerAvatarUrl'],
-              fallback: '',
-            ),
+            avatarUrl: _readString(json, [
+              'passengerAvatar',
+              'passengerAvatarUrl',
+            ], fallback: ''),
             isOnline: _readBool(json, ['passengerOnline'], fallback: false),
           );
 
@@ -62,31 +74,55 @@ class ChatConversation {
             name: _readString(json, ['driverName'], fallback: 'Driver'),
             role: 'driver',
             rating: _readDouble(json, ['driverRating']),
-            avatarUrl: _readString(
-              json,
-              ['driverAvatar', 'driverAvatarUrl'],
-              fallback: '',
-            ),
+            avatarUrl: _readString(json, [
+              'driverAvatar',
+              'driverAvatarUrl',
+            ], fallback: ''),
             isOnline: _readBool(json, ['driverOnline'], fallback: false),
           );
 
-    final lastMessagePreview = _readString(
-      json,
-      ['lastMessagePreview', 'lastMessage', 'last_message'],
-      fallback: '',
-    );
+    final lastMessagePreview = _readString(json, [
+      'lastMessagePreview',
+      'lastMessage',
+      'last_message',
+    ], fallback: '');
 
-    final lastMessageAt = _readDateTime(
-      json,
-      ['lastMessageAt', 'updatedAt', 'createdAt'],
-    );
+    final lastMessageAt = _readDateTime(json, [
+      'lastMessageAt',
+      'updatedAt',
+      'createdAt',
+    ]);
 
     final isDriver = currentRole == 'driver' || currentUserId == driverId;
     final participant = isDriver ? passenger : driver;
+    final rideStartTime =
+        _readDateTime(json, ['rideStartTime']) ??
+        _readDateTime(rideJson ?? const <String, dynamic>{}, ['startTime']);
+    final tripSummary = _readString(json, [
+      'tripSummary',
+      'routeSummary',
+    ], fallback: _buildRouteSummary(rideJson));
+    final tripTimeLabel = _readString(json, [
+      'tripTime',
+      'tripTimeLabel',
+      'pickupTime',
+    ], fallback: _formatTripTimeLabel(rideStartTime));
+    final rideReference = _readString(json, [
+      'rideReference',
+      'rideRef',
+    ], fallback: _buildRideReference(rideId));
+    final rideStatus = _readString(
+      json,
+      ['rideStatus'],
+      fallback: _readString(rideJson ?? const <String, dynamic>{}, ['status']),
+    );
+    final ridePricePerSeat =
+        _readDouble(json, ['ridePricePerSeat']) ??
+        _readDouble(rideJson ?? const <String, dynamic>{}, ['pricePerSeat']);
 
     return ChatConversation(
       id: _readString(json, ['id', 'conversationId']),
-      rideId: _readString(json, ['rideId', 'ride_id']),
+      rideId: rideId,
       passengerId: passengerId,
       driverId: driverId,
       passenger: passenger,
@@ -95,8 +131,12 @@ class ChatConversation {
       lastMessage: lastMessagePreview,
       lastMessageAt: lastMessageAt,
       unreadCount: _readInt(json, ['unreadCount', 'unread'], fallback: 0),
-      tripSummary: _readString(json, ['tripSummary', 'routeSummary'], fallback: ''),
-      tripTimeLabel: _readString(json, ['tripTime', 'pickupTime'], fallback: ''),
+      tripSummary: tripSummary,
+      tripTimeLabel: tripTimeLabel,
+      rideReference: rideReference,
+      rideStatus: rideStatus,
+      ridePricePerSeat: ridePricePerSeat,
+      rideStartTime: rideStartTime,
     );
   }
 
@@ -113,6 +153,10 @@ class ChatConversation {
     int? unreadCount,
     String? tripSummary,
     String? tripTimeLabel,
+    String? rideReference,
+    String? rideStatus,
+    double? ridePricePerSeat,
+    DateTime? rideStartTime,
   }) {
     return ChatConversation(
       id: id ?? this.id,
@@ -127,17 +171,19 @@ class ChatConversation {
       unreadCount: unreadCount ?? this.unreadCount,
       tripSummary: tripSummary ?? this.tripSummary,
       tripTimeLabel: tripTimeLabel ?? this.tripTimeLabel,
+      rideReference: rideReference ?? this.rideReference,
+      rideStatus: rideStatus ?? this.rideStatus,
+      ridePricePerSeat: ridePricePerSeat ?? this.ridePricePerSeat,
+      rideStartTime: rideStartTime ?? this.rideStartTime,
     );
   }
 }
 
-Map<String, dynamic>? _readMap(
-  Map<String, dynamic> json,
-  List<String> keys,
-) {
+Map<String, dynamic>? _readMap(Map<String, dynamic> json, List<String> keys) {
   for (final key in keys) {
     final value = json[key];
     if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
   }
   return null;
 }
@@ -156,11 +202,7 @@ String _readString(
   return fallback;
 }
 
-int _readInt(
-  Map<String, dynamic> json,
-  List<String> keys, {
-  int fallback = 0,
-}) {
+int _readInt(Map<String, dynamic> json, List<String> keys, {int fallback = 0}) {
   for (final key in keys) {
     final value = json[key];
     if (value is int) return value;
@@ -217,4 +259,45 @@ DateTime? _readDateTime(Map<String, dynamic> json, List<String> keys) {
     }
   }
   return null;
+}
+
+String _buildRouteSummary(Map<String, dynamic>? rideJson) {
+  if (rideJson == null) return '';
+  final from = _readString(rideJson, ['fromCity']);
+  final to = _readString(rideJson, ['toCity']);
+  if (from.isEmpty || to.isEmpty) return '';
+  return '$from → $to';
+}
+
+String _buildRideReference(String rideId) {
+  final normalized = rideId.trim();
+  if (normalized.isEmpty) return '';
+  final suffix = normalized.length <= 8
+      ? normalized.toUpperCase()
+      : normalized.substring(0, 8).toUpperCase();
+  return 'Ride #$suffix';
+}
+
+String _formatTripTimeLabel(DateTime? value) {
+  if (value == null) return '';
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  final local = value.toLocal();
+  final month = months[local.month - 1];
+  final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final suffix = local.hour >= 12 ? 'PM' : 'AM';
+  return '$month ${local.day}, $hour:$minute $suffix';
 }

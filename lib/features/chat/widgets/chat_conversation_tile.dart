@@ -24,15 +24,25 @@ class ChatConversationTile extends StatelessWidget {
     final timeLabel = conversation.lastMessageAt != null
         ? chatTimeAgo(conversation.lastMessageAt!)
         : '';
+    final routeSummary = conversation.tripSummary?.trim() ?? '';
+    final rideReference = conversation.rideReference?.trim().isNotEmpty == true
+        ? conversation.rideReference!.trim()
+        : chatRideReference(conversation.rideId);
+    final rideStatus = chatRideStatus(conversation.rideStatus ?? '');
+    final rideTimeLabel = conversation.tripTimeLabel?.trim() ?? '';
+    final priceLabel = conversation.ridePricePerSeat == null
+        ? ''
+        : '\$${chatCurrencyLabel(conversation.ridePricePerSeat!)}/seat';
     final subtitle = conversation.lastMessage.isNotEmpty
         ? conversation.lastMessage
         : 'Start a conversation';
     final hasUnread = conversation.unreadCount > 0;
 
     final badgeColor = accentColor;
-    final avatarBg = accentColor.withOpacity(isDark ? 0.25 : 0.15);
-    final tileBg =
-        hasUnread ? accentColor.withOpacity(isDark ? 0.14 : 0.06) : Colors.transparent;
+    final avatarBg = accentColor.withValues(alpha: isDark ? 0.25 : 0.15);
+    final tileBg = hasUnread
+        ? accentColor.withValues(alpha: isDark ? 0.14 : 0.06)
+        : Colors.transparent;
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
     final textMuted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     final isOnline = conversation.participant.isOnline;
@@ -74,12 +84,13 @@ class ChatConversationTile extends StatelessWidget {
                           color: isOnline
                               ? const Color(0xFF1BC47D)
                               : (isDark
-                                  ? const Color(0xFF4B5563)
-                                  : const Color(0xFFB7C0CF)),
+                                    ? const Color(0xFF4B5563)
+                                    : const Color(0xFFB7C0CF)),
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color:
-                                isDark ? AppColors.darkSurface : Colors.white,
+                            color: isDark
+                                ? AppColors.darkSurface
+                                : Colors.white,
                             width: 2,
                           ),
                         ),
@@ -96,17 +107,18 @@ class ChatConversationTile extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                            conversation.participant.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight:
-                                  hasUnread ? FontWeight.w800 : FontWeight.w700,
-                              color: textPrimary,
+                              conversation.participant.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: hasUnread
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
+                                color: textPrimary,
+                              ),
                             ),
                           ),
-                        ),
                           if (hasUnread)
                             Container(
                               margin: const EdgeInsets.only(right: 6),
@@ -123,12 +135,39 @@ class ChatConversationTile extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: hasUnread ? textPrimary : textMuted,
-                                fontWeight:
-                                    hasUnread ? FontWeight.w700 : FontWeight.w500,
+                                fontWeight: hasUnread
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
                               ),
                             ),
                         ],
                       ),
+                      if (routeSummary.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.route_rounded,
+                              size: 15,
+                              color: accentColor,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                routeSummary,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       Row(
                         children: [
@@ -149,30 +188,67 @@ class ChatConversationTile extends StatelessWidget {
                               style: TextStyle(
                                 color: hasUnread ? textPrimary : textMuted,
                                 fontSize: 14,
-                                fontWeight:
-                                    hasUnread ? FontWeight.w600 : FontWeight.w400,
+                                fontWeight: hasUnread
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
                               ),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           _RoleChip(label: roleLabel, color: accentColor),
-                          const SizedBox(width: 8),
                           _StatusChip(isOnline: isOnline),
+                          if (rideReference.isNotEmpty)
+                            _MetaChip(
+                              label: rideReference,
+                              background: accentColor.withValues(
+                                alpha: isDark ? 0.2 : 0.1,
+                              ),
+                              foreground: accentColor,
+                              icon: Icons.directions_car_filled_outlined,
+                            ),
+                          if (rideTimeLabel.isNotEmpty)
+                            _MetaChip(
+                              label: rideTimeLabel,
+                              background: isDark
+                                  ? const Color(0xFF1F2937)
+                                  : const Color(0xFFF1F5F9),
+                              foreground: textMuted,
+                              icon: Icons.schedule_rounded,
+                            ),
+                          if (priceLabel.isNotEmpty)
+                            _MetaChip(
+                              label: priceLabel,
+                              background: isDark
+                                  ? const Color(0xFF13232E)
+                                  : const Color(0xFFE8F7F0),
+                              foreground: const Color(0xFF179C5E),
+                              icon: Icons.attach_money_rounded,
+                            ),
+                          if (rideStatus.isNotEmpty)
+                            _MetaChip(
+                              label: rideStatus,
+                              background: isDark
+                                  ? const Color(0xFF242B39)
+                                  : const Color(0xFFEFF2F6),
+                              foreground: textMuted,
+                              icon: Icons.local_offer_outlined,
+                            ),
                           if (conversation.participant.rating != null)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.star,
-                                    size: 14,
-                                    color: Color(0xFFFFB347),
-                                  ),
-                                  const SizedBox(width: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.star,
+                                  size: 14,
+                                  color: Color(0xFFFFB347),
+                                ),
+                                const SizedBox(width: 4),
                                 Text(
                                   conversation.participant.rating!
                                       .toStringAsFixed(1),
@@ -184,7 +260,6 @@ class ChatConversationTile extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            ),
                         ],
                       ),
                     ],
@@ -193,8 +268,10 @@ class ChatConversationTile extends StatelessWidget {
                 if (hasUnread)
                   Container(
                     margin: const EdgeInsets.only(left: 8),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: badgeColor,
                       borderRadius: BorderRadius.circular(12),
@@ -223,6 +300,46 @@ class ChatConversationTile extends StatelessWidget {
   }
 }
 
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({
+    required this.label,
+    required this.background,
+    required this.foreground,
+    required this.icon,
+  });
+
+  final String label;
+  final Color background;
+  final Color foreground;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: foreground),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: foreground,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RoleChip extends StatelessWidget {
   const _RoleChip({required this.label, required this.color});
 
@@ -234,7 +351,7 @@ class _RoleChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
@@ -280,8 +397,8 @@ class _StatusChip extends StatelessWidget {
               color: isOnline
                   ? const Color(0xFF1BC47D)
                   : (isDark
-                      ? const Color(0xFF9AA3B2)
-                      : const Color(0xFF6B7280)),
+                        ? const Color(0xFF9AA3B2)
+                        : const Color(0xFF6B7280)),
               shape: BoxShape.circle,
             ),
           ),

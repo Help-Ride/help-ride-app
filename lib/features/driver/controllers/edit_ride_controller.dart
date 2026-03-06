@@ -1,9 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/features/rides/models/ride.dart';
-import '../models/ride_pricing_preview.dart';
 import 'package:help_ride/features/rides/services/rides_api.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/utils/input_validators.dart';
@@ -32,11 +29,6 @@ class EditRideController extends GetxController {
   final date = Rxn<DateTime>();
   final time = Rxn<TimeOfDay>();
   final submitAttempted = false.obs;
-  final pricingPreview = Rxn<RidePricingPreview>();
-  final pricingPreviewLoading = false.obs;
-  final _workers = <Worker>[];
-  Timer? _pricingPreviewDebounce;
-  int _pricingPreviewRequestId = 0;
 
   final amenities = <String, bool>{
     'AC': false,
@@ -62,26 +54,16 @@ class EditRideController extends GetxController {
     }
 
     await _loadRide();
-    _bindInputListeners();
-    _refreshPricingPreview();
   }
 
   @override
   void onClose() {
-    fromCtrl.removeListener(_refreshPricingPreview);
-    toCtrl.removeListener(_refreshPricingPreview);
-    seatsCtrl.removeListener(_refreshPricingPreview);
-    priceCtrl.removeListener(_refreshPricingPreview);
-    for (final w in _workers) {
-      w.dispose();
-    }
     fromCtrl.dispose();
     toCtrl.dispose();
     stopsCtrl.dispose();
     seatsCtrl.dispose();
     priceCtrl.dispose();
     notesCtrl.dispose();
-    _pricingPreviewDebounce?.cancel();
     super.onClose();
   }
 
@@ -153,121 +135,11 @@ class EditRideController extends GetxController {
     return DateTime(d.year, d.month, d.day, t.hour, t.minute);
   }
 
-  void _bindInputListeners() {
-    fromCtrl.addListener(_refreshPricingPreview);
-    toCtrl.addListener(_refreshPricingPreview);
-    seatsCtrl.addListener(_refreshPricingPreview);
-    priceCtrl.addListener(_refreshPricingPreview);
-    _workers.addAll([
-      ever(fromPick, (_) => _refreshPricingPreview()),
-      ever(toPick, (_) => _refreshPricingPreview()),
-      ever(date, (_) => _refreshPricingPreview()),
-      ever(time, (_) => _refreshPricingPreview()),
-    ]);
-  }
-
-  void _refreshPricingPreview() {
-    _schedulePricingPreviewRefresh();
-    if (submitAttempted.value && canSave) {
-      error.value = null;
-    }
-  }
-
-  _RidePricingPreviewRequest? _buildPricingPreviewRequest() {
-    final from = fromPick.value?.latLng;
-    final to = toPick.value?.latLng;
-    final departure = startDateTimeLocal;
-    final seats = int.tryParse(seatsCtrl.text.trim());
-    final basePrice = double.tryParse(priceCtrl.text.trim());
-
-    if (from == null ||
-        to == null ||
-        departure == null ||
-        seats == null ||
-        seats <= 0 ||
-        basePrice == null ||
-        basePrice < 0) {
-      return null;
-    }
-
-    return _RidePricingPreviewRequest(
-      fromCity: fromCtrl.text.trim(),
-      fromLat: from.lat,
-      fromLng: from.lng,
-      toCity: toCtrl.text.trim(),
-      toLat: to.lat,
-      toLng: to.lng,
-      startTimeUtc: departure.toUtc(),
-      seatsTotal: seats,
-      pricePerSeat: basePrice,
-    );
-  }
-
-  void _schedulePricingPreviewRefresh() {
-    _pricingPreviewDebounce?.cancel();
-    final request = _buildPricingPreviewRequest();
-    if (request == null) {
-      pricingPreviewLoading.value = false;
-      pricingPreview.value = null;
-      return;
-    }
-
-    final requestId = ++_pricingPreviewRequestId;
-    pricingPreviewLoading.value = true;
-    _pricingPreviewDebounce = Timer(
-      const Duration(milliseconds: 350),
-      () async {
-        try {
-          final preview = await _driverApi.previewRidePricing(
-            fromCity: request.fromCity,
-            fromLat: request.fromLat,
-            fromLng: request.fromLng,
-            toCity: request.toCity,
-            toLat: request.toLat,
-            toLng: request.toLng,
-            startTimeUtc: request.startTimeUtc,
-            seatsTotal: request.seatsTotal,
-            pricePerSeat: request.pricePerSeat,
-          );
-          if (requestId != _pricingPreviewRequestId) return;
-          pricingPreview.value = preview;
-        } catch (_) {
-          if (requestId != _pricingPreviewRequestId) return;
-          pricingPreview.value = null;
-        } finally {
-          if (requestId == _pricingPreviewRequestId) {
-            pricingPreviewLoading.value = false;
-          }
-        }
-      },
-    );
-  }
-
-  double? _readResolvedPrice(dynamic raw) {
-    if (raw is num) return raw.toDouble();
-    return double.tryParse(raw?.toString() ?? '');
-  }
-
   String _priceLabel(double value) {
     final fixed = value.toStringAsFixed(2);
     if (fixed.endsWith('.00')) return value.toStringAsFixed(0);
     if (fixed.endsWith('0')) return fixed.substring(0, fixed.length - 1);
     return fixed;
-  }
-
-  void _showSaveSuccess({
-    required double inputPrice,
-    required double finalPrice,
-  }) {
-    if ((finalPrice - inputPrice).abs() >= 0.01) {
-      Get.snackbar(
-        'Updated',
-        'Ride updated. Final rider price set to \$${_priceLabel(finalPrice)}/seat.',
-      );
-      return;
-    }
-
-    Get.snackbar('Updated', 'Ride updated successfully');
   }
 
   Future<void> _loadRide() async {
@@ -277,7 +149,6 @@ class EditRideController extends GetxController {
       final data = await _ridesApi.getRideById(rideId);
       ride.value = data;
       _fillFields(data);
-      _refreshPricingPreview();
     } catch (e) {
       error.value = e.toString();
     } finally {
@@ -292,7 +163,7 @@ class EditRideController extends GetxController {
     fromCtrl.text = r.fromCity;
     toCtrl.text = r.toCity;
     seatsCtrl.text = r.seatsTotal.toString();
-    priceCtrl.text = r.pricePerSeat.toString();
+    priceCtrl.text = _priceLabel(r.pricePerSeat);
     stopsCtrl.text = r.stops.join(', ');
     notesCtrl.text = r.notes ?? '';
 
@@ -342,7 +213,7 @@ class EditRideController extends GetxController {
 
     loading.value = true;
     try {
-      final updatedRide = await _driverApi.updateRide(
+      await _driverApi.updateRide(
         rideId: rideId,
         fromCity: from.fullText,
         fromLat: fromLL.lat,
@@ -352,20 +223,17 @@ class EditRideController extends GetxController {
         toLng: toLL.lng,
         startTimeUtc: startLocal.toUtc(),
         seatsTotal: seats,
-        pricePerSeat: basePrice,
         arrivalTimeUtc: ride.value?.arrivalTime?.toUtc(),
         stops: stops,
         amenities: selectedAmenities,
         additionalNotes: additionalNotes,
       );
-      final resolvedPrice =
-          _readResolvedPrice(
-            updatedRide['pricePerSeat'] ?? updatedRide['price_per_seat'],
-          ) ??
-          basePrice;
 
       Get.back();
-      _showSaveSuccess(inputPrice: basePrice, finalPrice: resolvedPrice);
+      Get.snackbar(
+        'Updated',
+        'Ride updated. Price remains locked at \$${_priceLabel(basePrice)}/seat.',
+      );
     } catch (e) {
       error.value = e.toString();
       Get.snackbar('Failed', error.value ?? 'Failed');
@@ -373,28 +241,4 @@ class EditRideController extends GetxController {
       loading.value = false;
     }
   }
-}
-
-class _RidePricingPreviewRequest {
-  const _RidePricingPreviewRequest({
-    required this.fromCity,
-    required this.fromLat,
-    required this.fromLng,
-    required this.toCity,
-    required this.toLat,
-    required this.toLng,
-    required this.startTimeUtc,
-    required this.seatsTotal,
-    required this.pricePerSeat,
-  });
-
-  final String fromCity;
-  final double fromLat;
-  final double fromLng;
-  final String toCity;
-  final double toLat;
-  final double toLng;
-  final DateTime startTimeUtc;
-  final int seatsTotal;
-  final double pricePerSeat;
 }

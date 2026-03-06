@@ -1,7 +1,6 @@
 import 'package:get/get.dart';
 import 'package:help_ride/features/driver/bindings/create_ride_binding.dart';
 import 'package:help_ride/features/driver/bindings/driver_ride_requests_binding.dart';
-import 'package:help_ride/features/driver/bindings/driver_ride_details_binding.dart';
 import 'package:help_ride/features/driver/bindings/edit_ride_binding.dart';
 import 'package:help_ride/features/driver/bindings/driver_onboarding_binding.dart';
 import 'package:help_ride/features/driver/middlewares/driver_access_middleware.dart';
@@ -41,7 +40,6 @@ class DriverRoutes {
     GetPage(
       name: rideDetails,
       page: () => const DriverRideDetailsView(),
-      binding: DriverRideDetailsBinding(),
       middlewares: [DriverAccessMiddleware()],
     ),
     GetPage(

@@ -7,7 +7,6 @@ import '../controllers/edit_ride_controller.dart';
 import '../widgets/create_ride/chip.dart';
 import '../widgets/create_ride/info_box.dart';
 import '../widgets/create_ride/picker_tile.dart';
-import '../widgets/create_ride/ride_price_preview.dart';
 import '../widgets/create_ride/section_title.dart';
 import '../widgets/create_ride/text_area.dart';
 import '../widgets/create_ride/text_field.dart';
@@ -174,31 +173,26 @@ class EditRideView extends GetView<EditRideController> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ExoTextField(
-                      label: 'Minimum Price / Seat',
-                      hint: '0 = auto',
+                      label: 'Ride Price / Seat',
+                      hint: 'Locked after publish',
                       controller: controller.priceCtrl,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
                       prefixIcon: Icons.attach_money,
-                      onChanged: (_) {},
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                      ],
+                      readOnly: true,
+                      helperText:
+                          'Locked after publishing to protect booked passenger payments.',
                       errorText: controller.priceError,
                     ),
                   ),
                 ],
               ),
-              if (controller.pricingPreviewLoading.value &&
-                  controller.pricingPreview.value == null) ...[
-                const SizedBox(height: 10),
-                const LinearProgressIndicator(minHeight: 2),
-              ],
-              if (controller.pricingPreview.value != null) ...[
-                const SizedBox(height: 10),
-                RidePricePreview(preview: controller.pricingPreview.value!),
-              ],
+              const SizedBox(height: 10),
+              Text(
+                'Need a different fare? Create a new ride and offer that instead.',
+                style: TextStyle(color: muted, fontSize: 12),
+              ),
 
               const SizedBox(height: 18),
               const SectionTitle('AMENITIES'),

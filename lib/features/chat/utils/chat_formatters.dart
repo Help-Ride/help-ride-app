@@ -28,3 +28,29 @@ String chatTimeOfDay(DateTime dt) {
   final h = hour % 12 == 0 ? 12 : hour % 12;
   return '$h:$minute $suffix';
 }
+
+String chatRideReference(String rideId) {
+  final normalized = rideId.trim();
+  if (normalized.isEmpty) return '';
+  final suffix = normalized.length <= 8
+      ? normalized.toUpperCase()
+      : normalized.substring(0, 8).toUpperCase();
+  return 'Ride #$suffix';
+}
+
+String chatRideStatus(String raw) {
+  final normalized = raw.trim();
+  if (normalized.isEmpty) return '';
+  final words = normalized.replaceAll('_', ' ').split(RegExp(r'\s+'));
+  return words
+      .where((word) => word.isNotEmpty)
+      .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
+      .join(' ');
+}
+
+String chatCurrencyLabel(double value) {
+  final fixed = value.toStringAsFixed(2);
+  if (fixed.endsWith('.00')) return fixed.substring(0, fixed.length - 3);
+  if (fixed.endsWith('0')) return fixed.substring(0, fixed.length - 1);
+  return fixed;
+}

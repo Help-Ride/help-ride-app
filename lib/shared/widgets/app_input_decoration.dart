@@ -7,6 +7,7 @@ InputDecoration appInputDecoration(
   String? labelText,
   Widget? prefixIcon,
   String? errorText,
+  String? helperText,
   EdgeInsetsGeometry? contentPadding,
   double radius = 14,
 }) {
@@ -28,8 +29,13 @@ InputDecoration appInputDecoration(
     labelText: labelText,
     prefixIcon: prefixIcon,
     errorText: errorText,
+    helperText: helperText,
     hintStyle: TextStyle(
       color: isDark ? AppColors.darkMuted : const Color(0xFF8B95A7),
+      fontWeight: FontWeight.w500,
+    ),
+    helperStyle: TextStyle(
+      color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
       fontWeight: FontWeight.w500,
     ),
     labelStyle: TextStyle(

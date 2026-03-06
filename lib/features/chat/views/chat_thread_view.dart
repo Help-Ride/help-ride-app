@@ -3,11 +3,13 @@ import 'package:get/get.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../shared/controllers/session_controller.dart';
 import '../../../shared/widgets/app_input_decoration.dart';
 import '../controllers/chat_thread_controller.dart';
 import '../controllers/chat_conversations_controller.dart';
 import '../models/chat_conversation.dart';
 import '../models/chat_message.dart';
+import '../utils/chat_formatters.dart';
 import '../widgets/chat_bubble.dart';
 
 class ChatThreadView extends StatefulWidget {
@@ -87,6 +89,7 @@ class _ChatThreadViewState extends State<ChatThreadView> {
               conversation: updated,
               accentColor: roleColor,
               isDark: isDark,
+              onOpenRide: () => _openRide(updated),
             ),
             Expanded(
               child: Obx(() {
@@ -101,7 +104,7 @@ class _ChatThreadViewState extends State<ChatThreadView> {
                       style: TextStyle(
                         color: isDark
                             ? AppColors.darkMuted
-                            : Colors.black.withOpacity(0.6),
+                            : Colors.black.withValues(alpha: 0.6),
                       ),
                     ),
                   );
@@ -142,6 +145,9 @@ class _ChatThreadViewState extends State<ChatThreadView> {
               controller: _textController,
               accentColor: roleColor,
               isDark: isDark,
+              rideReference: updated.rideReference?.trim().isNotEmpty == true
+                  ? updated.rideReference!.trim()
+                  : chatRideReference(updated.rideId),
               onChanged: (value) => _controller.draft.value = value,
               onSend: _handleSend,
             ),
@@ -181,6 +187,19 @@ class _ChatThreadViewState extends State<ChatThreadView> {
     }
     return null;
   }
+
+  void _openRide(ChatConversation conversation) {
+    final rideId = conversation.rideId.trim();
+    if (rideId.isEmpty) return;
+
+    final session = Get.isRegistered<SessionController>()
+        ? Get.find<SessionController>()
+        : null;
+    final isDriver = session?.user.value?.id == conversation.driverId;
+
+    final route = isDriver ? '/driver/rides/$rideId' : '/rides/$rideId';
+    Get.toNamed(route);
+  }
 }
 
 class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -196,6 +215,9 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final rideReference = conversation.rideReference?.trim().isNotEmpty == true
+        ? conversation.rideReference!.trim()
+        : chatRideReference(conversation.rideId);
     return AppBar(
       backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
       elevation: 0,
@@ -210,7 +232,7 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: accentColor.withOpacity(0.15),
+            backgroundColor: accentColor.withValues(alpha: 0.15),
             child: Text(
               conversation.participant.name.isNotEmpty
                   ? conversation.participant.name[0].toUpperCase()
@@ -234,9 +256,21 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                _StatusPill(
-                  isOnline: conversation.participant.isOnline,
-                  isDark: isDark,
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _StatusPill(
+                      isOnline: conversation.participant.isOnline,
+                      isDark: isDark,
+                    ),
+                    if (rideReference.isNotEmpty)
+                      _HeaderRidePill(
+                        label: rideReference,
+                        accentColor: accentColor,
+                        isDark: isDark,
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -259,7 +293,7 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => const Size.fromHeight(60);
+  Size get preferredSize => const Size.fromHeight(72);
 }
 
 class _TripSummaryCard extends StatelessWidget {
@@ -267,17 +301,30 @@ class _TripSummaryCard extends StatelessWidget {
     required this.conversation,
     required this.accentColor,
     required this.isDark,
+    required this.onOpenRide,
   });
 
   final ChatConversation conversation;
   final Color accentColor;
   final bool isDark;
+  final VoidCallback onOpenRide;
 
   @override
   Widget build(BuildContext context) {
     final summary = conversation.tripSummary?.trim() ?? '';
     final time = conversation.tripTimeLabel?.trim() ?? '';
-    if (summary.isEmpty && time.isEmpty) {
+    final rideReference = conversation.rideReference?.trim().isNotEmpty == true
+        ? conversation.rideReference!.trim()
+        : chatRideReference(conversation.rideId);
+    final rideStatus = chatRideStatus(conversation.rideStatus ?? '');
+    final priceLabel = conversation.ridePricePerSeat == null
+        ? ''
+        : '\$${chatCurrencyLabel(conversation.ridePricePerSeat!)}/seat';
+    if (summary.isEmpty &&
+        time.isEmpty &&
+        rideReference.isEmpty &&
+        rideStatus.isEmpty &&
+        priceLabel.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -286,71 +333,171 @@ class _TripSummaryCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: accentColor.withOpacity(isDark ? 0.16 : 0.08),
+          color: accentColor.withValues(alpha: isDark ? 0.16 : 0.08),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: accentColor.withOpacity(isDark ? 0.35 : 0.2),
+            color: accentColor.withValues(alpha: isDark ? 0.35 : 0.2),
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(isDark ? 0.25 : 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.route, color: accentColor),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Upcoming Trip',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? AppColors.darkText : AppColors.lightText,
-                    ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: isDark ? 0.25 : 0.15),
+                    shape: BoxShape.circle,
                   ),
-                  if (summary.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        summary,
+                  child: Icon(Icons.route_rounded, color: accentColor),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ride Reference',
                         style: TextStyle(
+                          fontWeight: FontWeight.w700,
                           color: isDark
-                              ? AppColors.darkMuted
-                              : AppColors.lightMuted,
+                              ? AppColors.darkText
+                              : AppColors.lightText,
                         ),
                       ),
-                    ),
-                ],
-              ),
+                      if (rideReference.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            rideReference,
+                            style: TextStyle(
+                              color: accentColor,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      if (summary.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            summary,
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkMuted
+                                  : AppColors.lightMuted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            if (time.isNotEmpty)
-              Row(
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    size: 16,
-                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    time,
-                    style: TextStyle(
-                      color: isDark
-                          ? AppColors.darkMuted
-                          : AppColors.lightMuted,
+            if (time.isNotEmpty ||
+                priceLabel.isNotEmpty ||
+                rideStatus.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (time.isNotEmpty)
+                      _RideMetaPill(
+                        icon: Icons.schedule_rounded,
+                        label: time,
+                        accentColor: accentColor,
+                        isDark: isDark,
+                      ),
+                    if (priceLabel.isNotEmpty)
+                      _RideMetaPill(
+                        icon: Icons.attach_money_rounded,
+                        label: priceLabel,
+                        accentColor: const Color(0xFF179C5E),
+                        isDark: isDark,
+                      ),
+                    if (rideStatus.isNotEmpty)
+                      _RideMetaPill(
+                        icon: Icons.local_offer_outlined,
+                        label: rideStatus,
+                        accentColor: isDark
+                            ? AppColors.darkMuted
+                            : AppColors.lightMuted,
+                        isDark: isDark,
+                      ),
+                  ],
+                ),
+              ),
+            if (conversation.rideId.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: onOpenRide,
+                    style: TextButton.styleFrom(
+                      foregroundColor: accentColor,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                    ),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                    label: const Text(
+                      'Open Ride',
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
-                ],
+                ),
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HeaderRidePill extends StatelessWidget {
+  const _HeaderRidePill({
+    required this.label,
+    required this.accentColor,
+    required this.isDark,
+  });
+
+  final String label;
+  final Color accentColor;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(alpha: isDark ? 0.2 : 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.directions_car_filled_outlined,
+            size: 12,
+            color: accentColor,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: accentColor,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -407,11 +554,53 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
+class _RideMetaPill extends StatelessWidget {
+  const _RideMetaPill({
+    required this.icon,
+    required this.label,
+    required this.accentColor,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color accentColor;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = accentColor.withValues(alpha: isDark ? 0.18 : 0.1);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: accentColor),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: accentColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
     required this.accentColor,
     required this.isDark,
+    required this.rideReference,
     required this.onChanged,
     required this.onSend,
   });
@@ -419,6 +608,7 @@ class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final Color accentColor;
   final bool isDark;
+  final String rideReference;
   final ValueChanged<String> onChanged;
   final VoidCallback onSend;
 
@@ -436,38 +626,66 @@ class _Composer extends StatelessWidget {
             ),
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                onChanged: onChanged,
-                onSubmitted: (_) => onSend(),
-                onTapOutside: (_) =>
-                    FocusManager.instance.primaryFocus?.unfocus(),
-                decoration: appInputDecoration(
-                  context,
-                  hintText: 'Type a message...',
-                  radius: 24,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+            if (rideReference.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.link_rounded, size: 16, color: accentColor),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'This chat is linked to $rideReference',
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkMuted
+                              : AppColors.lightMuted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    onChanged: onChanged,
+                    onSubmitted: (_) => onSend(),
+                    onTapOutside: (_) =>
+                        FocusManager.instance.primaryFocus?.unfocus(),
+                    decoration: appInputDecoration(
+                      context,
+                      hintText: rideReference.isNotEmpty
+                          ? 'Message about this ride...'
+                          : 'Type a message...',
+                      radius: 24,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            GestureDetector(
-              onTap: onSend,
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: accentColor,
-                  shape: BoxShape.circle,
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: onSend,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.send_rounded, color: Colors.white),
+                  ),
                 ),
-                child: const Icon(Icons.send_rounded, color: Colors.white),
-              ),
+              ],
             ),
           ],
         ),

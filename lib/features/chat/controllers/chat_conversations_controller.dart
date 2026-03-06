@@ -143,6 +143,10 @@ class ChatConversationsController extends GetxController {
       unreadCount: isActive ? 0 : incoming.unreadCount,
       tripSummary: incoming.tripSummary,
       tripTimeLabel: incoming.tripTimeLabel,
+      rideReference: incoming.rideReference,
+      rideStatus: incoming.rideStatus,
+      ridePricePerSeat: incoming.ridePricePerSeat,
+      rideStartTime: incoming.rideStartTime,
     );
 
     conversations[index] = updated;
@@ -205,7 +209,10 @@ class ChatConversationsController extends GetxController {
         .where(
           (c) =>
               c.participant.name.toLowerCase().contains(q) ||
-              c.lastMessage.toLowerCase().contains(q),
+              c.lastMessage.toLowerCase().contains(q) ||
+              (c.tripSummary?.toLowerCase().contains(q) ?? false) ||
+              (c.rideReference?.toLowerCase().contains(q) ?? false) ||
+              c.rideId.toLowerCase().contains(q),
         )
         .toList();
   }

@@ -11,7 +11,8 @@ import 'ride_formatters.dart';
 
 Future<void> showDriverRideBookingsSheet(
   BuildContext context, {
-  required DriverRideItem ride,
+  required String rideId,
+  DriverRideItem? ride,
 }) async {
   await showModalBottomSheet<void>(
     context: context,
@@ -20,20 +21,24 @@ Future<void> showDriverRideBookingsSheet(
     backgroundColor: Colors.transparent,
     builder: (_) => FractionallySizedBox(
       heightFactor: 0.9,
-      child: DriverRideBookingsSheet(ride: ride),
+      child: DriverRideBookingsSheet(rideId: rideId, ride: ride),
     ),
   ).whenComplete(() async {
-    await Get.find<DriverMyRidesController>().refreshAll();
+    if (Get.isRegistered<DriverMyRidesController>()) {
+      await Get.find<DriverMyRidesController>().refreshAll();
+    }
   });
 }
 
 class DriverRideBookingsSheet extends StatefulWidget {
-  const DriverRideBookingsSheet({super.key, required this.ride});
+  const DriverRideBookingsSheet({super.key, required this.rideId, this.ride});
 
-  final DriverRideItem ride;
+  final String rideId;
+  final DriverRideItem? ride;
 
   @override
-  State<DriverRideBookingsSheet> createState() => _DriverRideBookingsSheetState();
+  State<DriverRideBookingsSheet> createState() =>
+      _DriverRideBookingsSheetState();
 }
 
 class _DriverRideBookingsSheetState extends State<DriverRideBookingsSheet> {
@@ -43,9 +48,9 @@ class _DriverRideBookingsSheetState extends State<DriverRideBookingsSheet> {
   @override
   void initState() {
     super.initState();
-    _tag = 'driver-ride-bookings-${widget.ride.id}';
+    _tag = 'driver-ride-bookings-${widget.rideId}';
     _controller = Get.put(
-      DriverRideDetailsController(rideId: widget.ride.id),
+      DriverRideDetailsController(rideId: widget.rideId),
       tag: _tag,
     );
   }
@@ -96,18 +101,27 @@ class _DriverRideBookingsSheetState extends State<DriverRideBookingsSheet> {
                   Obx(() {
                     final ride = _controller.ride.value;
                     final routeText = ride == null
-                        ? '${widget.ride.from} → ${widget.ride.to}'
+                        ? widget.ride == null
+                              ? 'Loading ride...'
+                              : '${widget.ride!.from} → ${widget.ride!.to}'
                         : '${ride.fromCity} → ${ride.toCity}';
-                    final status = ride?.status ?? widget.ride.status;
-                    final startTime = ride?.startTime ?? widget.ride.startTime;
-                    final seatsTotal = ride?.seatsTotal ?? widget.ride.seatsTotal;
+                    final status = ride?.status ?? widget.ride?.status ?? '';
+                    final startTime = ride?.startTime ?? widget.ride?.startTime;
+                    final seatsTotal =
+                        ride?.seatsTotal ?? widget.ride?.seatsTotal ?? 0;
                     final seatsAvailable =
-                        ride?.seatsAvailable ?? widget.ride.seatsAvailable;
+                        ride?.seatsAvailable ??
+                        widget.ride?.seatsAvailable ??
+                        0;
                     final booked = (seatsTotal - seatsAvailable).clamp(
                       0,
                       seatsTotal,
                     );
-                    final price = ride?.pricePerSeat ?? widget.ride.pricePerSeat;
+                    final price =
+                        ride?.pricePerSeat ?? widget.ride?.pricePerSeat ?? 0;
+                    final startTimeLabel = startTime == null
+                        ? '—'
+                        : fmtDateTime(startTime);
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,7 +162,7 @@ class _DriverRideBookingsSheetState extends State<DriverRideBookingsSheet> {
                               Expanded(
                                 child: MiniInfo(
                                   label: 'Start time',
-                                  value: fmtDateTime(startTime),
+                                  value: startTimeLabel,
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -162,8 +176,7 @@ class _DriverRideBookingsSheetState extends State<DriverRideBookingsSheet> {
                               Expanded(
                                 child: MiniInfo(
                                   label: 'Price',
-                                  value:
-                                      '\$${price.toStringAsFixed(0)}/seat',
+                                  value: '\$${price.toStringAsFixed(0)}/seat',
                                 ),
                               ),
                             ],
@@ -256,12 +269,10 @@ class _DriverRideBookingsSheetState extends State<DriverRideBookingsSheet> {
                           DriverRequestCard(
                             booking: list[i],
                             busy: _controller.isActing(list[i].id),
-                            onConfirm: () => _controller.confirmBooking(
-                              list[i].id,
-                            ),
-                            onReject: () => _controller.rejectBooking(
-                              list[i].id,
-                            ),
+                            onConfirm: () =>
+                                _controller.confirmBooking(list[i].id),
+                            onReject: () =>
+                                _controller.rejectBooking(list[i].id),
                           ),
                           if (i != list.length - 1) const SizedBox(height: 14),
                         ],

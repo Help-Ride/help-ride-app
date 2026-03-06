@@ -79,10 +79,7 @@ class DriverRideCard extends StatelessWidget {
             children: [
               Icon(Icons.calendar_today_outlined, size: 16, color: muted),
               const SizedBox(width: 6),
-              Text(
-                fmtDateTime(ride.startTime),
-                style: TextStyle(color: muted),
-              ),
+              Text(fmtDateTime(ride.startTime), style: TextStyle(color: muted)),
               const SizedBox(width: 14),
               Icon(Icons.people_outline, size: 18, color: muted),
               const SizedBox(width: 6),
@@ -106,6 +103,7 @@ class DriverRideCard extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: () => showDriverRideBookingsSheet(
                     context,
+                    rideId: ride.id,
                     ride: ride,
                   ),
                   style: OutlinedButton.styleFrom(
@@ -139,10 +137,12 @@ class DriverRideCard extends StatelessWidget {
                       ? () async {
                           final confirm = await Get.dialog<bool>(
                             Dialog(
-                              insetPadding:
-                                  const EdgeInsets.symmetric(horizontal: 22),
-                              backgroundColor:
-                                  isDark ? AppColors.darkSurface : const Color(0xFFF2F2F6),
+                              insetPadding: const EdgeInsets.symmetric(
+                                horizontal: 22,
+                              ),
+                              backgroundColor: isDark
+                                  ? AppColors.darkSurface
+                                  : const Color(0xFFF2F2F6),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(28),
                               ),
@@ -167,9 +167,7 @@ class DriverRideCard extends StatelessWidget {
                                     const SizedBox(height: 12),
                                     Text(
                                       'This will remove the ride for passengers.',
-                                      style: TextStyle(
-                                        color: muted,
-                                      ),
+                                      style: TextStyle(color: muted),
                                     ),
                                     const SizedBox(height: 22),
                                     Row(
@@ -185,8 +183,9 @@ class DriverRideCard extends StatelessWidget {
                                           onPressed: () =>
                                               Get.back(result: true),
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                const Color(0xFFE53935),
+                                            backgroundColor: const Color(
+                                              0xFFE53935,
+                                            ),
                                             foregroundColor: Colors.white,
                                             elevation: 0,
                                             padding: const EdgeInsets.symmetric(
@@ -210,8 +209,9 @@ class DriverRideCard extends StatelessWidget {
                           );
 
                           if (confirm == true) {
-                            Get.find<DriverMyRidesController>()
-                                .cancelRide(ride.id);
+                            Get.find<DriverMyRidesController>().cancelRide(
+                              ride.id,
+                            );
                           }
                         }
                       : null,
