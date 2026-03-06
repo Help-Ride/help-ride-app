@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/ride_pricing_preview.dart';
+import '../../rides/utils/ride_recurrence.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/utils/input_validators.dart';
 import '../../../shared/widgets/place_picker_field.dart';
@@ -25,8 +26,10 @@ class CreateRideController extends GetxController {
   final fromPick = Rxn<PlacePick>();
   final toPick = Rxn<PlacePick>();
 
+  final rideType = 'one-time'.obs;
   final date = Rxn<DateTime>();
   final time = Rxn<TimeOfDay>();
+  final recurrenceEndDate = Rxn<DateTime>();
   final canPublishFlag = false.obs;
   final submitAttempted = false.obs;
   final pricingPreview = Rxn<RidePricingPreview>();
@@ -34,6 +37,10 @@ class CreateRideController extends GetxController {
   final _workers = <Worker>[];
   Timer? _pricingPreviewDebounce;
   int _pricingPreviewRequestId = 0;
+
+  final recurrenceDays = <String, bool>{
+    for (final day in rideRecurrenceDayOrder) day: false,
+  }.obs;
 
   final amenities = <String, bool>{
     'AC': false,
@@ -85,7 +92,10 @@ class CreateRideController extends GetxController {
       ever(toPick, (_) => _refreshComputedState()),
       ever(date, (_) => _refreshComputedState()),
       ever(time, (_) => _refreshComputedState()),
+      ever(rideType, (_) => _handleRideTypeChanged()),
+      ever(recurrenceEndDate, (_) => _refreshComputedState()),
     ]);
+    _syncRecurrenceDefaultsWithDate();
     _refreshComputedState();
   }
 
@@ -134,6 +144,36 @@ class CreateRideController extends GetxController {
     return 'Time is required.';
   }
 
+  bool get isRecurring => rideType.value == 'recurring';
+
+  List<String> get selectedRecurrenceDays => recurrenceDays.entries
+      .where((entry) => entry.value)
+      .map((entry) => entry.key)
+      .toList(growable: false);
+
+  String? get recurrenceDaysError {
+    if (!isRecurring || !submitAttempted.value) return null;
+    if (selectedRecurrenceDays.isNotEmpty) return null;
+    return 'Select at least one repeat day.';
+  }
+
+  String? get recurrenceEndDateError {
+    if (!isRecurring || !submitAttempted.value) return null;
+    final start = date.value;
+    final end = recurrenceEndDate.value;
+    if (end == null) return 'Repeat until date is required.';
+    if (start != null && _dateOnly(end).isBefore(_dateOnly(start))) {
+      return 'Repeat until date must be on or after the start date.';
+    }
+    if (_buildRecurringOccurrenceStarts().isEmpty) {
+      return 'No ride dates fall in the selected repeat window.';
+    }
+    if (_buildRecurringOccurrenceStarts().length > 90) {
+      return 'Recurring schedules are limited to 90 rides.';
+    }
+    return null;
+  }
+
   String? get seatsError {
     final value = seatsCtrl.text.trim();
     final raw = InputValidators.positiveInt(
@@ -155,7 +195,26 @@ class CreateRideController extends GetxController {
     return submitAttempted.value || value.isNotEmpty ? raw : null;
   }
 
+  void toggleRideType(String value) {
+    rideType.value = value == 'recurring' ? 'recurring' : 'one-time';
+  }
+
+  void toggleRecurrenceDay(String day) {
+    final current = recurrenceDays[day] ?? false;
+    recurrenceDays[day] = !current;
+    recurrenceDays.refresh();
+    _refreshComputedState();
+  }
+
+  List<DateTime> get recurringOccurrenceStarts => _buildRecurringOccurrenceStarts();
+
+  String get recurrenceDaysLabel => formatRideRecurrenceDays(selectedRecurrenceDays);
+
   bool _computeCanPublish() {
+    final recurringValid =
+        !isRecurring ||
+        recurrenceDaysError == null && recurrenceEndDateError == null;
+
     return fromPick.value?.latLng != null &&
         toPick.value?.latLng != null &&
         date.value != null &&
@@ -170,7 +229,8 @@ class CreateRideController extends GetxController {
               priceCtrl.text,
               fieldLabel: 'Price per seat',
             ) ==
-            null;
+            null &&
+        recurringValid;
   }
 
   void _recomputeCanPublish() {
@@ -178,6 +238,7 @@ class CreateRideController extends GetxController {
   }
 
   void _refreshComputedState() {
+    _syncRecurrenceDefaultsWithDate();
     _recomputeCanPublish();
     _schedulePricingPreviewRefresh();
     if (submitAttempted.value && canPublish) {
@@ -185,10 +246,66 @@ class CreateRideController extends GetxController {
     }
   }
 
+  void _handleRideTypeChanged() {
+    if (!isRecurring) {
+      recurrenceEndDate.value = null;
+      for (final day in recurrenceDays.keys) {
+        recurrenceDays[day] = false;
+      }
+      recurrenceDays.refresh();
+    } else {
+      _syncRecurrenceDefaultsWithDate();
+    }
+    _refreshComputedState();
+  }
+
+  void _syncRecurrenceDefaultsWithDate() {
+    if (!isRecurring) return;
+    final selectedDate = date.value;
+    if (selectedDate == null) return;
+
+    final selectedWeekday = rideRecurrenceWeekdayKey(selectedDate);
+    if (!selectedRecurrenceDays.contains(selectedWeekday)) {
+      recurrenceDays[selectedWeekday] = true;
+      recurrenceDays.refresh();
+    }
+
+    final end = recurrenceEndDate.value;
+    if (end == null || _dateOnly(end).isBefore(_dateOnly(selectedDate))) {
+      recurrenceEndDate.value = _dateOnly(selectedDate).add(
+        const Duration(days: 28),
+      );
+    }
+  }
+
+  DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  List<DateTime> _buildRecurringOccurrenceStarts() {
+    final startDate = date.value;
+    final timeOfDay = time.value;
+    final endDate = recurrenceEndDate.value;
+    if (!isRecurring ||
+        startDate == null ||
+        timeOfDay == null ||
+        endDate == null) {
+      return const <DateTime>[];
+    }
+
+    return buildRecurringRideOccurrenceStarts(
+      startDate: startDate,
+      time: timeOfDay,
+      endDate: endDate,
+      recurrenceDays: selectedRecurrenceDays.toSet(),
+    );
+  }
+
   _RidePricingPreviewRequest? _buildPricingPreviewRequest() {
     final from = fromPick.value?.latLng;
     final to = toPick.value?.latLng;
-    final departure = startDateTimeLocal;
+    final departure = isRecurring
+        ? (recurringOccurrenceStarts.isEmpty ? null : recurringOccurrenceStarts.first)
+        : startDateTimeLocal;
     final seats = int.tryParse(seatsCtrl.text.trim());
     final basePrice = double.tryParse(priceCtrl.text.trim());
 
@@ -270,16 +387,18 @@ class CreateRideController extends GetxController {
   void _showPublishSuccess({
     required double inputPrice,
     required double finalPrice,
+    required int createdCount,
   }) {
+    final rideLabel = createdCount > 1 ? '$createdCount rides created' : 'Ride created';
     if ((finalPrice - inputPrice).abs() >= 0.01) {
       Get.snackbar(
         'Published',
-        'Ride created. Final rider price set to \$${_priceLabel(finalPrice)}/seat.',
+        '$rideLabel. Final rider price set to \$${_priceLabel(finalPrice)}/seat.',
       );
       return;
     }
 
-    Get.snackbar('Published', 'Ride created successfully');
+    Get.snackbar('Published', '$rideLabel successfully.');
   }
 
   DateTime? get startDateTimeLocal {
@@ -311,6 +430,7 @@ class CreateRideController extends GetxController {
     }
 
     final startLocal = startDateTimeLocal!;
+    final recurringOccurrences = recurringOccurrenceStarts;
     final seats = int.parse(seatsCtrl.text.trim());
     final basePrice = double.parse(priceCtrl.text.trim());
 
@@ -331,9 +451,26 @@ class CreateRideController extends GetxController {
         toCity: to.fullText,
         toLat: toLL.lat,
         toLng: toLL.lng,
-        startTimeUtc: startLocal.toUtc(),
+        startTimeUtc: (isRecurring ? recurringOccurrences.first : startLocal)
+            .toUtc(),
         seatsTotal: seats,
         pricePerSeat: basePrice,
+        rideType: rideType.value,
+        recurrenceDays: selectedRecurrenceDays,
+        recurrenceEndDateUtc: recurrenceEndDate.value == null
+            ? null
+            : DateTime(
+                recurrenceEndDate.value!.year,
+                recurrenceEndDate.value!.month,
+                recurrenceEndDate.value!.day,
+                23,
+                59,
+                59,
+                999,
+              ).toUtc(),
+        occurrenceStartTimesUtc: recurringOccurrences
+            .map((value) => value.toUtc())
+            .toList(growable: false),
         stops: stops,
         amenities: selectedAmenities,
         additionalNotes: additionalNotes,
@@ -343,9 +480,39 @@ class CreateRideController extends GetxController {
             createdRide['pricePerSeat'] ?? createdRide['price_per_seat'],
           ) ??
           basePrice;
+      final createdCount =
+          (createdRide['createdCount'] as num?)?.toInt() ?? 1;
+      final createdRideType =
+          (createdRide['rideType'] ?? createdRide['ride_type'] ?? 'one-time')
+              .toString()
+              .trim()
+              .toLowerCase();
+      final recurringSeriesId =
+          (createdRide['recurringSeriesId'] ??
+                  createdRide['recurring_series_id'])
+              ?.toString()
+              .trim();
+      if (isRecurring) {
+        final expectedCount = recurringOccurrences.length;
+        final createdSeriesOk =
+            recurringSeriesId != null && recurringSeriesId.isNotEmpty;
+        if (createdRideType != 'recurring' ||
+            !createdSeriesOk ||
+            createdCount != expectedCount) {
+          throw StateError(
+            'Recurring ride series was not created correctly. Expected '
+            '$expectedCount rides, got $createdCount. Check that the app is connected '
+            'to the updated API deployment.',
+          );
+        }
+      }
 
       Get.back();
-      _showPublishSuccess(inputPrice: basePrice, finalPrice: resolvedPrice);
+      _showPublishSuccess(
+        inputPrice: basePrice,
+        finalPrice: resolvedPrice,
+        createdCount: createdCount,
+      );
     } catch (e) {
       error.value = e.toString();
       Get.snackbar('Failed', error.value ?? 'Failed');

@@ -53,6 +53,10 @@ class RideCard extends GetView<SearchRidesController> {
                         ),
                         const SizedBox(width: 8),
                         const Pill(text: 'Verified'),
+                        if (ride.isRecurring) ...[
+                          const SizedBox(width: 8),
+                          const Pill(text: 'Recurring'),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -112,6 +116,24 @@ class RideCard extends GetView<SearchRidesController> {
               ),
             ],
           ),
+          if (ride.isRecurring) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.repeat_rounded, size: 18, color: muted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Repeats ${ride.recurrenceLabel}',
+                    style: TextStyle(
+                      color: muted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
 
           const SizedBox(height: 10),
 

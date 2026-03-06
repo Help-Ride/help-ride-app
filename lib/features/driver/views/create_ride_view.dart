@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../rides/utils/ride_recurrence.dart';
 import '../../../shared/widgets/place_picker_field.dart';
 import '../controllers/create_ride_controller.dart';
 import '../widgets/create_ride/chip.dart';
@@ -78,6 +79,37 @@ class CreateRideView extends GetView<CreateRideController> {
               const SizedBox(height: 18),
               const SectionTitle('SCHEDULE'),
 
+              Text(
+                'Ride Type',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? AppColors.darkText : AppColors.lightText,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Obx(() {
+                final active = controller.rideType.value;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    SelectChip(
+                      text: 'One-time',
+                      active: active == 'one-time',
+                      activeColor: primary,
+                      onTap: () => controller.toggleRideType('one-time'),
+                    ),
+                    SelectChip(
+                      text: 'Recurring',
+                      active: active == 'recurring',
+                      activeColor: primary,
+                      onTap: () => controller.toggleRideType('recurring'),
+                    ),
+                  ],
+                );
+              }),
+              const SizedBox(height: 14),
+
               Row(
                 children: [
                   Expanded(
@@ -126,6 +158,106 @@ class CreateRideView extends GetView<CreateRideController> {
                     style: const TextStyle(color: AppColors.error),
                   ),
                 ),
+              Obx(() {
+                if (!controller.isRecurring) return const SizedBox.shrink();
+
+                final occurrences = controller.recurringOccurrenceStarts;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 14),
+                    Text(
+                      'Repeat On',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: isDark
+                            ? AppColors.darkText
+                            : AppColors.lightText,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: rideRecurrenceDayOrder.map((day) {
+                        return SelectChip(
+                          text: rideRecurrenceDayLabels[day] ?? day,
+                          active: controller.recurrenceDays[day] == true,
+                          activeColor: primary,
+                          onTap: () => controller.toggleRecurrenceDay(day),
+                        );
+                      }).toList(),
+                    ),
+                    if (controller.recurrenceDaysError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        controller.recurrenceDaysError!,
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    PickerTile(
+                      label: 'Repeat Until',
+                      value: controller.recurrenceEndDate.value == null
+                          ? ''
+                          : _fmtDate(controller.recurrenceEndDate.value!),
+                      icon: Icons.event_repeat_outlined,
+                      onTap: () async {
+                        final selectedStart =
+                            controller.date.value ?? DateTime.now();
+                        final initialDate =
+                            controller.recurrenceEndDate.value ??
+                            selectedStart.add(const Duration(days: 28));
+                        final picked = await showDatePicker(
+                          context: context,
+                          firstDate: selectedStart,
+                          lastDate: selectedStart.add(
+                            const Duration(days: 365),
+                          ),
+                          initialDate: initialDate,
+                        );
+                        if (picked != null) {
+                          controller.recurrenceEndDate.value = picked;
+                        }
+                      },
+                    ),
+                    if (controller.recurrenceEndDateError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        controller.recurrenceEndDateError!,
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF111827)
+                            : const Color(0xFFF5F8FC),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark
+                              ? const Color(0xFF232836)
+                              : const Color(0xFFDCE5F2),
+                        ),
+                      ),
+                      child: Text(
+                        occurrences.isEmpty
+                            ? 'Choose repeat days and an end date to create a recurring schedule.'
+                            : 'This will publish ${occurrences.length} rides on ${controller.recurrenceDaysLabel} through ${_fmtDate(controller.recurrenceEndDate.value!)}.',
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkMuted
+                              : AppColors.lightMuted,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }),
 
               const SizedBox(height: 18),
               const SectionTitle('CAPACITY & PRICING'),

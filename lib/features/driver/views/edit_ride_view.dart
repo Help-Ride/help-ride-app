@@ -100,6 +100,30 @@ class EditRideView extends GetView<EditRideController> {
 
               const SizedBox(height: 18),
               const SectionTitle('SCHEDULE'),
+              if (controller.ride.value?.isRecurring == true) ...[
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF111827)
+                        : const Color(0xFFF5F8FC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF232836)
+                          : const Color(0xFFDCE5F2),
+                    ),
+                  ),
+                  child: Text(
+                    'Recurring ride on ${controller.ride.value!.recurrenceLabel}'
+                    '${controller.ride.value!.recurrenceEndDate == null ? '' : ' until ${_fmtDate(controller.ride.value!.recurrenceEndDate!)}'}. '
+                    'Changes here only update this occurrence.',
+                    style: TextStyle(color: muted, height: 1.4),
+                  ),
+                ),
+              ],
 
               Row(
                 children: [

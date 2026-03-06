@@ -15,6 +15,10 @@ class DriverRideItem {
   final int seatsAvailable;
   final double pricePerSeat;
   final String status; // open/ongoing/completed/cancelled
+  final String rideType;
+  final String? recurringSeriesId;
+  final List<String> recurrenceDays;
+  final DateTime? recurrenceEndDate;
 
   DriverRideItem({
     required this.id,
@@ -27,9 +31,14 @@ class DriverRideItem {
     required this.seatsAvailable,
     required this.pricePerSeat,
     required this.status,
+    this.rideType = 'one-time',
+    this.recurringSeriesId,
+    this.recurrenceDays = const [],
+    this.recurrenceEndDate,
   });
 
   int get booked => (seatsTotal - seatsAvailable).clamp(0, seatsTotal);
+  bool get isRecurring => rideType.trim().toLowerCase() == 'recurring';
 }
 
 class DriverMyRidesController extends GetxController {
@@ -124,6 +133,16 @@ class DriverMyRidesController extends GetxController {
       return dt?.toLocal();
     }
 
+    List<String> readStringList(dynamic v) {
+      if (v is List) {
+        return v
+            .map((item) => item?.toString().trim() ?? '')
+            .where((item) => item.isNotEmpty)
+            .toList();
+      }
+      return const <String>[];
+    }
+
     return DriverRideItem(
       id: (j['id'] ?? '').toString(),
       from: (j['fromCity'] ?? j['from_city'] ?? '').toString(),
@@ -136,6 +155,15 @@ class DriverMyRidesController extends GetxController {
           ((j['seatsAvailable'] ?? j['seats_available']) as num?)?.toInt() ?? 0,
       pricePerSeat: toDouble(j['pricePerSeat'] ?? j['price_per_seat']),
       status: (j['status'] ?? 'open').toString(),
+      rideType: (j['rideType'] ?? j['ride_type'] ?? 'one-time').toString(),
+      recurringSeriesId:
+          (j['recurringSeriesId'] ?? j['recurring_series_id'])?.toString(),
+      recurrenceDays: readStringList(
+        j['recurrenceDays'] ?? j['recurrence_days'],
+      ),
+      recurrenceEndDate: readDate(
+        j['recurrenceEndDate'] ?? j['recurrence_end_date'],
+      ),
     );
   }
 

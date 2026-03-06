@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../rides/utils/ride_recurrence.dart';
 import '../../controllers/driver_my_rides_controller.dart';
 import 'driver_ride_bookings_sheet.dart';
 import 'ride_formatters.dart';
@@ -43,6 +44,18 @@ class DriverRideCard extends StatelessWidget {
           Row(
             children: [
               _StatusPill(status: status),
+              if (ride.isRecurring) ...[
+                const SizedBox(width: 8),
+                _MetaPill(
+                  text: 'Recurring',
+                  background: isDark
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFF3F5F8),
+                  foreground: isDark
+                      ? const Color(0xFFBFDBFE)
+                      : const Color(0xFF475569),
+                ),
+              ],
               const Spacer(),
               Text(
                 '\$${ride.pricePerSeat.toStringAsFixed(0)}/seat',
@@ -89,6 +102,22 @@ class DriverRideCard extends StatelessWidget {
               ),
             ],
           ),
+          if (ride.isRecurring) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.repeat_rounded, size: 16, color: muted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Repeats ${formatRideRecurrenceDays(ride.recurrenceDays)}'
+                    '${ride.recurrenceEndDate == null ? '' : ' until ${_fmtSeriesDate(ride.recurrenceEndDate!)}'}',
+                    style: TextStyle(color: muted),
+                  ),
+                ),
+              ],
+            ),
+          ],
 
           const SizedBox(height: 12),
           Divider(
@@ -279,4 +308,52 @@ class _StatusPill extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({
+    required this.text,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String text;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: foreground,
+        ),
+      ),
+    );
+  }
+}
+
+String _fmtSeriesDate(DateTime value) {
+  const monthNames = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${monthNames[value.month - 1]} ${value.day}';
 }

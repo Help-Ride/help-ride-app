@@ -1,3 +1,5 @@
+import '../utils/ride_recurrence.dart';
+
 class RideDriver {
   final String id;
   final String name;
@@ -75,6 +77,10 @@ class Ride {
   final int seatsTotal;
   final int seatsAvailable;
   final String status;
+  final String rideType;
+  final String? recurringSeriesId;
+  final List<String> recurrenceDays;
+  final DateTime? recurrenceEndDate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final List<String> stops;
@@ -98,6 +104,10 @@ class Ride {
     required this.seatsTotal,
     required this.seatsAvailable,
     required this.status,
+    this.rideType = 'one-time',
+    this.recurringSeriesId,
+    this.recurrenceDays = const [],
+    this.recurrenceEndDate,
     this.createdAt,
     this.updatedAt,
     this.stops = const [],
@@ -180,6 +190,21 @@ class Ride {
       seatsTotal: _toInt(json['seatsTotal'] ?? json['seats_total']),
       seatsAvailable: _toInt(json['seatsAvailable'] ?? json['seats_available']),
       status: (json['status'] ?? json['ride_status'] ?? 'open').toString(),
+      rideType: (json['rideType'] ?? json['ride_type'] ?? 'one-time')
+          .toString(),
+      recurringSeriesId:
+          _readString(json['recurringSeriesId'] ?? json['recurring_series_id']),
+      recurrenceDays: normalizeRideRecurrenceDays(
+        _readStringList(
+          json['recurrenceDays'] ??
+              json['recurrence_days'] ??
+              json['repeatDays'] ??
+              json['repeat_days'],
+        ),
+      ),
+      recurrenceEndDate: _readDate(
+        json['recurrenceEndDate'] ?? json['recurrence_end_date'],
+      ),
       createdAt: _readDate(json['createdAt'] ?? json['created_at']),
       updatedAt: _readDate(json['updatedAt'] ?? json['updated_at']),
       stops: _readStringList(
@@ -208,4 +233,8 @@ class Ride {
           : null,
     );
   }
+
+  bool get isRecurring => rideType.trim().toLowerCase() == 'recurring';
+
+  String get recurrenceLabel => formatRideRecurrenceDays(recurrenceDays);
 }

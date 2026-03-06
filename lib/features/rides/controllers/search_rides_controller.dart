@@ -104,7 +104,8 @@ class SearchRidesController extends GetxController {
         radiusKm: radiusKm.value,
       );
 
-      final prioritized = await _prioritizeFocusedRide(list);
+      final deduped = _dedupeRecurringSeries(list);
+      final prioritized = await _prioritizeFocusedRide(deduped);
       rides.assignAll(prioritized);
 
       // init default selection if missing
@@ -161,5 +162,25 @@ class SearchRidesController extends GetxController {
       // Ignore if the exact ride can not be fetched.
     }
     return reordered;
+  }
+
+  List<Ride> _dedupeRecurringSeries(List<Ride> list) {
+    if ((focusRideId.value?.trim().isNotEmpty ?? false)) {
+      return list;
+    }
+
+    final seenSeriesIds = <String>{};
+    final result = <Ride>[];
+    for (final ride in list) {
+      final seriesId = ride.recurringSeriesId?.trim();
+      if (ride.isRecurring && seriesId != null && seriesId.isNotEmpty) {
+        if (seenSeriesIds.add(seriesId)) {
+          result.add(ride);
+        }
+        continue;
+      }
+      result.add(ride);
+    }
+    return result;
   }
 }

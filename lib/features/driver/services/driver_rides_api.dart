@@ -15,6 +15,10 @@ class DriverRidesApi {
     required DateTime startTimeUtc,
     required int seatsTotal,
     required double pricePerSeat,
+    String rideType = 'one-time',
+    List<String> recurrenceDays = const [],
+    DateTime? recurrenceEndDateUtc,
+    List<DateTime> occurrenceStartTimesUtc = const [],
     DateTime? arrivalTimeUtc,
     required List<String> stops,
     required List<String> amenities,
@@ -29,6 +33,17 @@ class DriverRidesApi {
         .where((amenity) => amenity.isNotEmpty)
         .toList();
     final notes = additionalNotes?.trim();
+    final normalizedRecurrenceDays = recurrenceDays
+        .map((day) => day.trim().toLowerCase())
+        .where((day) => day.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    final hasRecurringSchedule =
+        rideType.trim().toLowerCase() == 'recurring' ||
+        normalizedRecurrenceDays.isNotEmpty ||
+        recurrenceEndDateUtc != null ||
+        occurrenceStartTimesUtc.length > 1;
+    final effectiveRideType = hasRecurringSchedule ? 'recurring' : 'one-time';
 
     final res = await _client.post<Map<String, dynamic>>(
       '/rides',
@@ -43,6 +58,14 @@ class DriverRidesApi {
         'arrivalTime': arrivalTimeUtc?.toIso8601String(),
         'seatsTotal': seatsTotal,
         'pricePerSeat': pricePerSeat,
+        'rideType': effectiveRideType,
+        if (hasRecurringSchedule) 'recurrenceDays': normalizedRecurrenceDays,
+        if (hasRecurringSchedule && recurrenceEndDateUtc != null)
+          'recurrenceEndDate': recurrenceEndDateUtc.toIso8601String(),
+        if (hasRecurringSchedule && occurrenceStartTimesUtc.isNotEmpty)
+          'occurrenceStartTimes': occurrenceStartTimesUtc
+              .map((value) => value.toIso8601String())
+              .toList(),
         'stops': cleanedStops,
         'amenities': cleanedAmenities,
         'additionalNotes': notes?.isEmpty ?? true ? null : notes,

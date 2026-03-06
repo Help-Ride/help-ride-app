@@ -1349,7 +1349,6 @@ class _StripeConnectSection extends StatelessWidget {
         final loading = controller.stripeStatusLoading.value;
         final onboardingLoading = controller.stripeOnboardingLoading.value;
         final dashboardLoading = controller.stripeDashboardLoading.value;
-        final resetLoading = controller.stripeResetLoading.value;
         final error = controller.stripeConnectError.value;
         final uiState = _statusUiState(status, loading: loading);
         final canOpenDashboard = status.hasStripeAccount;
@@ -1483,35 +1482,10 @@ class _StripeConnectSection extends StatelessWidget {
                             ),
                           )
                         : const Text(
-                            'Open Dashboard',
+                            'View Pay Details',
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                   ),
-                TextButton(
-                  onPressed: resetLoading
-                      ? null
-                      : () => _confirmAndResetStripe(context),
-                  child: resetLoading
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Reset setup (test)',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                ),
-                TextButton(
-                  onPressed: loading
-                      ? null
-                      : () =>
-                            unawaited(controller.refreshStripeConnectStatus()),
-                  child: const Text(
-                    'Refresh',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
               ],
             ),
           ],
@@ -1538,46 +1512,7 @@ class _StripeConnectSection extends StatelessWidget {
       final uri = await controller.createStripeDashboardUri();
       await _launchStripeInBrowser(
         uri,
-        failureMessage: 'Could not open Stripe dashboard.',
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      _showSnack(context, _cleanError(e));
-    }
-  }
-
-  Future<void> _confirmAndResetStripe(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Reset Stripe setup?'),
-          content: const Text(
-            'This deletes your current Stripe Connect test account and creates a new one. Continue only if you want to restart onboarding from scratch.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text(
-                'Reset',
-                style: TextStyle(color: AppColors.error),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true || !context.mounted) return;
-    try {
-      final uri = await controller.resetStripeConnectUri();
-      await _launchStripeInBrowser(
-        uri,
-        failureMessage: 'Could not open Stripe onboarding after reset.',
+        failureMessage: 'Could not open pay details.',
       );
     } catch (e) {
       if (!context.mounted) return;
