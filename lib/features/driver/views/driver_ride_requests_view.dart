@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bookings/utils/booking_formatters.dart';
 import '../../ride_requests/models/ride_request.dart';
+import '../../../shared/utils/input_validators.dart';
 import '../controllers/driver_ride_requests_controller.dart';
 import '../widgets/requests/driver_ride_request_card.dart';
 import '../widgets/requests/driver_offer_card.dart';
@@ -145,9 +147,38 @@ class _TabPill extends StatelessWidget {
   }
 }
 
-class _RequestsTab extends StatelessWidget {
+class _RequestsTab extends StatefulWidget {
   const _RequestsTab({required this.controller});
   final DriverRideRequestsController controller;
+
+  @override
+  State<_RequestsTab> createState() => _RequestsTabState();
+}
+
+class _RequestsTabState extends State<_RequestsTab> {
+  String? _autoOpeningRequestId;
+
+  DriverRideRequestsController get controller => widget.controller;
+
+  void _maybeAutoOpenNotificationRequest(BuildContext context) {
+    if (_autoOpeningRequestId != null) return;
+    final request = controller.pendingAutoOpenRequest();
+    if (request == null) return;
+
+    _autoOpeningRequestId = request.id;
+    controller.markAutoOpenRequestHandled();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      try {
+        await _openOfferSheet(context, controller, request);
+      } finally {
+        if (mounted) {
+          setState(() => _autoOpeningRequestId = null);
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -455,6 +486,10 @@ class _RequestsTab extends StatelessWidget {
 
       final initialLoading = controller.requestsLoading.value && list.isEmpty;
 
+      if (!initialLoading && err == null && list.isNotEmpty) {
+        _maybeAutoOpenNotificationRequest(context);
+      }
+
       Widget body;
       if (initialLoading) {
         body = const SliverFillRemaining(
@@ -610,45 +645,14 @@ Future<void> _openOfferSheet(
   if (!context.mounted) return;
   final matches = controller.matchingRidesFor(request);
   if (matches.isEmpty) {
-    final goCreate = await showAdaptiveDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog.adaptive(
-        title: const Text('No matching rides'),
-        content: const Text(
-          'Create a ride that matches this request before sending an offer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Create Ride'),
-          ),
-        ],
-      ),
-    );
-    if (goCreate == true) {
-      Get.toNamed(
-        '/driver/create-ride',
-        arguments: {
-          'fromCity': request.fromCity,
-          'toCity': request.toCity,
-          if (request.fromLat != null) 'fromLat': request.fromLat,
-          if (request.fromLng != null) 'fromLng': request.fromLng,
-          if (request.toLat != null) 'toLat': request.toLat,
-          if (request.toLng != null) 'toLng': request.toLng,
-        },
-      );
-    }
+    await _openQuickCreateOfferSheet(context, controller, request);
     return;
   }
 
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final rides = matches;
   String selectedRideId = rides.first.id;
-  int seatsOffered = 1;
+  int seatsOffered = request.seatsNeeded;
   String? error;
 
   await showModalBottomSheet<void>(
@@ -663,8 +667,12 @@ Future<void> _openOfferSheet(
             orElse: () => rides.first,
           );
           final maxSeats = ride.seatsAvailable <= 0 ? 1 : ride.seatsAvailable;
+          final minSeats = request.seatsNeeded;
           if (seatsOffered > maxSeats) {
             seatsOffered = maxSeats;
+          }
+          if (seatsOffered < minSeats) {
+            seatsOffered = minSeats;
           }
 
           return Container(
@@ -750,7 +758,7 @@ Future<void> _openOfferSheet(
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Seats Offered (max $maxSeats)',
+                  'Seats Offered (min $minSeats, max $maxSeats)',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     color: isDark ? AppColors.darkText : AppColors.lightText,
@@ -760,7 +768,7 @@ Future<void> _openOfferSheet(
                 Row(
                   children: [
                     IconButton(
-                      onPressed: seatsOffered <= 1
+                      onPressed: seatsOffered <= minSeats
                           ? null
                           : () => setState(() => seatsOffered -= 1),
                       icon: const Icon(Icons.remove_circle_outline),
@@ -797,8 +805,10 @@ Future<void> _openOfferSheet(
                         setState(() => error = 'Select a ride.');
                         return;
                       }
-                      if (seatsOffered <= 0) {
-                        setState(() => error = 'Pick seats offered.');
+                      if (seatsOffered < minSeats) {
+                        setState(
+                          () => error = 'Offer at least $minSeats seat(s).',
+                        );
                         return;
                       }
                       try {
@@ -834,4 +844,403 @@ Future<void> _openOfferSheet(
       );
     },
   );
+}
+
+Future<void> _openQuickCreateOfferSheet(
+  BuildContext context,
+  DriverRideRequestsController controller,
+  RideRequest request,
+) async {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final surfaceAlt = isDark ? const Color(0xFF1C2331) : const Color(0xFFF3F5F8);
+  final requestTime = (request.preferredTime ?? '').trim().isNotEmpty
+      ? request.preferredTime!.trim()
+      : formatDateTime(request.preferredDate);
+  final seatsCtrl = TextEditingController(text: request.seatsNeeded.toString());
+  final priceCtrl = TextEditingController(
+    text: _formatPriceSeed(request.quotedPricePerSeat ?? 25.0),
+  );
+  var submitting = false;
+  String? error;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          Future<void> submit() async {
+            final seatsError = InputValidators.positiveInt(
+              seatsCtrl.text,
+              fieldLabel: 'Available seats',
+              min: request.seatsNeeded,
+            );
+            if (seatsError != null) {
+              setState(() => error = seatsError);
+              return;
+            }
+
+            final priceError = InputValidators.nonNegativeDecimal(
+              priceCtrl.text,
+              fieldLabel: 'Price per seat',
+            );
+            if (priceError != null) {
+              setState(() => error = priceError);
+              return;
+            }
+
+            final seatsTotal = int.parse(seatsCtrl.text.trim());
+            final pricePerSeat = double.parse(priceCtrl.text.trim());
+            setState(() {
+              submitting = true;
+              error = null;
+            });
+
+            try {
+              final finalPrice = await controller.createRideAndOffer(
+                request: request,
+                seatsTotal: seatsTotal,
+                pricePerSeat: pricePerSeat,
+              );
+              Get.back();
+              final adjusted =
+                  finalPrice != null &&
+                  (finalPrice - pricePerSeat).abs() > 0.009;
+              final message = adjusted
+                  ? 'Ride created and offer sent at \$${_formatPriceSeed(finalPrice)}/seat.'
+                  : 'Ride created and offer sent.';
+              Get.snackbar('Offer sent', message);
+            } catch (e) {
+              setState(() {
+                submitting = false;
+                error = e.toString();
+              });
+            }
+          }
+
+          return Container(
+            padding: EdgeInsets.fromLTRB(
+              18,
+              18,
+              18,
+              18 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF121826) : Colors.white,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0x24FFFFFF)
+                            : const Color(0xFFD6DCE8),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'No Scheduled Ride',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 22,
+                      color: isDark ? AppColors.darkText : AppColors.lightText,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "You don't have a scheduled ride for this request.",
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: isDark
+                          ? AppColors.darkMuted
+                          : AppColors.lightMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Want to create one and send the offer automatically?',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: isDark
+                          ? AppColors.darkMuted
+                          : AppColors.lightMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: surfaceAlt,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.alt_route_rounded,
+                              size: 18,
+                              color: isDark
+                                  ? AppColors.darkMuted
+                                  : AppColors.lightMuted,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${request.fromCity} → ${request.toCity}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark
+                                      ? AppColors.darkText
+                                      : AppColors.lightText,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            _QuickInfoChip(
+                              icon: Icons.access_time_rounded,
+                              text: requestTime,
+                              isDark: isDark,
+                            ),
+                            _QuickInfoChip(
+                              icon: Icons.event_seat_outlined,
+                              text:
+                                  '${request.seatsNeeded} seat${request.seatsNeeded == 1 ? '' : 's'} requested',
+                              isDark: isDark,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _FieldHeader(
+                    title: 'Available Seats',
+                    helper:
+                        'Set how many seats this new ride will publish. Minimum ${request.seatsNeeded}.',
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: seatsCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(2),
+                    ],
+                    decoration: InputDecoration(
+                      hintText: 'Enter seat count',
+                      prefixIcon: const Icon(Icons.event_seat_outlined),
+                      filled: true,
+                      fillColor: surfaceAlt,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _FieldHeader(
+                    title: 'Price Per Seat',
+                    helper:
+                        'This is the per-seat price the passenger will see on the offer.',
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: priceCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                    ],
+                    decoration: InputDecoration(
+                      hintText: 'Enter price',
+                      prefixText: '\$ ',
+                      filled: true,
+                      fillColor: surfaceAlt,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFE8E8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        error!,
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: submitting ? null : () => Get.back(),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(46),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text(
+                            'Not Now',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: SizedBox(
+                          height: 46,
+                          child: ElevatedButton(
+                            onPressed: submitting ? null : submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.driverPrimary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              submitting
+                                  ? 'Creating...'
+                                  : 'Create Ride & Send Offer',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  ).whenComplete(() {
+    seatsCtrl.dispose();
+    priceCtrl.dispose();
+  });
+}
+
+String _formatPriceSeed(double value) {
+  final fixed = value.toStringAsFixed(2);
+  if (fixed.endsWith('.00')) return value.toStringAsFixed(0);
+  if (fixed.endsWith('0')) return fixed.substring(0, fixed.length - 1);
+  return fixed;
+}
+
+class _FieldHeader extends StatelessWidget {
+  const _FieldHeader({
+    required this.title,
+    required this.helper,
+    required this.isDark,
+  });
+
+  final String title;
+  final String helper;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: isDark ? AppColors.darkText : AppColors.lightText,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          helper,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickInfoChip extends StatelessWidget {
+  const _QuickInfoChip({
+    required this.icon,
+    required this.text,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF121826) : Colors.white,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.darkText : AppColors.lightText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

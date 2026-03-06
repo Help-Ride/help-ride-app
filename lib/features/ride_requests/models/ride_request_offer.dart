@@ -34,11 +34,11 @@ class RideRequestOfferRide {
 
     return RideRequestOfferRide(
       id: (json['id'] ?? '').toString(),
-      fromCity: (json['fromCity'] ?? '').toString(),
-      toCity: (json['toCity'] ?? '').toString(),
-      startTime: toDate(json['startTime']),
-      pricePerSeat: toDouble(json['pricePerSeat']),
-      seatsAvailable: toInt(json['seatsAvailable']),
+      fromCity: (json['fromCity'] ?? json['from_city'] ?? '').toString(),
+      toCity: (json['toCity'] ?? json['to_city'] ?? '').toString(),
+      startTime: toDate(json['startTime'] ?? json['start_time']),
+      pricePerSeat: toDouble(json['pricePerSeat'] ?? json['price_per_seat']),
+      seatsAvailable: toInt(json['seatsAvailable'] ?? json['seats_available']),
     );
   }
 }
@@ -48,6 +48,7 @@ class RideRequestOffer {
   final String rideRequestId;
   final String rideId;
   final int seatsOffered;
+  final double pricePerSeat;
   final String status;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -60,6 +61,7 @@ class RideRequestOffer {
     required this.rideRequestId,
     required this.rideId,
     required this.seatsOffered,
+    required this.pricePerSeat,
     required this.status,
     required this.createdAt,
     this.updatedAt,
@@ -68,7 +70,23 @@ class RideRequestOffer {
     this.driver,
   });
 
+  bool get isOpen {
+    final normalized = status.trim().toLowerCase();
+    return normalized.contains('pending') || normalized.contains('sent');
+  }
+
+  double get displayPricePerSeat {
+    if (pricePerSeat > 0) return pricePerSeat;
+    final ridePrice = ride?.pricePerSeat ?? 0;
+    return ridePrice > 0 ? ridePrice : 0;
+  }
+
   factory RideRequestOffer.fromJson(Map<String, dynamic> json) {
+    double toDouble(dynamic v) {
+      if (v is num) return v.toDouble();
+      return double.tryParse(v?.toString() ?? '') ?? 0;
+    }
+
     DateTime toDate(dynamic v) {
       return DateTime.tryParse(v?.toString() ?? '')?.toLocal() ??
           DateTime.now();
@@ -83,10 +101,10 @@ class RideRequestOffer {
     final requestMap = json['rideRequest'] is Map
         ? json['rideRequest']
         : json['request'] is Map
-            ? json['request']
-            : json['ride_request'] is Map
-                ? json['ride_request']
-                : null;
+        ? json['request']
+        : json['ride_request'] is Map
+        ? json['ride_request']
+        : null;
 
     final rideMap = json['ride'] is Map ? json['ride'] : null;
 
@@ -103,23 +121,26 @@ class RideRequestOffer {
         ? null
         : RideRequestOfferDriver.fromJson(driverMap.cast<String, dynamic>());
 
-    final requestId = (json['rideRequestId'] ??
-            request?.id ??
-            json['requestId'] ??
-            '')
-        .toString();
+    final requestId =
+        (json['rideRequestId'] ?? request?.id ?? json['requestId'] ?? '')
+            .toString();
 
-    final rideId =
-        (json['rideId'] ?? ride?.id ?? json['driverRideId'] ?? '').toString();
+    final rideId = (json['rideId'] ?? ride?.id ?? json['driverRideId'] ?? '')
+        .toString();
 
     return RideRequestOffer(
       id: (json['id'] ?? json['offerId'] ?? '').toString(),
       rideRequestId: requestId,
       rideId: rideId,
       seatsOffered: toInt(json['seatsOffered'] ?? json['seats'] ?? 0),
+      pricePerSeat: toDouble(
+        json['pricePerSeat'] ?? json['price_per_seat'] ?? ride?.pricePerSeat,
+      ),
       status: (json['status'] ?? 'pending').toString(),
-      createdAt: toDate(json['createdAt']),
-      updatedAt: json['updatedAt'] == null ? null : toDate(json['updatedAt']),
+      createdAt: toDate(json['createdAt'] ?? json['created_at']),
+      updatedAt: json['updatedAt'] == null && json['updated_at'] == null
+          ? null
+          : toDate(json['updatedAt'] ?? json['updated_at']),
       request: request,
       ride: ride,
       driver: driver,

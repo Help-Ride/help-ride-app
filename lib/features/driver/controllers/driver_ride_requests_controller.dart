@@ -12,6 +12,7 @@ import '../../../shared/widgets/place_picker_field.dart';
 import '../../ride_requests/models/ride_request.dart';
 import '../../ride_requests/models/ride_request_offer.dart';
 import '../../ride_requests/services/ride_requests_api.dart';
+import '../services/driver_rides_api.dart';
 
 enum DriverRideRequestsTab { requests, offers }
 
@@ -44,6 +45,7 @@ class DriverRideItemLite {
 class DriverRideRequestsController extends GetxController {
   late final ApiClient _client;
   late final RideRequestsApi _api;
+  late final DriverRidesApi _ridesApi;
 
   static const List<double> radiusOptionsKm = [10, 20, 50];
   static const double defaultRadiusKm = 20;
@@ -85,16 +87,30 @@ class DriverRideRequestsController extends GetxController {
   Position? _lastFetchPosition;
   Timer? _onlineSyncTimer;
   StreamSubscription<String>? _rideRequestPushSub;
+  String? _requestedRideRequestId;
+  bool _autoOpenOfferSheet = false;
 
   @override
   Future<void> onInit() async {
     super.onInit();
     _client = await ApiClient.create();
     _api = RideRequestsApi(_client);
+    _ridesApi = DriverRidesApi(_client);
+    final args = (Get.arguments as Map?) ?? {};
+    final requestedId = (args['rideRequestId'] ?? '').toString().trim();
+    final autoOpenRaw = args['autoOpenOfferSheet'];
+    _requestedRideRequestId = requestedId.isEmpty ? null : requestedId;
+    _autoOpenOfferSheet =
+        autoOpenRaw == true ||
+        autoOpenRaw?.toString().trim().toLowerCase() == 'true';
+    if (_autoOpenOfferSheet) {
+      tab.value = DriverRideRequestsTab.requests;
+    }
     _bindRideRequestPushRefresh();
     _startOnlineSyncTimer();
     await fetchOffers();
     await refreshNearbyRequests(force: true);
+    await _ensureRequestedRideVisible();
   }
 
   @override
@@ -225,6 +241,7 @@ class DriverRideRequestsController extends GetxController {
       requests.assignAll(list);
       _lastFetchAt = now;
       _lastFetchPosition = position;
+      await _ensureRequestedRideVisible();
     } catch (e) {
       requestsError.value = e.toString();
     } finally {
@@ -433,7 +450,7 @@ class DriverRideRequestsController extends GetxController {
 
     return driverRides.where((ride) {
       if (!ride.startTime.isAfter(now)) return false;
-      if (ride.seatsAvailable <= 0) return false;
+      if (ride.seatsAvailable < request.seatsNeeded) return false;
       if (ride.fromLat == null ||
           ride.fromLng == null ||
           ride.toLat == null ||
@@ -469,6 +486,44 @@ class DriverRideRequestsController extends GetxController {
 
   double _degToRad(double deg) => deg * (pi / 180.0);
 
+  RideRequest? pendingAutoOpenRequest() {
+    if (!_autoOpenOfferSheet) return null;
+    final requestedId = _requestedRideRequestId;
+    if (requestedId == null || requestedId.isEmpty) return null;
+    for (final request in requests) {
+      if (request.id == requestedId) return request;
+    }
+    return null;
+  }
+
+  void markAutoOpenRequestHandled() {
+    _autoOpenOfferSheet = false;
+    _requestedRideRequestId = null;
+  }
+
+  Future<void> _ensureRequestedRideVisible() async {
+    final requestedId = _requestedRideRequestId;
+    if (requestedId == null || requestedId.isEmpty) return;
+    final existingIndex = requests.indexWhere(
+      (request) => request.id == requestedId,
+    );
+    if (existingIndex != -1) {
+      final existing = requests.removeAt(existingIndex);
+      requests.insert(0, existing);
+      requests.refresh();
+      return;
+    }
+
+    try {
+      final request = await _api.getRideRequestById(requestedId);
+      if (request == null) return;
+      requests.insert(0, request);
+      requests.refresh();
+    } catch (_) {
+      // Best effort for notification deep-links.
+    }
+  }
+
   Future<void> createOffer({
     required String rideRequestId,
     required String rideId,
@@ -499,5 +554,105 @@ class DriverRideRequestsController extends GetxController {
       cancelingOfferIds.remove(offerId);
       cancelingOfferIds.refresh();
     }
+  }
+
+  Future<double?> createRideAndOffer({
+    required RideRequest request,
+    required int seatsTotal,
+    required double pricePerSeat,
+  }) async {
+    if (request.fromLat == null ||
+        request.fromLng == null ||
+        request.toLat == null ||
+        request.toLng == null) {
+      throw Exception('Request is missing route coordinates.');
+    }
+    if (seatsTotal < request.seatsNeeded) {
+      throw Exception(
+        'Available seats must be at least ${request.seatsNeeded}.',
+      );
+    }
+    if (pricePerSeat < 0) {
+      throw Exception('Price per seat can not be negative.');
+    }
+
+    final createdRide = await _ridesApi.createRide(
+      fromCity: request.fromCity,
+      fromLat: request.fromLat!,
+      fromLng: request.fromLng!,
+      toCity: request.toCity,
+      toLat: request.toLat!,
+      toLng: request.toLng!,
+      startTimeUtc: _requestStartTimeLocal(request).toUtc(),
+      seatsTotal: seatsTotal,
+      pricePerSeat: pricePerSeat,
+      stops: const [],
+      amenities: const [],
+      additionalNotes: null,
+    );
+
+    final rideId = (createdRide['id'] ?? '').toString().trim();
+    if (rideId.isEmpty) {
+      throw Exception('Ride created, but no ride id was returned.');
+    }
+
+    await createOffer(
+      rideRequestId: request.id,
+      rideId: rideId,
+      seatsOffered: request.seatsNeeded,
+    );
+    await loadDriverRides();
+
+    return _asDouble(
+      createdRide['pricePerSeat'] ?? createdRide['price_per_seat'],
+    );
+  }
+
+  DateTime _requestStartTimeLocal(RideRequest request) {
+    final base = request.preferredDate;
+    final parsedTime = _parseHourMinute(request.preferredTime);
+    if (parsedTime == null) return base;
+    return DateTime(
+      base.year,
+      base.month,
+      base.day,
+      parsedTime.$1,
+      parsedTime.$2,
+    );
+  }
+
+  (int, int)? _parseHourMinute(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) return null;
+
+    final match = RegExp(
+      r'^(\d{1,2}):(\d{2})(?:\s*([AaPp][Mm]))?$',
+    ).firstMatch(value);
+    if (match == null) return null;
+
+    var hour = int.tryParse(match.group(1) ?? '');
+    final minute = int.tryParse(match.group(2) ?? '');
+    final meridiem = match.group(3)?.toUpperCase();
+    if (hour == null || minute == null || minute < 0 || minute > 59) {
+      return null;
+    }
+
+    if (meridiem != null) {
+      if (hour < 1 || hour > 12) return null;
+      if (meridiem == 'AM') {
+        hour = hour % 12;
+      } else {
+        hour = hour % 12 + 12;
+      }
+    } else if (hour < 0 || hour > 23) {
+      return null;
+    }
+
+    return (hour, minute);
+  }
+
+  double? _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
   }
 }

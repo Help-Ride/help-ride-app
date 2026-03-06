@@ -19,6 +19,7 @@ class SearchRidesController extends GetxController {
   final toLat = RxnDouble();
   final toLng = RxnDouble();
   final radiusKm = RxnDouble();
+  final focusRideId = RxnString();
 
   // per-ride seat selection
   final selectedSeats = <String, int>{}.obs;
@@ -39,6 +40,10 @@ class SearchRidesController extends GetxController {
     toLat.value = _readDouble(args['toLat']);
     toLng.value = _readDouble(args['toLng']);
     radiusKm.value = _readDouble(args['radiusKm']);
+    final focusId = (args['focusRideId'] ?? args['rideId'] ?? '')
+        .toString()
+        .trim();
+    focusRideId.value = focusId.isEmpty ? null : focusId;
 
     final rawSeats = args['seats'];
     final parsedSeats = rawSeats is int
@@ -47,13 +52,17 @@ class SearchRidesController extends GetxController {
 
     seatsRequired.value = parsedSeats <= 0 ? 1 : parsedSeats;
 
-    final missingCoords = fromLat.value == null ||
+    final missingCoords =
+        fromLat.value == null ||
         fromLng.value == null ||
         toLat.value == null ||
         toLng.value == null;
     if (missingCoords) {
-      error.value = 'Missing location coordinates. Select places from suggestions.';
-      return;
+      if (focusRideId.value == null || focusRideId.value!.isEmpty) {
+        error.value =
+            'Missing location coordinates. Select places from suggestions.';
+        return;
+      }
     }
 
     await fetch();
@@ -82,7 +91,8 @@ class SearchRidesController extends GetxController {
           fromLngValue == null ||
           toLatValue == null ||
           toLngValue == null) {
-        throw Exception('Missing location coordinates.');
+        await _loadFocusedRideOnly();
+        return;
       }
 
       final list = await _api.searchRides(
@@ -94,10 +104,11 @@ class SearchRidesController extends GetxController {
         radiusKm: radiusKm.value,
       );
 
-      rides.assignAll(list);
+      final prioritized = await _prioritizeFocusedRide(list);
+      rides.assignAll(prioritized);
 
       // init default selection if missing
-      for (final r in list) {
+      for (final r in prioritized) {
         selectedSeats.putIfAbsent(r.id, () => 1);
       }
       selectedSeats.refresh();
@@ -112,5 +123,43 @@ class SearchRidesController extends GetxController {
     if (value == null) return null;
     if (value is num) return value.toDouble();
     return double.tryParse(value.toString());
+  }
+
+  Future<void> _loadFocusedRideOnly() async {
+    final rideId = focusRideId.value?.trim() ?? '';
+    if (rideId.isEmpty) {
+      throw Exception('Missing location coordinates.');
+    }
+    final ride = await _api.getRideById(rideId);
+    fromCity.value = ride.fromCity;
+    toCity.value = ride.toCity;
+    fromLat.value = ride.fromLat;
+    fromLng.value = ride.fromLng;
+    toLat.value = ride.toLat;
+    toLng.value = ride.toLng;
+    rides.assignAll([ride]);
+    selectedSeats[ride.id] = 1;
+    selectedSeats.refresh();
+  }
+
+  Future<List<Ride>> _prioritizeFocusedRide(List<Ride> list) async {
+    final rideId = focusRideId.value?.trim() ?? '';
+    if (rideId.isEmpty) return list;
+
+    final reordered = [...list];
+    final existingIndex = reordered.indexWhere((ride) => ride.id == rideId);
+    if (existingIndex != -1) {
+      final matched = reordered.removeAt(existingIndex);
+      reordered.insert(0, matched);
+      return reordered;
+    }
+
+    try {
+      final ride = await _api.getRideById(rideId);
+      reordered.insert(0, ride);
+    } catch (_) {
+      // Ignore if the exact ride can not be fetched.
+    }
+    return reordered;
   }
 }

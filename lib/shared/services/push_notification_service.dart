@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -6,7 +7,11 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 
+import '../../core/routes/app_routes.dart';
+import '../../features/driver/routes/driver_routes.dart';
+import '../../features/rides/routes/rides_routes.dart';
 import 'api_client.dart';
 import 'notifications_api.dart';
 import 'token_storage.dart';
@@ -49,6 +54,10 @@ class PushNotificationService {
     'ride_request_created',
     'ride_request_created_nearby',
   };
+  static const Set<String> _rideCreatedKinds = {'ride_created'};
+
+  Map<String, String>? _pendingNavigationTarget;
+  bool _navigationInFlight = false;
 
   Stream<String> get rideOfferStream => _rideOfferController.stream;
 
@@ -200,6 +209,15 @@ class PushNotificationService {
   void _onNotificationResponse(NotificationResponse response) {
     final payload = response.payload?.trim();
     if (payload == null || payload.isEmpty) return;
+    final target = _decodeNavigationPayload(payload);
+    final rideRequestId = target?['rideRequestId'];
+    if (rideRequestId != null && rideRequestId.isNotEmpty) {
+      _rideOfferController.add(rideRequestId);
+    }
+    if (target != null) {
+      unawaited(_queueNotificationNavigation(target));
+      return;
+    }
     _rideOfferController.add(payload);
   }
 
@@ -207,26 +225,32 @@ class PushNotificationService {
     if (kDebugMode) {
       debugPrint('FCM foreground message: ${message.messageId}');
     }
-    final rideRequestId = _extractRideRequestId(message);
+    final target = _extractNavigationTarget(message.data);
+    final rideRequestId = target?['rideRequestId'];
     if (rideRequestId != null && rideRequestId.isNotEmpty) {
       _rideOfferController.add(rideRequestId);
     }
-    await _showForegroundNotification(message, rideRequestId: rideRequestId);
+    await _showForegroundNotification(message, navigationTarget: target);
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {
-    final rideRequestId = _extractRideRequestId(message);
-    if (rideRequestId == null || rideRequestId.isEmpty) return;
-    _rideOfferController.add(rideRequestId);
+    final target = _extractNavigationTarget(message.data);
+    if (target == null) return;
+    final rideRequestId = target['rideRequestId'];
+    if (rideRequestId != null && rideRequestId.isNotEmpty) {
+      _rideOfferController.add(rideRequestId);
+    }
+    unawaited(_queueNotificationNavigation(target));
   }
 
   Future<void> _showForegroundNotification(
     RemoteMessage message, {
-    String? rideRequestId,
+    Map<String, String>? navigationTarget,
   }) async {
     if (!_localNotificationReady) return;
     final title = message.notification?.title?.trim();
     final body = message.notification?.body?.trim();
+    final rideRequestId = navigationTarget?['rideRequestId'];
 
     final hasVisualContent =
         (title != null && title.isNotEmpty) ||
@@ -262,7 +286,9 @@ class PushNotificationService {
           android: androidDetails,
           iOS: iosDetails,
         ),
-        payload: rideRequestId,
+        payload: navigationTarget == null
+            ? rideRequestId
+            : jsonEncode(navigationTarget),
       );
     } on MissingPluginException {
       _localNotificationReady = false;
@@ -274,8 +300,7 @@ class PushNotificationService {
     }
   }
 
-  String? _extractRideRequestId(RemoteMessage message) {
-    final data = message.data;
+  Map<String, String>? _extractNavigationTarget(Map<String, dynamic> data) {
     if (data.isEmpty) return null;
 
     final kind = _firstNonEmpty(data, const [
@@ -285,19 +310,106 @@ class PushNotificationService {
       'event',
       'type',
     ]);
-    if (kind != null && kind.isNotEmpty) {
-      final normalized = kind.trim().toLowerCase();
-      if (!_rideRequestKinds.contains(normalized)) {
-        return null;
-      }
+    final normalizedKind = kind?.trim().toLowerCase() ?? '';
+    if (normalizedKind.isEmpty) return null;
+
+    if (_rideRequestKinds.contains(normalizedKind)) {
+      final rideRequestId = _firstNonEmpty(data, const [
+        'rideRequestId',
+        'ride_request_id',
+        'requestId',
+        'request_id',
+      ]);
+      if (rideRequestId == null || rideRequestId.isEmpty) return null;
+      return {'kind': normalizedKind, 'rideRequestId': rideRequestId};
     }
 
-    return _firstNonEmpty(data, const [
-      'rideRequestId',
-      'ride_request_id',
-      'requestId',
-      'request_id',
-    ]);
+    if (_rideCreatedKinds.contains(normalizedKind)) {
+      final rideId = _firstNonEmpty(data, const ['rideId', 'ride_id']);
+      if (rideId == null || rideId.isEmpty) return null;
+      return {'kind': normalizedKind, 'rideId': rideId};
+    }
+
+    return null;
+  }
+
+  Map<String, String>? _decodeNavigationPayload(String payload) {
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map) {
+        return decoded.map(
+          (key, value) =>
+              MapEntry(key.toString(), value?.toString().trim() ?? ''),
+        );
+      }
+    } catch (_) {
+      if (payload.trim().isNotEmpty) {
+        return {
+          'kind': 'ride_request_created_nearby',
+          'rideRequestId': payload.trim(),
+        };
+      }
+    }
+    return null;
+  }
+
+  Future<void> _queueNotificationNavigation(Map<String, String> target) async {
+    _pendingNavigationTarget = target;
+    await flushPendingNavigation();
+  }
+
+  Future<void> flushPendingNavigation() async {
+    if (_navigationInFlight) return;
+    final target = _pendingNavigationTarget;
+    if (target == null) return;
+    if (!await _canNavigateNow()) return;
+
+    _navigationInFlight = true;
+    _pendingNavigationTarget = null;
+    try {
+      await _navigateToTarget(target);
+    } catch (e) {
+      _pendingNavigationTarget = target;
+      _log('Notification navigation failed: $e');
+    } finally {
+      _navigationInFlight = false;
+    }
+  }
+
+  Future<bool> _canNavigateNow() async {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      if (Get.key.currentState != null && Get.currentRoute != AppRoutes.gate) {
+        return true;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    return false;
+  }
+
+  Future<void> _navigateToTarget(Map<String, String> target) async {
+    final kind = (target['kind'] ?? '').trim().toLowerCase();
+    switch (kind) {
+      case 'ride_request_created':
+      case 'ride_request_created_nearby':
+        final rideRequestId = (target['rideRequestId'] ?? '').trim();
+        if (rideRequestId.isEmpty) return;
+        await Get.toNamed(
+          DriverRoutes.rideRequests,
+          arguments: {
+            'rideRequestId': rideRequestId,
+            'autoOpenOfferSheet': true,
+          },
+        );
+        return;
+      case 'ride_created':
+        final rideId = (target['rideId'] ?? '').trim();
+        if (rideId.isEmpty) return;
+        await Get.toNamed(
+          RidesRoutes.search,
+          arguments: {'focusRideId': rideId, 'rideId': rideId},
+        );
+        return;
+    }
   }
 
   Future<void> _handleTokenRefresh(String token) async {
