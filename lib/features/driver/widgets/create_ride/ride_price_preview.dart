@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:help_ride/features/driver/utils/ride_price_policy.dart';
+import 'package:help_ride/features/driver/models/ride_pricing_preview.dart';
+
 import '../../../../core/theme/app_colors.dart';
 
 class RidePricePreview extends StatelessWidget {
   const RidePricePreview({super.key, required this.preview});
 
-  final RidePriceResolution preview;
+  final RidePricingPreview preview;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +22,7 @@ class RidePricePreview extends StatelessWidget {
     final titleColor = preview.adjusted
         ? const Color(0xFF8A5A00)
         : AppColors.driverPrimary;
-    final classification = _classificationLabel(preview.classification);
+    final classification = _classificationLabel(preview.rideTiming);
     final appliedRules = _appliedRules(preview);
 
     return Container(
@@ -36,7 +37,7 @@ class RidePricePreview extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            preview.adjusted ? 'Safety caps applied' : 'Pricing preview',
+            _title(preview),
             style: TextStyle(
               color: titleColor,
               fontWeight: FontWeight.w800,
@@ -50,7 +51,16 @@ class RidePricePreview extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            'Entered: \$${_formatPrice(preview.basePricePerSeat)} • $classification • ${preview.distanceKm.toStringAsFixed(1)} km',
+            'Entered: \$${_formatPrice(preview.inputPricePerSeat)} • Floor: \$${_formatPrice(preview.marketFloorPricePerSeat)} • $classification',
+            style: TextStyle(
+              color: muted,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${preview.distanceKm.toStringAsFixed(1)} km • ${preview.estimatedDurationMinutes} min est. • Trip est. \$${_formatPrice(preview.estimatedTripTotal)}',
             style: TextStyle(
               color: muted,
               fontWeight: FontWeight.w600,
@@ -73,22 +83,39 @@ class RidePricePreview extends StatelessWidget {
     );
   }
 
-  List<String> _appliedRules(RidePriceResolution preview) {
+  String _title(RidePricingPreview preview) {
+    switch (preview.strategy) {
+      case RidePricingStrategy.fixedRoute:
+        return 'Fixed route price applies';
+      case RidePricingStrategy.marketMinimum:
+        return 'Market minimum will apply';
+      case RidePricingStrategy.driverInput:
+        return 'Pricing preview';
+    }
+  }
+
+  List<String> _appliedRules(RidePricingPreview preview) {
     final out = <String>[];
-    if (preview.appliedOntimeMarkup) out.add('ONTIME +30%');
-    if (preview.appliedMinimumProtection) out.add('Min \$20 protected');
-    if (preview.appliedSameDropCeiling) out.add('Same-drop ceiling \$15');
-    if (preview.appliedUpperSafetyCap) out.add('Upper cap enforced');
+    if (preview.fixedRoutePricePerSeat != null) {
+      out.add('Fixed route \$${_formatPrice(preview.fixedRoutePricePerSeat!)}');
+    }
+    if (preview.appliedOntimeMarkup) out.add('On-time demand applied');
+    if (preview.sharedSeatDivisor > 1.01) {
+      out.add('Shared factor ÷${_formatPrice(preview.sharedSeatDivisor)}');
+    }
+    if (preview.strategy == RidePricingStrategy.marketMinimum) {
+      out.add('Entered price is below the market minimum');
+    }
     return out;
   }
 
-  String _classificationLabel(RideTypeClassification type) {
+  String _classificationLabel(RideTimingClass type) {
     switch (type) {
-      case RideTypeClassification.prebooked:
+      case RideTimingClass.prebooked:
         return 'PREBOOKED';
-      case RideTypeClassification.ontime:
+      case RideTimingClass.ontime:
         return 'ONTIME';
-      case RideTypeClassification.standard:
+      case RideTimingClass.standard:
         return 'STANDARD';
     }
   }

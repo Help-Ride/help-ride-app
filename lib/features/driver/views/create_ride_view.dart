@@ -150,8 +150,8 @@ class CreateRideView extends GetView<CreateRideController> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ExoTextField(
-                      label: 'Price per Seat',
-                      hint: '25',
+                      label: 'Minimum Price / Seat',
+                      hint: '0 = auto',
                       controller: controller.priceCtrl,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -166,6 +166,11 @@ class CreateRideView extends GetView<CreateRideController> {
                   ),
                 ],
               ),
+              if (controller.pricingPreviewLoading.value &&
+                  controller.pricingPreview.value == null) ...[
+                const SizedBox(height: 10),
+                const LinearProgressIndicator(minHeight: 2),
+              ],
               if (controller.pricingPreview.value != null) ...[
                 const SizedBox(height: 10),
                 RidePricePreview(preview: controller.pricingPreview.value!),

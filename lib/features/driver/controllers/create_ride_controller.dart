@@ -1,11 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../models/ride_pricing_preview.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/utils/input_validators.dart';
 import '../../../shared/widgets/place_picker_field.dart';
 import '../services/driver_rides_api.dart';
 import '../utils/ride_payload_utils.dart';
-import '../utils/ride_price_policy.dart';
 
 class CreateRideController extends GetxController {
   late final DriverRidesApi _api;
@@ -17,7 +19,7 @@ class CreateRideController extends GetxController {
   final toCtrl = TextEditingController();
   final stopsCtrl = TextEditingController();
   final seatsCtrl = TextEditingController();
-  final priceCtrl = TextEditingController(text: '25');
+  final priceCtrl = TextEditingController(text: '0');
   final notesCtrl = TextEditingController();
 
   final fromPick = Rxn<PlacePick>();
@@ -27,8 +29,11 @@ class CreateRideController extends GetxController {
   final time = Rxn<TimeOfDay>();
   final canPublishFlag = false.obs;
   final submitAttempted = false.obs;
-  final pricingPreview = Rxn<RidePriceResolution>();
+  final pricingPreview = Rxn<RidePricingPreview>();
+  final pricingPreviewLoading = false.obs;
   final _workers = <Worker>[];
+  Timer? _pricingPreviewDebounce;
+  int _pricingPreviewRequestId = 0;
 
   final amenities = <String, bool>{
     'AC': false,
@@ -99,6 +104,7 @@ class CreateRideController extends GetxController {
     seatsCtrl.dispose();
     priceCtrl.dispose();
     notesCtrl.dispose();
+    _pricingPreviewDebounce?.cancel();
     super.onClose();
   }
 
@@ -173,13 +179,13 @@ class CreateRideController extends GetxController {
 
   void _refreshComputedState() {
     _recomputeCanPublish();
-    pricingPreview.value = _buildPricingPreview();
+    _schedulePricingPreviewRefresh();
     if (submitAttempted.value && canPublish) {
       error.value = null;
     }
   }
 
-  RidePriceResolution? _buildPricingPreview() {
+  _RidePricingPreviewRequest? _buildPricingPreviewRequest() {
     final from = fromPick.value?.latLng;
     final to = toPick.value?.latLng;
     final departure = startDateTimeLocal;
@@ -196,24 +202,84 @@ class CreateRideController extends GetxController {
       return null;
     }
 
-    final distanceKm = RidePricePolicy.distanceKm(
+    return _RidePricingPreviewRequest(
+      fromCity: fromCtrl.text.trim(),
       fromLat: from.lat,
       fromLng: from.lng,
+      toCity: toCtrl.text.trim(),
       toLat: to.lat,
       toLng: to.lng,
+      startTimeUtc: departure.toUtc(),
+      seatsTotal: seats,
+      pricePerSeat: basePrice,
     );
+  }
 
-    return RidePricePolicy.resolvePerSeatPrice(
-      basePricePerSeat: basePrice,
-      seats: seats,
-      distanceKm: distanceKm,
-      bookingTimeLocal: DateTime.now(),
-      departureTimeLocal: departure,
-      sameDestination: RidePricePolicy.isSameDestination(
-        from: fromCtrl.text,
-        to: toCtrl.text,
-      ),
+  void _schedulePricingPreviewRefresh() {
+    _pricingPreviewDebounce?.cancel();
+    final request = _buildPricingPreviewRequest();
+    if (request == null) {
+      pricingPreviewLoading.value = false;
+      pricingPreview.value = null;
+      return;
+    }
+
+    final requestId = ++_pricingPreviewRequestId;
+    pricingPreviewLoading.value = true;
+    _pricingPreviewDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () async {
+        try {
+          final preview = await _api.previewRidePricing(
+            fromCity: request.fromCity,
+            fromLat: request.fromLat,
+            fromLng: request.fromLng,
+            toCity: request.toCity,
+            toLat: request.toLat,
+            toLng: request.toLng,
+            startTimeUtc: request.startTimeUtc,
+            seatsTotal: request.seatsTotal,
+            pricePerSeat: request.pricePerSeat,
+          );
+          if (requestId != _pricingPreviewRequestId) return;
+          pricingPreview.value = preview;
+        } catch (_) {
+          if (requestId != _pricingPreviewRequestId) return;
+          pricingPreview.value = null;
+        } finally {
+          if (requestId == _pricingPreviewRequestId) {
+            pricingPreviewLoading.value = false;
+          }
+        }
+      },
     );
+  }
+
+  double? _readResolvedPrice(dynamic raw) {
+    if (raw is num) return raw.toDouble();
+    return double.tryParse(raw?.toString() ?? '');
+  }
+
+  String _priceLabel(double value) {
+    final fixed = value.toStringAsFixed(2);
+    if (fixed.endsWith('.00')) return value.toStringAsFixed(0);
+    if (fixed.endsWith('0')) return fixed.substring(0, fixed.length - 1);
+    return fixed;
+  }
+
+  void _showPublishSuccess({
+    required double inputPrice,
+    required double finalPrice,
+  }) {
+    if ((finalPrice - inputPrice).abs() >= 0.01) {
+      Get.snackbar(
+        'Published',
+        'Ride created. Final rider price set to \$${_priceLabel(finalPrice)}/seat.',
+      );
+      return;
+    }
+
+    Get.snackbar('Published', 'Ride created successfully');
   }
 
   DateTime? get startDateTimeLocal {
@@ -252,35 +318,13 @@ class CreateRideController extends GetxController {
     final to = toPick.value!;
     final fromLL = from.latLng!;
     final toLL = to.latLng!;
-    final pricing =
-        _buildPricingPreview() ??
-        RidePricePolicy.resolvePerSeatPrice(
-          basePricePerSeat: basePrice,
-          seats: seats,
-          distanceKm: RidePricePolicy.distanceKm(
-            fromLat: fromLL.lat,
-            fromLng: fromLL.lng,
-            toLat: toLL.lat,
-            toLng: toLL.lng,
-          ),
-          bookingTimeLocal: DateTime.now(),
-          departureTimeLocal: startLocal,
-          sameDestination: RidePricePolicy.isSameDestination(
-            from: from.fullText,
-            to: to.fullText,
-          ),
-        );
-    final finalPrice = pricing.finalPricePerSeat;
-    if (pricing.adjusted) {
-      priceCtrl.text = _formatPrice(finalPrice);
-    }
     final stops = parseRideStopsCsv(stopsCtrl.text);
     final selectedAmenities = selectedRideAmenitiesForApi(amenities);
     final additionalNotes = normalizeRideAdditionalNotes(notesCtrl.text);
 
     loading.value = true;
     try {
-      await _api.createRide(
+      final createdRide = await _api.createRide(
         fromCity: from.fullText,
         fromLat: fromLL.lat,
         fromLng: fromLL.lng,
@@ -289,19 +333,19 @@ class CreateRideController extends GetxController {
         toLng: toLL.lng,
         startTimeUtc: startLocal.toUtc(),
         seatsTotal: seats,
-        pricePerSeat: finalPrice,
+        pricePerSeat: basePrice,
         stops: stops,
         amenities: selectedAmenities,
         additionalNotes: additionalNotes,
       );
+      final resolvedPrice =
+          _readResolvedPrice(
+            createdRide['pricePerSeat'] ?? createdRide['price_per_seat'],
+          ) ??
+          basePrice;
 
       Get.back();
-      Get.snackbar(
-        'Published',
-        pricing.adjusted
-            ? 'Ride created. Price adjusted to \$${_formatPrice(finalPrice)}/seat by safety caps.'
-            : 'Ride created successfully',
-      );
+      _showPublishSuccess(inputPrice: basePrice, finalPrice: resolvedPrice);
     } catch (e) {
       error.value = e.toString();
       Get.snackbar('Failed', error.value ?? 'Failed');
@@ -311,9 +355,26 @@ class CreateRideController extends GetxController {
   }
 }
 
-String _formatPrice(double value) {
-  final fixed = value.toStringAsFixed(2);
-  if (fixed.endsWith('.00')) return value.toStringAsFixed(0);
-  if (fixed.endsWith('0')) return fixed.substring(0, fixed.length - 1);
-  return fixed;
+class _RidePricingPreviewRequest {
+  const _RidePricingPreviewRequest({
+    required this.fromCity,
+    required this.fromLat,
+    required this.fromLng,
+    required this.toCity,
+    required this.toLat,
+    required this.toLng,
+    required this.startTimeUtc,
+    required this.seatsTotal,
+    required this.pricePerSeat,
+  });
+
+  final String fromCity;
+  final double fromLat;
+  final double fromLng;
+  final String toCity;
+  final double toLat;
+  final double toLng;
+  final DateTime startTimeUtc;
+  final int seatsTotal;
+  final double pricePerSeat;
 }

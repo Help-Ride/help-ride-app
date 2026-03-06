@@ -1,4 +1,5 @@
 import '../../../shared/services/api_client.dart';
+import '../models/ride_pricing_preview.dart';
 
 class DriverRidesApi {
   DriverRidesApi(this._client);
@@ -126,5 +127,33 @@ class DriverRidesApi {
     }
     final res = await _client.put<Map<String, dynamic>>('/rides/$id/complete');
     return res.data ?? <String, dynamic>{};
+  }
+
+  Future<RidePricingPreview> previewRidePricing({
+    required String fromCity,
+    required double fromLat,
+    required double fromLng,
+    required String toCity,
+    required double toLat,
+    required double toLng,
+    required DateTime startTimeUtc,
+    required int seatsTotal,
+    required double pricePerSeat,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/rides/pricing-preview',
+      data: {
+        'fromCity': fromCity,
+        'fromLat': fromLat,
+        'fromLng': fromLng,
+        'toCity': toCity,
+        'toLat': toLat,
+        'toLng': toLng,
+        'startTime': startTimeUtc.toIso8601String(),
+        'seatsTotal': seatsTotal,
+        'pricePerSeat': pricePerSeat,
+      },
+    );
+    return RidePricingPreview.fromJson(res.data ?? const <String, dynamic>{});
   }
 }
