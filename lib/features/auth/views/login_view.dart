@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart' as apple_sign_in;
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
@@ -263,13 +266,51 @@ class LoginView extends GetView<AuthController> {
                         ],
                       ),
                       const SizedBox(height: 14),
+                      if (Platform.isIOS) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              apple_sign_in.SignInWithAppleButton(
+                                onPressed: controller.canStartAppleOauth
+                                    ? controller.loginWithApple
+                                    : null,
+                                height: 52,
+                                borderRadius: BorderRadius.circular(14),
+                                style: isDark
+                                    ? apple_sign_in
+                                          .SignInWithAppleButtonStyle
+                                          .whiteOutlined
+                                    : apple_sign_in
+                                          .SignInWithAppleButtonStyle
+                                          .black,
+                                iconAlignment: apple_sign_in.IconAlignment.left,
+                              ),
+                              if (controller.appleOauthLoading.value)
+                                SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      isDark ? Colors.black : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       SizedBox(
                         width: double.infinity,
                         height: 52,
                         child: OutlinedButton(
-                          onPressed: controller.oauthLoading.value
-                              ? null
-                              : controller.loginWithGoogle,
+                          onPressed: controller.canStartGoogleOauth
+                              ? controller.loginWithGoogle
+                              : null,
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(
                               color: isDark
@@ -280,7 +321,7 @@ class LoginView extends GetView<AuthController> {
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          child: controller.oauthLoading.value
+                          child: controller.googleOauthLoading.value
                               ? const SizedBox(
                                   height: 18,
                                   width: 18,

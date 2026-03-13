@@ -188,6 +188,24 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                 isDark: isDark,
               ),
               const SizedBox(height: 16),
+              _SectionLabel(label: 'ACCOUNT', isDark: isDark),
+              const SizedBox(height: 8),
+              _ActionGroup(
+                items: [
+                  _ActionItem(
+                    icon: Icons.delete_forever_outlined,
+                    label: _controller.deleteAccountLoading.value
+                        ? 'Deleting Account...'
+                        : 'Delete Account',
+                    destructive: true,
+                    onTap: _controller.deleteAccountLoading.value
+                        ? null
+                        : () => _confirmDeleteAccount(context),
+                  ),
+                ],
+                isDark: isDark,
+              ),
+              const SizedBox(height: 16),
               _LogoutCard(
                 onLogout: () async {
                   await session.logout();
@@ -217,6 +235,65 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
     if (_didAutoOpenDriverEditor || !widget.openDriverEditorOnLoad) return;
     _didAutoOpenDriverEditor = true;
     await _openDriverEditSheet(context, _controller.driverProfile.value);
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Account'),
+          content: const Text(
+            'This permanently deletes your Help Ride account. You will lose access immediately, and deletion can be blocked until active rides, bookings, ride requests, or driver payouts are resolved.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _controller.deleteMyAccount();
+      if (!context.mounted) return;
+      Get.offAllNamed(AppRoutes.login);
+      Get.snackbar('Account deleted', 'Your account has been deleted.');
+    } on DeleteAccountBlockedException catch (error) {
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Deletion blocked'),
+            content: Text(
+              [
+                error.message,
+                if (error.reasons.isNotEmpty) '',
+                ...error.reasons.map(_deletionReasonLabel),
+              ].join('\n'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      _showError(context, error);
+    }
   }
 
   Future<void> _listenForStripeReturnLinks() async {
@@ -1775,9 +1852,15 @@ class _ActionGroup extends StatelessWidget {
 class _ActionItem {
   final IconData icon;
   final String label;
+  final bool destructive;
   final VoidCallback? onTap;
 
-  const _ActionItem({required this.icon, required this.label, this.onTap});
+  const _ActionItem({
+    required this.icon,
+    required this.label,
+    this.destructive = false,
+    this.onTap,
+  });
 }
 
 class _ProfileActionTile extends StatelessWidget {
@@ -1788,20 +1871,37 @@ class _ProfileActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accentColor = item.destructive ? Colors.red : _mutedText(isDark);
+    final textColor = item.destructive ? Colors.red : _textPrimary(isDark);
+
     return ListTile(
       onTap: item.onTap,
-      leading: Icon(item.icon, color: _mutedText(isDark)),
+      leading: Icon(item.icon, color: accentColor),
       title: Text(
         item.label,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: _textPrimary(isDark),
-        ),
+        style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
       ),
-      trailing: Icon(Icons.chevron_right, color: _mutedText(isDark)),
+      trailing: Icon(Icons.chevron_right, color: accentColor),
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14),
     );
+  }
+}
+
+String _deletionReasonLabel(String reason) {
+  switch (reason.trim().toLowerCase()) {
+    case 'active_booking':
+      return '• Resolve your active bookings first.';
+    case 'active_ride':
+      return '• Resolve your active driver rides first.';
+    case 'active_ride_request':
+      return '• Resolve your active ride requests first.';
+    case 'active_ride_request_offer':
+      return '• Resolve your active ride request offers first.';
+    case 'pending_driver_transfer':
+      return '• Wait for pending driver payouts to finish first.';
+    default:
+      return '• ${reason.replaceAll('_', ' ')}';
   }
 }
 

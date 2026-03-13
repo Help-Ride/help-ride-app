@@ -86,6 +86,10 @@ class ProfileApi {
     return User.fromJson(res.data ?? const <String, dynamic>{});
   }
 
+  Future<void> deleteMyAccount() async {
+    await _client.delete<void>('/users/me');
+  }
+
   Future<DriverDocumentPresign> getDriverDocumentPresign(
     String userId, {
     required String type,

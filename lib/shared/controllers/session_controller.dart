@@ -80,6 +80,10 @@ class SessionController extends GetxController {
         // Best-effort revoke; proceed to clear local session.
       }
     }
+    await clearLocalSession();
+  }
+
+  Future<void> clearLocalSession() async {
     await PushNotificationService.instance.unregisterDeviceTokenIfNeeded();
     await _tokenStorage.clear();
     user.value = null;

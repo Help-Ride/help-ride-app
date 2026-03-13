@@ -9,6 +9,7 @@ import 'package:help_ride/shared/utils/phone_number_utils.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/token_storage.dart';
 import '../routes/auth_routes.dart';
+import '../services/apple_oauth_service.dart';
 import '../services/auth_api.dart';
 import '../services/google_oauth_service.dart';
 import '../services/oauth_api.dart';
@@ -26,7 +27,8 @@ class AuthController extends GetxController {
   final loginMethod = AuthLoginMethod.password.obs;
 
   final isLoading = false.obs;
-  final oauthLoading = false.obs;
+  final googleOauthLoading = false.obs;
+  final appleOauthLoading = false.obs;
   final isSendingOtp = false.obs;
   final isVerifyingOtp = false.obs;
   final otpSent = false.obs;
@@ -39,6 +41,7 @@ class AuthController extends GetxController {
   late final AuthApi _authApi;
   late final OAuthApi _oauthApi;
   late final GoogleOAuthService _googleOAuth;
+  late final AppleOAuthService _appleOAuth;
 
   String? get emailError => InputValidators.email(email.value);
   String? get passwordError => InputValidators.password(password.value);
@@ -62,7 +65,7 @@ class AuthController extends GetxController {
       emailError == null &&
       passwordError == null &&
       !isLoading.value &&
-      !oauthLoading.value;
+      !isOauthBusy;
 
   bool get canRegister =>
       isReady.value &&
@@ -71,10 +74,10 @@ class AuthController extends GetxController {
       passwordError == null &&
       registerPhoneError == null &&
       !isLoading.value &&
-      !oauthLoading.value;
+      !isOauthBusy;
 
   bool get canSendLoginOtp {
-    if (!isReady.value || isLoading.value || oauthLoading.value) return false;
+    if (!isReady.value || isLoading.value || isOauthBusy) return false;
     if (isSendingOtp.value || isVerifyingOtp.value) return false;
     return otpIdentifierError == null;
   }
@@ -90,6 +93,14 @@ class AuthController extends GetxController {
   String? get normalizedOtpPhone =>
       PhoneNumberUtils.normalizeToE164(otpIdentifier.value);
   String get normalizedOtpEmail => otpIdentifier.value.trim();
+  bool get isOauthBusy => googleOauthLoading.value || appleOauthLoading.value;
+  bool get canStartGoogleOauth =>
+      isReady.value &&
+      !isLoading.value &&
+      !isSendingOtp.value &&
+      !isVerifyingOtp.value &&
+      !isOauthBusy;
+  bool get canStartAppleOauth => canStartGoogleOauth;
 
   @override
   void onInit() {
@@ -103,6 +114,7 @@ class AuthController extends GetxController {
     _authApi = AuthApi(apiClient);
     _oauthApi = OAuthApi(apiClient);
     _googleOAuth = GoogleOAuthService();
+    _appleOAuth = AppleOAuthService();
     isReady.value = true;
   }
 
@@ -246,9 +258,9 @@ class AuthController extends GetxController {
   }
 
   Future<void> loginWithGoogle() async {
-    if (isLoading.value || oauthLoading.value) return;
+    if (!canStartGoogleOauth) return;
 
-    oauthLoading.value = true;
+    googleOauthLoading.value = true;
     _clearFeedback();
 
     try {
@@ -270,12 +282,49 @@ class AuthController extends GetxController {
       await _persistTokens(
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
+        provider: 'google',
       );
       await _finishAuthenticatedFlow();
     } catch (e) {
       error.value = _prettyError(e);
     } finally {
-      oauthLoading.value = false;
+      googleOauthLoading.value = false;
+    }
+  }
+
+  Future<void> loginWithApple() async {
+    if (!canStartAppleOauth) return;
+
+    appleOauthLoading.value = true;
+    _clearFeedback();
+
+    try {
+      final credential = await _appleOAuth.signIn();
+      if (credential == null) return;
+
+      final authLocation = await LocationSyncService.instance
+          .captureCurrentLocation(requestPermission: false);
+      final oauthName = (credential.fullName ?? '').trim().isEmpty
+          ? 'Apple User'
+          : credential.fullName!.trim();
+      final tokens = await _oauthApi.oauthLogin(
+        provider: 'apple',
+        providerUserId: credential.userIdentifier,
+        email: credential.email,
+        name: oauthName,
+        location: authLocation,
+      );
+
+      await _persistTokens(
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        provider: 'apple',
+      );
+      await _finishAuthenticatedFlow();
+    } catch (e) {
+      error.value = _prettyError(e);
+    } finally {
+      appleOauthLoading.value = false;
     }
   }
 
@@ -334,9 +383,10 @@ class AuthController extends GetxController {
   Future<void> _persistTokens({
     required String accessToken,
     String? refreshToken,
+    String provider = 'email',
   }) async {
     await _tokenStorage.saveAccessToken(accessToken.trim());
-    await _tokenStorage.saveAuthProvider('email');
+    await _tokenStorage.saveAuthProvider(provider);
     if (refreshToken != null && refreshToken.trim().isNotEmpty) {
       await _tokenStorage.saveRefreshToken(refreshToken.trim());
     } else {

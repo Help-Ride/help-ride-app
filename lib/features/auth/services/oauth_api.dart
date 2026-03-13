@@ -8,17 +8,18 @@ class OAuthApi {
   Future<OAuthTokens> oauthLogin({
     required String provider,
     required String providerUserId,
-    required String email,
-    required String name,
+    String? email,
+    String? name,
     String? avatarUrl,
     LocationSample? location,
   }) async {
     final payload = <String, dynamic>{
       'provider': provider,
       'providerUserId': providerUserId,
-      'email': email,
-      'name': name,
-      'avatarUrl': avatarUrl,
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+      if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+      if (avatarUrl != null && avatarUrl.trim().isNotEmpty)
+        'avatarUrl': avatarUrl.trim(),
       if (location != null) ...location.toApiJson(),
     };
     final res = await _client.post<Map<String, dynamic>>(

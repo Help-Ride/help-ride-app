@@ -1,13 +1,28 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/models/user.dart';
+import '../../../shared/services/api_exception.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/utils/phone_number_utils.dart';
 import '../models/driver_document.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_connect_api.dart';
+
+class DeleteAccountBlockedException implements Exception {
+  const DeleteAccountBlockedException({
+    required this.message,
+    required this.reasons,
+  });
+
+  final String message;
+  final List<String> reasons;
+
+  @override
+  String toString() => message;
+}
 
 class ProfileController extends GetxController {
   late final ProfileApi _api;
@@ -24,6 +39,7 @@ class ProfileController extends GetxController {
   final docsError = RxnString();
   final avatarUploading = false.obs;
   final avatarUploadError = RxnString();
+  final deleteAccountLoading = false.obs;
   final stripeConnectStatus = const StripeConnectStatus.empty().obs;
   final stripeStatusLoading = false.obs;
   final stripeOnboardingLoading = false.obs;
@@ -211,6 +227,38 @@ class ProfileController extends GetxController {
     }
   }
 
+  Future<void> deleteMyAccount() async {
+    deleteAccountLoading.value = true;
+    try {
+      await _api.deleteMyAccount();
+      await _session.clearLocalSession();
+    } on DioException catch (error) {
+      final apiError = error.error;
+      if (apiError is ApiException && apiError.statusCode == 409) {
+        final details = apiError.details;
+        List<String> reasons = const [];
+        if (details is Map) {
+          final rawReasons = details['reasons'];
+          if (rawReasons is List) {
+            reasons = rawReasons
+                .map((item) => item?.toString().trim() ?? '')
+                .where((item) => item.isNotEmpty)
+                .toList();
+          }
+        }
+        throw DeleteAccountBlockedException(
+          message: apiError.message,
+          reasons: reasons,
+        );
+      }
+      throw Exception(_normalizeError(error));
+    } catch (error) {
+      throw Exception(_normalizeError(error));
+    } finally {
+      deleteAccountLoading.value = false;
+    }
+  }
+
   Future<void> upsertDriverProfile({
     required String carMake,
     required String carModel,
@@ -364,6 +412,9 @@ class ProfileController extends GetxController {
   }
 
   String _normalizeError(Object error) {
+    if (error is DioException && error.error is ApiException) {
+      return (error.error as ApiException).message;
+    }
     return error.toString().replaceFirst('Exception: ', '').trim();
   }
 }

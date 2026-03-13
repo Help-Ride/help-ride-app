@@ -152,6 +152,8 @@ PODS:
   - SDWebImage (5.21.6):
     - SDWebImage/Core (= 5.21.6)
   - SDWebImage/Core (5.21.6)
+  - sign_in_with_apple (0.0.1):
+    - Flutter
   - Stripe (25.0.1):
     - StripeApplePay (= 25.0.1)
     - StripeCore (= 25.0.1)
@@ -223,6 +225,7 @@ DEPENDENCIES:
   - google_sign_in_ios (from `.symlinks/plugins/google_sign_in_ios/darwin`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - pusher_channels_flutter (from `.symlinks/plugins/pusher_channels_flutter/ios`)
+  - sign_in_with_apple (from `.symlinks/plugins/sign_in_with_apple/ios`)
   - stripe_ios (from `.symlinks/plugins/stripe_ios/ios`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
 
@@ -281,6 +284,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
   pusher_channels_flutter:
     :path: ".symlinks/plugins/pusher_channels_flutter/ios"
+  sign_in_with_apple:
+    :path: ".symlinks/plugins/sign_in_with_apple/ios"
   stripe_ios:
     :path: ".symlinks/plugins/stripe_ios/ios"
   url_launcher_ios:
@@ -318,6 +323,7 @@ SPEC CHECKSUMS:
   PusherSwift: 84a45a6b62c137c52ca948626817989d3127c022
   PusherTweetNacl: 015f56f2cf010e718703f2bd9bca66fdcc91b208
   SDWebImage: 1bb6a1b84b6fe87b972a102bdc77dd589df33477
+  sign_in_with_apple: c5dcc141574c8c54d5ac99dd2163c0c72ad22418
   Stripe: 4728e3e0dd8df134e4a420ab504e929a93a815f0
   stripe_ios: b6b8ef64e89a5409da466b4e6a2a6a26178892a6
   StripeApplePay: 43997281ace138a1c75a8f2d7be11925ea28644c
