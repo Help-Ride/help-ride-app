@@ -11,6 +11,7 @@ class OAuthApi {
     String? email,
     String? name,
     String? avatarUrl,
+    String? identityToken,
     LocationSample? location,
   }) async {
     final payload = <String, dynamic>{
@@ -20,6 +21,8 @@ class OAuthApi {
       if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
       if (avatarUrl != null && avatarUrl.trim().isNotEmpty)
         'avatarUrl': avatarUrl.trim(),
+      if (identityToken != null && identityToken.trim().isNotEmpty)
+        'identityToken': identityToken.trim(),
       if (location != null) ...location.toApiJson(),
     };
     final res = await _client.post<Map<String, dynamic>>(

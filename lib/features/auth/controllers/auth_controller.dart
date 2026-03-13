@@ -312,6 +312,7 @@ class AuthController extends GetxController {
         providerUserId: credential.userIdentifier,
         email: credential.email,
         name: oauthName,
+        identityToken: credential.identityToken,
         location: authLocation,
       );
 

@@ -11,19 +11,6 @@ import '../models/driver_document.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_connect_api.dart';
 
-class DeleteAccountBlockedException implements Exception {
-  const DeleteAccountBlockedException({
-    required this.message,
-    required this.reasons,
-  });
-
-  final String message;
-  final List<String> reasons;
-
-  @override
-  String toString() => message;
-}
-
 class ProfileController extends GetxController {
   late final ProfileApi _api;
   late final StripeConnectApi _stripeConnectApi;
@@ -232,26 +219,6 @@ class ProfileController extends GetxController {
     try {
       await _api.deleteMyAccount();
       await _session.clearLocalSession();
-    } on DioException catch (error) {
-      final apiError = error.error;
-      if (apiError is ApiException && apiError.statusCode == 409) {
-        final details = apiError.details;
-        List<String> reasons = const [];
-        if (details is Map) {
-          final rawReasons = details['reasons'];
-          if (rawReasons is List) {
-            reasons = rawReasons
-                .map((item) => item?.toString().trim() ?? '')
-                .where((item) => item.isNotEmpty)
-                .toList();
-          }
-        }
-        throw DeleteAccountBlockedException(
-          message: apiError.message,
-          reasons: reasons,
-        );
-      }
-      throw Exception(_normalizeError(error));
     } catch (error) {
       throw Exception(_normalizeError(error));
     } finally {

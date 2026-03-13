@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart' as apple_sign_in;
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
@@ -66,7 +69,9 @@ class RegisterView extends GetView<AuthController> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'We will verify your mobile number before your account goes live.',
+                        Platform.isIOS
+                            ? 'Create your account with Sign in with Apple, Google, or email and password. We will verify your mobile number before your account goes live.'
+                            : 'Create your account with Google or email and password. We will verify your mobile number before your account goes live.',
                         style: TextStyle(
                           color: isDark
                               ? AppColors.darkMuted
@@ -176,6 +181,112 @@ class RegisterView extends GetView<AuthController> {
                               ? AppColors.darkMuted
                               : AppColors.lightMuted,
                           fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          const Expanded(child: Divider(height: 1)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              Platform.isIOS
+                                  ? 'Or sign up with'
+                                  : 'Or continue with',
+                              style: TextStyle(
+                                color: isDark
+                                    ? AppColors.darkMuted
+                                    : AppColors.lightMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const Expanded(child: Divider(height: 1)),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      if (Platform.isIOS) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              apple_sign_in.SignInWithAppleButton(
+                                onPressed: controller.canStartAppleOauth
+                                    ? controller.loginWithApple
+                                    : null,
+                                height: 52,
+                                borderRadius: BorderRadius.circular(14),
+                                style: isDark
+                                    ? apple_sign_in
+                                          .SignInWithAppleButtonStyle
+                                          .whiteOutlined
+                                    : apple_sign_in
+                                          .SignInWithAppleButtonStyle
+                                          .black,
+                                iconAlignment: apple_sign_in.IconAlignment.left,
+                              ),
+                              if (controller.appleOauthLoading.value)
+                                SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      isDark ? Colors.black : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: OutlinedButton(
+                          onPressed: controller.canStartGoogleOauth
+                              ? controller.loginWithGoogle
+                              : null,
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF232836)
+                                  : const Color(0xFFE2E6EF),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: controller.googleOauthLoading.value
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Text(
+                                      'G',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Sign up with Google',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ),
                       ),
                       const SizedBox(height: 14),

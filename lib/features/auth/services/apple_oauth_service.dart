@@ -26,6 +26,7 @@ class AppleOAuthService {
         userIdentifier: userIdentifier,
         email: credential.email?.trim(),
         fullName: fullName.isEmpty ? null : fullName,
+        identityToken: credential.identityToken?.trim(),
       );
     } on SignInWithAppleAuthorizationException catch (error) {
       if (error.code == AuthorizationErrorCode.canceled) {
@@ -43,9 +44,11 @@ class AppleOAuthResult {
     required this.userIdentifier,
     this.email,
     this.fullName,
+    this.identityToken,
   });
 
   final String userIdentifier;
   final String? email;
   final String? fullName;
+  final String? identityToken;
 }

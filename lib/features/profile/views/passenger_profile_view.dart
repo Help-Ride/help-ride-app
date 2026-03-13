@@ -244,7 +244,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
         return AlertDialog(
           title: const Text('Delete Account'),
           content: const Text(
-            'This permanently deletes your Help Ride account. You will lose access immediately, and deletion can be blocked until active rides, bookings, ride requests, or driver payouts are resolved.',
+            'This permanently deletes your Help Ride account. If you continue, Help Ride will automatically cancel your active rides, bookings, ride requests, and open offers for you. You do not need to cancel them manually. Any refunds or driver payouts already in progress will continue processing after deletion.',
           ),
           actions: [
             TextButton(
@@ -267,29 +267,6 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
       if (!context.mounted) return;
       Get.offAllNamed(AppRoutes.login);
       Get.snackbar('Account deleted', 'Your account has been deleted.');
-    } on DeleteAccountBlockedException catch (error) {
-      if (!context.mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) {
-          return AlertDialog(
-            title: const Text('Deletion blocked'),
-            content: Text(
-              [
-                error.message,
-                if (error.reasons.isNotEmpty) '',
-                ...error.reasons.map(_deletionReasonLabel),
-              ].join('\n'),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          );
-        },
-      );
     } catch (error) {
       if (!context.mounted) return;
       _showError(context, error);
@@ -1885,23 +1862,6 @@ class _ProfileActionTile extends StatelessWidget {
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14),
     );
-  }
-}
-
-String _deletionReasonLabel(String reason) {
-  switch (reason.trim().toLowerCase()) {
-    case 'active_booking':
-      return '• Resolve your active bookings first.';
-    case 'active_ride':
-      return '• Resolve your active driver rides first.';
-    case 'active_ride_request':
-      return '• Resolve your active ride requests first.';
-    case 'active_ride_request_offer':
-      return '• Resolve your active ride request offers first.';
-    case 'pending_driver_transfer':
-      return '• Wait for pending driver payouts to finish first.';
-    default:
-      return '• ${reason.replaceAll('_', ' ')}';
   }
 }
 
