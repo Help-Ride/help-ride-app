@@ -10,6 +10,7 @@ import '../../../core/theme/theme_controller.dart';
 import '../controllers/auth_controller.dart';
 import '../routes/auth_routes.dart';
 import '../widgets/auth_text_field.dart';
+import '../widgets/social_auth_button.dart';
 
 class LoginView extends GetView<AuthController> {
   const LoginView({super.key});
@@ -304,51 +305,24 @@ class LoginView extends GetView<AuthController> {
                         ),
                         const SizedBox(height: 12),
                       ],
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: OutlinedButton(
-                          onPressed: controller.canStartGoogleOauth
-                              ? controller.loginWithGoogle
-                              : null,
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: isDark
-                                  ? const Color(0xFF232836)
-                                  : const Color(0xFFE2E6EF),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
+                      SocialAuthButton(
+                        label: 'Continue with Google',
+                        icon: const Text(
+                          'G',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            height: 1,
                           ),
-                          child: controller.googleOauthLoading.value
-                              ? const SizedBox(
-                                  height: 18,
-                                  width: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
-                                    Text(
-                                      'G',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    SizedBox(width: 10),
-                                    Text(
-                                      'Continue with Google',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
                         ),
+                        onPressed: controller.canStartGoogleOauth
+                            ? controller.loginWithGoogle
+                            : null,
+                        borderColor: isDark
+                            ? const Color(0xFF232836)
+                            : const Color(0xFFE2E6EF),
+                        backgroundColor: surface,
+                        isLoading: controller.googleOauthLoading.value,
                       ),
                       const SizedBox(height: 14),
                       Text(
