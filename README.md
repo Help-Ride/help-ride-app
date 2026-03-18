@@ -72,6 +72,26 @@ The app entry point initializes environment variables, Stripe, Firebase, storage
 flutter test
 ```
 
+## Android publishing
+
+The Android app is currently configured with package ID `ca.helpride.mobile` and version `1.0.1+3`. Bump the version in `pubspec.yaml` before every new Play upload.
+
+1. Create an upload keystore for Play signing:
+   ```bash
+   keytool -genkey -v \
+     -keystore android/upload-keystore.jks \
+     -keyalg RSA -keysize 2048 -validity 10000 \
+     -alias upload
+   ```
+2. Copy `android/key.properties.example` to `android/key.properties` and fill in the real passwords, alias, and keystore path.
+3. Build the Play bundle:
+   ```bash
+   flutter build appbundle --release
+   ```
+4. Upload `build/app/outputs/bundle/release/app-release.aab` to Google Play.
+
+Before submitting to production in Play Console, make sure the store listing, privacy policy, data safety form, and app content declarations are complete. This app requests location permissions and uses push notifications, payments, and file uploads, so those disclosures need to match the app's real behavior.
+
 ## Useful commands
 
 ```bash
