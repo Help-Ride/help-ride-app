@@ -273,7 +273,8 @@ class ProfileController extends GetxController {
   Future<void> refreshStripeConnectStatus({bool silent = false}) async {
     if (!_servicesReady) return;
 
-    if (!_canManageStripeConnect) {
+    final canManageStripeConnect = await _ensureStripeConnectAccess();
+    if (!canManageStripeConnect) {
       stripeConnectStatus.value = const StripeConnectStatus.empty();
       stripeConnectError.value = null;
       stripeStatusLoading.value = false;
@@ -299,7 +300,8 @@ class ProfileController extends GetxController {
       throw Exception('Profile service is still initializing.');
     }
 
-    if (!_canManageStripeConnect) {
+    final canManageStripeConnect = await _ensureStripeConnectAccess();
+    if (!canManageStripeConnect) {
       throw Exception('Stripe Connect is only available for driver accounts.');
     }
 
@@ -325,7 +327,8 @@ class ProfileController extends GetxController {
       throw Exception('Profile service is still initializing.');
     }
 
-    if (!_canManageStripeConnect) {
+    final canManageStripeConnect = await _ensureStripeConnectAccess();
+    if (!canManageStripeConnect) {
       throw Exception('Stripe Connect is only available for driver accounts.');
     }
 
@@ -351,7 +354,8 @@ class ProfileController extends GetxController {
       throw Exception('Profile service is still initializing.');
     }
 
-    if (!_canManageStripeConnect) {
+    final canManageStripeConnect = await _ensureStripeConnectAccess();
+    if (!canManageStripeConnect) {
       throw Exception('Stripe Connect is only available for driver accounts.');
     }
 
@@ -375,7 +379,15 @@ class ProfileController extends GetxController {
   bool get _canManageStripeConnect {
     final user = _session.user.value;
     if (user == null) return false;
-    return user.driverProfile != null || user.roleDefault == 'driver';
+    return user.driverProfile != null ||
+        driverProfile.value != null ||
+        user.roleDefault == 'driver';
+  }
+
+  Future<bool> _ensureStripeConnectAccess() async {
+    if (_canManageStripeConnect) return true;
+    await refreshDriverProfile();
+    return _canManageStripeConnect;
   }
 
   String _normalizeError(Object error) {

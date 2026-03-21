@@ -75,13 +75,16 @@ class _ChatThreadViewState extends State<ChatThreadView> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Obx(() {
-      final updated = _headerConversation.value ?? widget.conversation;
+      final updated = _effectiveConversation(
+        _headerConversation.value ?? widget.conversation,
+      );
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: _ChatHeader(
           conversation: updated,
           accentColor: roleColor,
           isDark: isDark,
+          onMenuTap: () => _openConversationActions(updated),
         ),
         body: Column(
           children: [
@@ -91,6 +94,12 @@ class _ChatThreadViewState extends State<ChatThreadView> {
               isDark: isDark,
               onOpenRide: () => _openRide(updated),
             ),
+            if (_controller.chatDisabled)
+              _ModerationBanner(
+                message: _chatDisabledMessage(updated),
+                accentColor: roleColor,
+                isDark: isDark,
+              ),
             Expanded(
               child: Obx(() {
                 if (_controller.loading.value) {
@@ -136,6 +145,9 @@ class _ChatThreadViewState extends State<ChatThreadView> {
                       isMine: _isMine(msg),
                       accentColor: roleColor,
                       isDark: isDark,
+                      onLongPress: _isMine(msg)
+                          ? null
+                          : () => _promptReportMessage(msg),
                     );
                   },
                 );
@@ -145,6 +157,12 @@ class _ChatThreadViewState extends State<ChatThreadView> {
               controller: _textController,
               accentColor: roleColor,
               isDark: isDark,
+              enabled:
+                  !_controller.chatDisabled &&
+                  !_controller.moderationBusy.value,
+              helperText: _controller.chatDisabled
+                  ? _chatDisabledMessage(updated)
+                  : null,
               rideReference: updated.rideReference?.trim().isNotEmpty == true
                   ? updated.rideReference!.trim()
                   : chatRideReference(updated.rideId),
@@ -157,16 +175,32 @@ class _ChatThreadViewState extends State<ChatThreadView> {
     });
   }
 
+  ChatConversation _effectiveConversation(ChatConversation conversation) {
+    return conversation.copyWith(
+      blockedByMe: _controller.blockedByMe.value,
+      blockedByOtherUser: _controller.blockedByOtherUser.value,
+      chatDisabled: _controller.chatDisabled,
+    );
+  }
+
   bool _isMine(ChatMessage msg) {
     final me = _controller.currentUserId;
     if (me.isEmpty) return msg.senderRole == _controller.currentRole;
     return msg.senderId == me;
   }
 
-  void _handleSend() {
-    _controller.draft.value = _textController.text;
-    _controller.sendCurrent();
-    _textController.clear();
+  Future<void> _handleSend() async {
+    final draft = _textController.text;
+    _controller.draft.value = draft;
+    final sent = await _controller.sendCurrent();
+    if (sent && !_controller.chatDisabled) {
+      _textController.clear();
+    } else {
+      _textController.text = draft;
+      _textController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _textController.text.length),
+      );
+    }
   }
 
   void _scrollToBottom() {
@@ -200,6 +234,120 @@ class _ChatThreadViewState extends State<ChatThreadView> {
     final route = isDriver ? '/driver/rides/$rideId' : '/rides/$rideId';
     Get.toNamed(route);
   }
+
+  String _chatDisabledMessage(ChatConversation conversation) {
+    if (conversation.blockedByMe) {
+      return 'You blocked this user. Unblock them to send more messages.';
+    }
+    if (conversation.blockedByOtherUser) {
+      return 'This user is not available for chat right now.';
+    }
+    return 'Chat is unavailable right now.';
+  }
+
+  Future<void> _openConversationActions(ChatConversation conversation) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) {
+        final blockedByMe = _controller.blockedByMe.value;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(
+                  blockedByMe ? Icons.person_add_alt_1 : Icons.block,
+                  color: blockedByMe ? null : Colors.red,
+                ),
+                title: Text(blockedByMe ? 'Unblock user' : 'Block user'),
+                subtitle: Text(
+                  blockedByMe
+                      ? 'Allow messages in this chat again.'
+                      : 'Stop this user from messaging you.',
+                ),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  if (blockedByMe) {
+                    await _controller.unblockParticipant();
+                  } else {
+                    await _controller.blockParticipant();
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.report_outlined),
+                title: const Text('Report user'),
+                subtitle: const Text(
+                  'Send this conversation to support for review.',
+                ),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  final details = await _promptForReportDetails(
+                    title: 'Report user',
+                    hint:
+                        'Describe what happened in this conversation. Include any safety concerns.',
+                  );
+                  if (details == null) return;
+                  await _controller.reportParticipant(details: details);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _promptReportMessage(ChatMessage message) async {
+    final details = await _promptForReportDetails(
+      title: 'Report message',
+      hint:
+          'Explain why this message should be reviewed. We will attach the selected message automatically.',
+    );
+    if (details == null) return;
+    await _controller.reportMessage(message: message, details: details);
+  }
+
+  Future<String?> _promptForReportDetails({
+    required String title,
+    required String hint,
+  }) async {
+    final textController = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: textController,
+            minLines: 4,
+            maxLines: 8,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: hint,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final details = textController.text.trim();
+                if (details.isEmpty) return;
+                Navigator.of(dialogContext).pop(details);
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        );
+      },
+    );
+    textController.dispose();
+    return result;
+  }
 }
 
 class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -207,11 +355,13 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
     required this.conversation,
     required this.accentColor,
     required this.isDark,
+    required this.onMenuTap,
   });
 
   final ChatConversation conversation;
   final Color accentColor;
   final bool isDark;
+  final VoidCallback onMenuTap;
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +434,7 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
           color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
         ),
         IconButton(
-          onPressed: () {},
+          onPressed: onMenuTap,
           icon: const Icon(Icons.more_vert),
           color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
         ),
@@ -595,22 +745,71 @@ class _RideMetaPill extends StatelessWidget {
   }
 }
 
+class _ModerationBanner extends StatelessWidget {
+  const _ModerationBanner({
+    required this.message,
+    required this.accentColor,
+    required this.isDark,
+  });
+
+  final String message;
+  final Color accentColor;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(alpha: isDark ? 0.18 : 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: accentColor.withValues(alpha: isDark ? 0.35 : 0.2),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.shield_outlined, color: accentColor, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: isDark ? AppColors.darkText : AppColors.lightText,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
     required this.accentColor,
     required this.isDark,
+    required this.enabled,
     required this.rideReference,
     required this.onChanged,
     required this.onSend,
+    this.helperText,
   });
 
   final TextEditingController controller;
   final Color accentColor;
   final bool isDark;
+  final bool enabled;
   final String rideReference;
   final ValueChanged<String> onChanged;
-  final VoidCallback onSend;
+  final Future<void> Function() onSend;
+  final String? helperText;
 
   @override
   Widget build(BuildContext context) {
@@ -650,15 +849,31 @@ class _Composer extends StatelessWidget {
                   ],
                 ),
               ),
+            if (helperText != null && helperText!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  helperText!,
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: controller,
-                    onChanged: onChanged,
-                    onSubmitted: (_) => onSend(),
+                    onChanged: enabled ? onChanged : null,
+                    onSubmitted: enabled
+                        ? (_) {
+                            onSend();
+                          }
+                        : null,
                     onTapOutside: (_) =>
                         FocusManager.instance.primaryFocus?.unfocus(),
+                    enabled: enabled,
                     decoration: appInputDecoration(
                       context,
                       hintText: rideReference.isNotEmpty
@@ -674,12 +889,14 @@ class _Composer extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 GestureDetector(
-                  onTap: onSend,
+                  onTap: enabled ? () => onSend() : null,
                   child: Container(
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: accentColor,
+                      color: enabled
+                          ? accentColor
+                          : accentColor.withValues(alpha: 0.35),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.send_rounded, color: Colors.white),

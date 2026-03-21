@@ -147,6 +147,9 @@ class ChatConversationsController extends GetxController {
       rideStatus: incoming.rideStatus,
       ridePricePerSeat: incoming.ridePricePerSeat,
       rideStartTime: incoming.rideStartTime,
+      blockedByMe: incoming.blockedByMe,
+      blockedByOtherUser: incoming.blockedByOtherUser,
+      chatDisabled: incoming.chatDisabled,
     );
 
     conversations[index] = updated;

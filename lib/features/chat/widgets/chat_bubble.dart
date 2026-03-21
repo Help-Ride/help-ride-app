@@ -10,12 +10,14 @@ class ChatBubble extends StatelessWidget {
     required this.isMine,
     required this.accentColor,
     required this.isDark,
+    this.onLongPress,
   });
 
   final ChatMessage message;
   final bool isMine;
   final Color accentColor;
   final bool isDark;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -40,36 +42,39 @@ class ChatBubble extends StatelessWidget {
             ? CrossAxisAlignment.end
             : CrossAxisAlignment.start,
         children: [
-          Container(
-            constraints: const BoxConstraints(maxWidth: 280),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: bubbleColor,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: isMine
-                    ? const Radius.circular(16)
-                    : const Radius.circular(4),
-                bottomRight: isMine
-                    ? const Radius.circular(4)
-                    : const Radius.circular(16),
+          GestureDetector(
+            onLongPress: onLongPress,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 280),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: bubbleColor,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: isMine
+                      ? const Radius.circular(16)
+                      : const Radius.circular(4),
+                  bottomRight: isMine
+                      ? const Radius.circular(4)
+                      : const Radius.circular(16),
+                ),
+                boxShadow: isMine
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: isDark
+                              ? Colors.black.withValues(alpha: 0.2)
+                              : Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
               ),
-              boxShadow: isMine
-                  ? null
-                  : [
-                      BoxShadow(
-                        color: isDark
-                            ? Colors.black.withOpacity(0.2)
-                            : Colors.black.withOpacity(0.06),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-            ),
-            child: Text(
-              message.body,
-              style: TextStyle(color: textColor, fontSize: 14, height: 1.3),
+              child: Text(
+                message.body,
+                style: TextStyle(color: textColor, fontSize: 14, height: 1.3),
+              ),
             ),
           ),
           const SizedBox(height: 6),

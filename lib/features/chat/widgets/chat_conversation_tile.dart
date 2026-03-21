@@ -37,6 +37,9 @@ class ChatConversationTile extends StatelessWidget {
         ? conversation.lastMessage
         : 'Start a conversation';
     final hasUnread = conversation.unreadCount > 0;
+    final moderationLabel = conversation.blockedByMe
+        ? 'Blocked'
+        : (conversation.blockedByOtherUser ? 'Unavailable' : '');
 
     final badgeColor = accentColor;
     final avatarBg = accentColor.withValues(alpha: isDark ? 0.25 : 0.15);
@@ -202,6 +205,15 @@ class ChatConversationTile extends StatelessWidget {
                         runSpacing: 8,
                         children: [
                           _RoleChip(label: roleLabel, color: accentColor),
+                          if (moderationLabel.isNotEmpty)
+                            _MetaChip(
+                              label: moderationLabel,
+                              background: isDark
+                                  ? const Color(0xFF332126)
+                                  : const Color(0xFFFCEBEC),
+                              foreground: const Color(0xFFC5394D),
+                              icon: Icons.shield_outlined,
+                            ),
                           _StatusChip(isOnline: isOnline),
                           if (rideReference.isNotEmpty)
                             _MetaChip(

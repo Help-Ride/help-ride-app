@@ -381,12 +381,14 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
       final onboardingLoading =
           _profileController.stripeOnboardingLoading.value;
       final dashboardLoading = _profileController.stripeDashboardLoading.value;
-      final resetLoading = _profileController.stripeResetLoading.value;
       final error = _profileController.stripeConnectError.value;
 
       final uiState = _stripeStepUiState(status, loading: loading);
       final isReady = uiState.ready;
       final requiresInformation = uiState.requiresInformation;
+      final setupLabel = status.hasStripeAccount
+          ? 'Continue Stripe setup'
+          : 'Set up payouts';
 
       return ListView(
         key: const ValueKey('stripe-step'),
@@ -509,9 +511,8 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
                   ),
                 ],
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (uiState.showOnboardingButton)
                       ElevatedButton(
@@ -525,68 +526,50 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
                             borderRadius: BorderRadius.circular(10),
                           ),
                           elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         child: onboardingLoading
                             ? const SizedBox(
-                                width: 14,
-                                height: 14,
+                                width: 16,
+                                height: 16,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                 ),
                               )
                             : Text(
-                                status.hasStripeAccount
-                                    ? 'Continue onboarding'
-                                    : 'Start onboarding',
+                                setupLabel,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                       ),
-                    if (status.hasStripeAccount)
+                    if (status.hasStripeAccount) ...[
+                      if (uiState.showOnboardingButton)
+                        const SizedBox(height: 8),
                       OutlinedButton(
                         onPressed: dashboardLoading
                             ? null
                             : () => _openStripeDashboard(context),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
                         child: dashboardLoading
                             ? const SizedBox(
-                                width: 14,
-                                height: 14,
+                                width: 16,
+                                height: 16,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                 ),
                               )
                             : const Text(
-                                'Open Dashboard',
+                                'Open payout dashboard',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                       ),
-                    TextButton(
-                      onPressed: resetLoading
-                          ? null
-                          : () => _confirmAndResetStripe(context),
-                      child: resetLoading
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Reset setup (test)',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                    ),
-                    TextButton(
-                      onPressed: loading
-                          ? null
-                          : () => unawaited(
-                              _profileController.refreshStripeConnectStatus(),
-                            ),
-                      child: const Text(
-                        'Refresh',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
+                    ],
                   ],
                 ),
               ],
@@ -598,19 +581,24 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
   }
 
   Future<void> _saveCarDetailsAndContinue() async {
-    await _driverController.submit(refreshSession: false, closeOnRoute: false);
-    final hasError = (_driverController.error.value ?? '').trim().isNotEmpty;
-    if (hasError) return;
+    final saved = await _driverController.submit(
+      refreshSession: false,
+      closeOnRoute: false,
+    );
+    if (!saved) return;
 
     if (!mounted) return;
     setState(() => _stepIndex = 1);
+    await _profileController.refreshDriverProfile();
     await _profileController.refreshDriverDocuments();
     await _profileController.refreshStripeConnectStatus(silent: true);
   }
 
-  void _continueToStripeStep() {
+  Future<void> _continueToStripeStep() async {
+    final ready = await _ensureDriverProfileReadyForStripe();
+    if (!ready || !mounted) return;
     setState(() => _stepIndex = 2);
-    unawaited(_profileController.refreshStripeConnectStatus());
+    await _profileController.refreshStripeConnectStatus();
   }
 
   void _goBackStep() {
@@ -753,6 +741,8 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
 
   Future<void> _openStripeOnboarding(BuildContext context) async {
     try {
+      final ready = await _ensureDriverProfileReadyForStripe();
+      if (!ready) return;
       final uri = await _profileController.createStripeOnboardingUri();
       await _launchStripeInBrowser(
         uri,
@@ -772,47 +762,6 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
       await _launchStripeInBrowser(
         uri,
         failureMessage: 'Could not open Stripe dashboard.',
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_cleanError(e))));
-    }
-  }
-
-  Future<void> _confirmAndResetStripe(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Reset Stripe setup?'),
-          content: const Text(
-            'This deletes your current Stripe Connect test account and creates a new one.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text(
-                'Reset',
-                style: TextStyle(color: AppColors.error),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true || !context.mounted) return;
-    try {
-      final uri = await _profileController.resetStripeConnectUri();
-      await _launchStripeInBrowser(
-        uri,
-        failureMessage: 'Could not open Stripe onboarding after reset.',
       );
     } catch (e) {
       if (!context.mounted) return;
@@ -842,6 +791,7 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
   }
 
   Future<void> _hydrateInitialStepState() async {
+    await _profileController.refreshDriverProfile();
     await _profileController.refreshDriverDocuments(silent: true);
     await _profileController.refreshStripeConnectStatus(silent: true);
     if (!mounted) return;
@@ -854,6 +804,27 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
       _profileController.driverDocuments,
     );
     setState(() => _stepIndex = docsReady ? 2 : 1);
+  }
+
+  Future<bool> _ensureDriverProfileReadyForStripe() async {
+    await _profileController.refreshDriverProfile();
+
+    final hasDriverProfile =
+        _session.user.value?.driverProfile != null ||
+        _profileController.driverProfile.value != null;
+    if (hasDriverProfile) {
+      return true;
+    }
+
+    final saved = await _driverController.submit(
+      refreshSession: false,
+      closeOnRoute: false,
+    );
+    if (!saved) return false;
+
+    await _profileController.refreshDriverProfile();
+    return _session.user.value?.driverProfile != null ||
+        _profileController.driverProfile.value != null;
   }
 
   Future<void> _listenForStripeReturnLinks() async {

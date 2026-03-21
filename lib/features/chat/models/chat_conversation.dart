@@ -17,6 +17,9 @@ class ChatConversation {
   final String? rideStatus;
   final double? ridePricePerSeat;
   final DateTime? rideStartTime;
+  final bool blockedByMe;
+  final bool blockedByOtherUser;
+  final bool chatDisabled;
 
   ChatConversation({
     required this.id,
@@ -35,6 +38,9 @@ class ChatConversation {
     this.rideStatus,
     this.ridePricePerSeat,
     this.rideStartTime,
+    this.blockedByMe = false,
+    this.blockedByOtherUser = false,
+    this.chatDisabled = false,
   });
 
   factory ChatConversation.fromJson(
@@ -137,6 +143,11 @@ class ChatConversation {
       rideStatus: rideStatus,
       ridePricePerSeat: ridePricePerSeat,
       rideStartTime: rideStartTime,
+      blockedByMe: _readBool(json, ['blockedByMe'], fallback: false),
+      blockedByOtherUser: _readBool(json, [
+        'blockedByOtherUser',
+      ], fallback: false),
+      chatDisabled: _readBool(json, ['chatDisabled'], fallback: false),
     );
   }
 
@@ -157,6 +168,9 @@ class ChatConversation {
     String? rideStatus,
     double? ridePricePerSeat,
     DateTime? rideStartTime,
+    bool? blockedByMe,
+    bool? blockedByOtherUser,
+    bool? chatDisabled,
   }) {
     return ChatConversation(
       id: id ?? this.id,
@@ -175,6 +189,9 @@ class ChatConversation {
       rideStatus: rideStatus ?? this.rideStatus,
       ridePricePerSeat: ridePricePerSeat ?? this.ridePricePerSeat,
       rideStartTime: rideStartTime ?? this.rideStartTime,
+      blockedByMe: blockedByMe ?? this.blockedByMe,
+      blockedByOtherUser: blockedByOtherUser ?? this.blockedByOtherUser,
+      chatDisabled: chatDisabled ?? this.chatDisabled,
     );
   }
 }

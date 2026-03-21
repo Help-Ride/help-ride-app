@@ -60,6 +60,12 @@ class TermsPrivacyView extends StatelessWidget {
                     text:
                         'Location may be used to match rides, provide navigation context, and improve safety.',
                   ),
+                  const SizedBox(height: 8),
+                  _Bullet(
+                    isDark: isDark,
+                    text:
+                        'Chat abuse can be reported in-app, and users can block other users from the chat menu.',
+                  ),
                 ],
               ),
             ),
@@ -83,6 +89,11 @@ class TermsPrivacyView extends StatelessWidget {
                         title: 'Safety and conduct',
                         body:
                             'Treat others with respect. Do not harass, discriminate, threaten, or attempt to misuse the platform. If we believe the app is being used in a harmful way, we may suspend or close accounts.',
+                      ),
+                      _PolicySection(
+                        title: 'Chat safety tools',
+                        body:
+                            'If a conversation feels unsafe or inappropriate, users can report the chat to support and block the other user from within the app.',
                       ),
                       _PolicySection(
                         title: 'Payments and pricing',
@@ -149,7 +160,10 @@ class TermsPrivacyView extends StatelessWidget {
                     ),
                     subtitle: Text(
                       _supportEmail,
-                      style: TextStyle(color: muted, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: muted,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     trailing: IconButton(
                       tooltip: 'Copy email',
@@ -324,4 +338,3 @@ Color _cardBorder(bool isDark) =>
 
 Color _cardDivider(bool isDark) =>
     isDark ? const Color(0xFF1C202B) : const Color(0xFFF1F3F7);
-

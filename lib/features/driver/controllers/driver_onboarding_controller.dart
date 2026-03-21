@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/features/home/services/drivers_api.dart';
 import 'package:help_ride/shared/utils/input_validators.dart';
 import '../routes/driver_routes.dart';
 import '../../../shared/controllers/session_controller.dart';
+import '../../../shared/services/api_exception.dart';
 import '../../../shared/services/api_client.dart';
 
 class DriverOnboardingController extends GetxController {
@@ -72,7 +74,7 @@ class DriverOnboardingController extends GetxController {
     _api = DriversApi(client);
   }
 
-  Future<void> submit({
+  Future<bool> submit({
     bool refreshSession = true,
     bool closeOnRoute = true,
   }) async {
@@ -80,7 +82,7 @@ class DriverOnboardingController extends GetxController {
 
     if (!_validateFields(showErrors: true)) {
       error.value = 'Please fix highlighted fields.';
-      return;
+      return false;
     }
 
     loading.value = true;
@@ -106,8 +108,19 @@ class DriverOnboardingController extends GetxController {
           (Get.key.currentState?.canPop() ?? false)) {
         Get.back();
       }
+      return true;
+    } on DioException catch (e) {
+      if (_isDriverProfileAlreadyExistsError(e)) {
+        if (refreshSession) {
+          await _session.bootstrap();
+        }
+        return true;
+      }
+      error.value = _normalizeError(e);
+      return false;
     } catch (e) {
-      error.value = e.toString();
+      error.value = _normalizeError(e);
+      return false;
     } finally {
       loading.value = false;
     }
@@ -146,5 +159,20 @@ class DriverOnboardingController extends GetxController {
   void _clearFieldError(String key) {
     if (!fieldErrors.containsKey(key)) return;
     fieldErrors.remove(key);
+  }
+
+  bool _isDriverProfileAlreadyExistsError(DioException error) {
+    final apiError = error.error;
+    if (apiError is! ApiException) return false;
+
+    final message = apiError.message.trim().toLowerCase();
+    return apiError.statusCode == 400 && message.contains('already exists');
+  }
+
+  String _normalizeError(Object error) {
+    if (error is DioException && error.error is ApiException) {
+      return (error.error as ApiException).message;
+    }
+    return error.toString().replaceFirst('Exception: ', '').trim();
   }
 }

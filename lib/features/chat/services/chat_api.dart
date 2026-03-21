@@ -205,6 +205,43 @@ class ChatApi {
     if (data is Map) return data.cast<String, dynamic>();
     throw Exception('Invalid pusher auth payload');
   }
+
+  Future<ChatModerationState> blockUser({required String userId}) async {
+    final id = userId.trim();
+    if (id.isEmpty) throw Exception('Missing userId');
+
+    final res = await _client.post('/chat/users/$id/block');
+    return _readModerationState(res.data, fallbackUserId: id);
+  }
+
+  Future<ChatModerationState> unblockUser({required String userId}) async {
+    final id = userId.trim();
+    if (id.isEmpty) throw Exception('Missing userId');
+
+    final res = await _client.delete('/chat/users/$id/block');
+    return _readModerationState(res.data, fallbackUserId: id);
+  }
+
+  ChatModerationState _readModerationState(
+    dynamic data, {
+    required String fallbackUserId,
+  }) {
+    if (data is Map<String, dynamic>) {
+      return ChatModerationState.fromJson(data, fallbackUserId: fallbackUserId);
+    }
+    if (data is Map && data['data'] is Map<String, dynamic>) {
+      return ChatModerationState.fromJson(
+        data['data'],
+        fallbackUserId: fallbackUserId,
+      );
+    }
+    return ChatModerationState(
+      userId: fallbackUserId,
+      blockedByMe: false,
+      blockedByOtherUser: false,
+      chatDisabled: false,
+    );
+  }
 }
 
 class ChatMessagesPage {
@@ -237,6 +274,35 @@ class MarkMessagesReadResult {
   }
 }
 
+class ChatModerationState {
+  const ChatModerationState({
+    required this.userId,
+    required this.blockedByMe,
+    required this.blockedByOtherUser,
+    required this.chatDisabled,
+  });
+
+  final String userId;
+  final bool blockedByMe;
+  final bool blockedByOtherUser;
+  final bool chatDisabled;
+
+  factory ChatModerationState.fromJson(
+    Map<String, dynamic> json, {
+    required String fallbackUserId,
+  }) {
+    return ChatModerationState(
+      userId: (json['blockedUserId'] ?? json['userId'] ?? fallbackUserId)
+          .toString(),
+      blockedByMe: _readBool(json['blockedByMe'] ?? json['blocked_by_me']),
+      blockedByOtherUser: _readBool(
+        json['blockedByOtherUser'] ?? json['blocked_by_other_user'],
+      ),
+      chatDisabled: _readBool(json['chatDisabled'] ?? json['chat_disabled']),
+    );
+  }
+}
+
 String? _readCursor(Map<dynamic, dynamic> map) {
   final direct = map['nextCursor'] ?? map['next_cursor'];
   final nested = map['data'] is Map
@@ -252,6 +318,13 @@ int _readInt(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+bool _readBool(dynamic value) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  final normalized = value?.toString().trim().toLowerCase();
+  return normalized == 'true' || normalized == '1';
 }
 
 DateTime? _readDateTime(dynamic value) {
