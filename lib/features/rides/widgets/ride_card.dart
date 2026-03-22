@@ -365,10 +365,12 @@ class RideCard extends GetView<SearchRidesController> {
                               ? 1
                               : ride.seatsAvailable;
                           final seats = controller.getSelectedSeats(ride.id, max);
-
-                          Get.snackbar(
-                            'Book',
-                            'Booking $seats seat(s) for ride ${ride.id}',
+                          Get.toNamed(
+                            '/rides/${ride.id}',
+                            arguments: {
+                              'seats': seats,
+                              'openConfirmSheet': true,
+                            },
                           );
                         },
                   style: ElevatedButton.styleFrom(

@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:help_ride/features/chat/services/chat_api.dart';
+import 'package:help_ride/features/chat/views/chat_thread_view.dart';
+import 'package:help_ride/shared/controllers/session_controller.dart';
+import 'package:help_ride/shared/services/api_client.dart';
+import 'package:help_ride/shared/services/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../controllers/my_rides_controller.dart';
 import '../routes/booking_routes.dart';
+import '../utils/booking_formatters.dart';
 import '../widgets/rides_tabs.dart';
 import '../widgets/booking_card.dart';
 import '../../ride_requests/widgets/ride_request_card.dart';
@@ -173,10 +179,19 @@ class MyRidesView extends GetView<MyRidesController> {
                               final canCancel = controller.canCancelBooking(
                                 booking,
                               );
+                              final rideIdForChat =
+                                  booking.rideId.trim().isNotEmpty
+                                  ? booking.rideId.trim()
+                                  : booking.ride.id.trim();
+                              final canChat =
+                                  isPaymentPaidStatus(booking.paymentStatus) &&
+                                  _isConfirmedBookingStatus(booking.status) &&
+                                  rideIdForChat.isNotEmpty;
                               return BookingCard(
                                 b: booking,
                                 showPay: canPay,
                                 showCancel: canCancel,
+                                showChat: canChat,
                                 isPaying: controller.isPaying(booking.id),
                                 isCanceling: controller.isCancelingBooking(
                                   booking.id,
@@ -194,6 +209,11 @@ class MyRidesView extends GetView<MyRidesController> {
                                         arguments: {
                                           'seats': booking.seatsBooked,
                                           'bookingId': booking.id,
+                                          'bookingStatus': booking.status,
+                                          'bookingPaymentStatus':
+                                              booking.paymentStatus,
+                                          'bookingPassengerId':
+                                              booking.passengerId,
                                           'bookingPickupName':
                                               booking.passengerPickupName,
                                           'bookingPickupLat':
@@ -213,6 +233,57 @@ class MyRidesView extends GetView<MyRidesController> {
                                         BookingRoutes.payNow,
                                         arguments: {'booking': booking},
                                       )
+                                    : null,
+                                onChat: canChat
+                                    ? () async {
+                                        final session =
+                                            Get.isRegistered<SessionController>()
+                                            ? Get.find<SessionController>()
+                                            : null;
+                                        final currentUserId =
+                                            session?.user.value?.id ?? '';
+                                        if (currentUserId.isEmpty) {
+                                          Get.snackbar(
+                                            'Chat',
+                                            'Please sign in to chat.',
+                                          );
+                                          return;
+                                        }
+
+                                        final passengerId = booking.passengerId
+                                            .trim()
+                                            .isNotEmpty
+                                            ? booking.passengerId.trim()
+                                            : currentUserId;
+
+                                        try {
+                                          final client = await ApiClient.create();
+                                          final api = ChatApi(client);
+                                          final conversation =
+                                              await api.createOrGetConversation(
+                                                rideId: rideIdForChat,
+                                                passengerId: passengerId,
+                                                currentUserId: currentUserId,
+                                                currentRole: session
+                                                    ?.user
+                                                    .value
+                                                    ?.roleDefault,
+                                              );
+                                          Get.to(
+                                            () => ChatThreadView(
+                                              conversation: conversation,
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          final message = e is ApiException
+                                              ? e.message
+                                              : 'Unable to open chat right now.';
+                                          Get.snackbar(
+                                            'Chat unavailable',
+                                            message,
+                                          );
+                                        }
+                                      }
                                     : null,
                                 onCancel: canCancel
                                     ? () async {
@@ -259,4 +330,9 @@ class MyRidesView extends GetView<MyRidesController> {
       ),
     );
   }
+}
+
+bool _isConfirmedBookingStatus(String value) {
+  final status = value.toLowerCase().trim();
+  return status.contains('confirm') || status.contains('accept');
 }

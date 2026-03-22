@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+
 import '../../../../core/theme/app_colors.dart';
 import '../../../rides/utils/ride_recurrence.dart';
-import '../../controllers/driver_my_rides_controller.dart';
-import 'driver_ride_bookings_sheet.dart';
+import '../../models/driver_ride_management.dart';
 import 'ride_formatters.dart';
 
 class DriverRideCard extends StatelessWidget {
-  const DriverRideCard({super.key, required this.ride});
+  const DriverRideCard({
+    super.key,
+    required this.ride,
+    required this.onViewDetails,
+    required this.onEdit,
+    required this.onCancel,
+  });
+
   final DriverRideItem ride;
+  final VoidCallback onViewDetails;
+  final VoidCallback onEdit;
+  final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +38,7 @@ class DriverRideCard extends StatelessWidget {
           color: isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2),
         ),
         boxShadow: isDark
-            ? []
+            ? const []
             : const [
                 BoxShadow(
                   blurRadius: 18,
@@ -47,7 +56,7 @@ class DriverRideCard extends StatelessWidget {
               if (ride.isRecurring) ...[
                 const SizedBox(width: 8),
                 _MetaPill(
-                  text: 'Recurring',
+                  text: 'Recurring occurrence',
                   background: isDark
                       ? const Color(0xFF1E293B)
                       : const Color(0xFFF3F5F8),
@@ -67,14 +76,13 @@ class DriverRideCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-
           Row(
             children: [
               Icon(Icons.place_outlined, size: 18, color: muted),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${ride.from}  →  ${ride.to}',
+                  ride.routeLabel,
                   softWrap: true,
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
@@ -85,9 +93,7 @@ class DriverRideCard extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 10),
-
           Row(
             children: [
               Icon(Icons.calendar_today_outlined, size: 16, color: muted),
@@ -118,23 +124,17 @@ class DriverRideCard extends StatelessWidget {
               ],
             ),
           ],
-
           const SizedBox(height: 12),
           Divider(
             height: 1,
             color: isDark ? const Color(0xFF232836) : const Color(0xFFE9EEF6),
           ),
           const SizedBox(height: 12),
-
           Row(
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => showDriverRideBookingsSheet(
-                    context,
-                    rideId: ride.id,
-                    ride: ride,
-                  ),
+                  onPressed: onViewDetails,
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                     shape: RoundedRectangleBorder(
@@ -147,9 +147,7 @@ class DriverRideCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: canManage
-                      ? () => Get.toNamed('/driver/rides/${ride.id}/edit')
-                      : null,
+                  onPressed: canManage ? onEdit : null,
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                     shape: RoundedRectangleBorder(
@@ -162,88 +160,7 @@ class DriverRideCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: canManage
-                      ? () async {
-                          final confirm = await Get.dialog<bool>(
-                            Dialog(
-                              insetPadding: const EdgeInsets.symmetric(
-                                horizontal: 22,
-                              ),
-                              backgroundColor: isDark
-                                  ? AppColors.darkSurface
-                                  : const Color(0xFFF2F2F6),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  22,
-                                  22,
-                                  22,
-                                  18,
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Cancel ride?',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'This will remove the ride for passengers.',
-                                      style: TextStyle(color: muted),
-                                    ),
-                                    const SizedBox(height: 22),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Get.back(result: false),
-                                          child: const Text('Keep'),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        ElevatedButton(
-                                          onPressed: () =>
-                                              Get.back(result: true),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(
-                                              0xFFE53935,
-                                            ),
-                                            foregroundColor: Colors.white,
-                                            elevation: 0,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 18,
-                                              vertical: 12,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(18),
-                                            ),
-                                          ),
-                                          child: const Text('Cancel Ride'),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            barrierDismissible: true,
-                          );
-
-                          if (confirm == true) {
-                            Get.find<DriverMyRidesController>().cancelRide(
-                              ride.id,
-                            );
-                          }
-                        }
-                      : null,
+                  onPressed: canManage ? onCancel : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE53935),
                     foregroundColor: Colors.white,
@@ -266,47 +183,48 @@ class DriverRideCard extends StatelessWidget {
 
 class _StatusPill extends StatelessWidget {
   const _StatusPill({required this.status});
+
   final String status;
 
   @override
   Widget build(BuildContext context) {
-    Color bg;
-    Color fg;
-    String text;
+    final isCancelled = status.contains('cancel');
+    final isCompleted = status.contains('complete');
+    final isOngoing = status.contains('ongoing');
 
-    if (status.contains('open')) {
-      bg = const Color(0xFFEFF6FF);
-      fg = const Color(0xFF2F6BFF);
-      text = 'Open';
-    } else if (status.contains('ongoing')) {
-      bg = const Color(0xFFFFF2D6);
-      fg = const Color(0xFFB86B00);
-      text = 'Ongoing';
-    } else if (status.contains('completed')) {
-      bg = const Color(0xFFEFF2F6);
-      fg = const Color(0xFF6B7280);
-      text = 'Completed';
-    } else if (status.contains('cancel')) {
-      bg = const Color(0xFFFFE2E2);
-      fg = const Color(0xFFD64545);
-      text = 'Cancelled';
-    } else {
-      bg = const Color(0xFFEFF2F6);
-      fg = const Color(0xFF6B7280);
-      text = status;
-    }
+    final background = isCancelled
+        ? const Color(0xFFFDECEC)
+        : isCompleted
+        ? const Color(0xFFEFF2F6)
+        : isOngoing
+        ? const Color(0xFFEAF3FF)
+        : const Color(0xFFE7F8EF);
+    final foreground = isCancelled
+        ? const Color(0xFFC5394D)
+        : isCompleted
+        ? const Color(0xFF64748B)
+        : isOngoing
+        ? const Color(0xFF2563EB)
+        : const Color(0xFF179C5E);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: bg,
+        color: background,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        text,
-        style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 12),
+        _title(status),
+        style: TextStyle(color: foreground, fontWeight: FontWeight.w800),
       ),
     );
+  }
+
+  String _title(String value) {
+    if (value.contains('cancel')) return 'Cancelled';
+    if (value.contains('complete')) return 'Completed';
+    if (value.contains('ongoing')) return 'Ongoing';
+    return 'Open';
   }
 }
 
@@ -331,17 +249,14 @@ class _MetaPill extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(
-          fontWeight: FontWeight.w800,
-          color: foreground,
-        ),
+        style: TextStyle(color: foreground, fontWeight: FontWeight.w700),
       ),
     );
   }
 }
 
 String _fmtSeriesDate(DateTime value) {
-  const monthNames = <String>[
+  const months = [
     'Jan',
     'Feb',
     'Mar',
@@ -355,5 +270,5 @@ String _fmtSeriesDate(DateTime value) {
     'Nov',
     'Dec',
   ];
-  return '${monthNames[value.month - 1]} ${value.day}';
+  return '${months[value.month - 1]} ${value.day}';
 }

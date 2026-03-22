@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:help_ride/features/driver/bindings/create_ride_binding.dart';
 import 'package:help_ride/features/driver/bindings/driver_ride_requests_binding.dart';
+import 'package:help_ride/features/driver/bindings/driver_ride_series_binding.dart';
 import 'package:help_ride/features/driver/bindings/edit_ride_binding.dart';
 import 'package:help_ride/features/driver/bindings/driver_onboarding_binding.dart';
 import 'package:help_ride/features/driver/middlewares/driver_access_middleware.dart';
@@ -8,6 +9,7 @@ import 'package:help_ride/features/driver/views/driver_active_ride_view.dart';
 import 'package:help_ride/features/driver/views/create_ride_view.dart';
 import 'package:help_ride/features/driver/views/driver_ride_requests_view.dart';
 import 'package:help_ride/features/driver/views/driver_ride_details_view.dart';
+import 'package:help_ride/features/driver/views/driver_ride_series_view.dart';
 import 'package:help_ride/features/driver/views/edit_ride_view.dart';
 import 'package:help_ride/features/driver/views/driver_onboarding_view.dart';
 
@@ -16,6 +18,7 @@ class DriverRoutes {
   static const createRide = '/driver/create-ride';
   static const rideRequests = '/driver/ride-requests';
   static const rideDetails = '/driver/rides/:id';
+  static const rideSeries = '/driver/rides/series/:seriesId';
   static const editRide = '/driver/rides/:id/edit';
   static const activeRide = '/driver/active-ride';
 
@@ -40,6 +43,12 @@ class DriverRoutes {
     GetPage(
       name: rideDetails,
       page: () => const DriverRideDetailsView(),
+      middlewares: [DriverAccessMiddleware()],
+    ),
+    GetPage(
+      name: rideSeries,
+      page: () => const DriverRideSeriesView(),
+      binding: DriverRideSeriesBinding(),
       middlewares: [DriverAccessMiddleware()],
     ),
     GetPage(

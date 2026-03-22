@@ -27,162 +27,165 @@ class BookingSuccessView extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 24, 18, 18),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                height: 84,
-                width: 84,
-                decoration: const BoxDecoration(
-                  color: AppColors.passengerPrimary,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isConfirmed ? Icons.check : Icons.schedule,
-                  color: Colors.white,
-                  size: 42,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                isConfirmed ? 'Booking Confirmed!' : 'Request Sent!',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                isConfirmed
-                    ? 'Your ride is confirmed. The driver will contact you soon.'
-                    : 'Waiting for the driver to accept your request. You’ll be notified soon.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: muted, height: 1.4),
-              ),
-
-              const SizedBox(height: 20),
-
-              _Card(
-                isDark: isDark,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Booking Details',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: textPrimary,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(18, 24, 18, 18),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 84,
+                        width: 84,
+                        decoration: const BoxDecoration(
+                          color: AppColors.passengerPrimary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isConfirmed ? Icons.check : Icons.schedule,
+                          color: Colors.white,
+                          size: 42,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    _DetailRow(
-                      icon: Icons.place,
-                      iconBg: const Color(0xFFE7F8EF),
-                      label: 'Route',
-                      value: route.isEmpty ? '-' : route,
-                      isDark: isDark,
-                    ),
-                    const SizedBox(height: 12),
-                    _DetailRow(
-                      icon: Icons.access_time,
-                      iconBg: const Color(0xFFEFF6FF),
-                      label: 'Departure',
-                      value: departure.isEmpty ? '-' : departure,
-                      isDark: isDark,
-                    ),
-                    const SizedBox(height: 12),
-                    _DetailRow(
-                      icon: Icons.attach_money,
-                      iconBg: const Color(0xFFF3ECFF),
-                      label: 'Total Price',
-                      value: '\$${total.toStringAsFixed(0)}',
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              _Card(
-                isDark: isDark,
-                child: Column(
-                  children: [
-                    Text(
-                      'Booking Reference',
-                      style: TextStyle(
-                        color: muted,
-                        fontWeight: FontWeight.w700,
+                      const SizedBox(height: 16),
+                      Text(
+                        isConfirmed ? 'Booking Confirmed!' : 'Request Sent!',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: textPrimary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      ref.isEmpty ? '-' : ref,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                        color: textPrimary,
+                      const SizedBox(height: 8),
+                      Text(
+                        isConfirmed
+                            ? 'Your ride is confirmed. The driver will contact you soon.'
+                            : 'Waiting for the driver to accept your request. You’ll be notified soon.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: muted, height: 1.4),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 20),
+                      _Card(
+                        isDark: isDark,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Booking Details',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            _DetailRow(
+                              icon: Icons.place,
+                              iconBg: const Color(0xFFE7F8EF),
+                              label: 'Route',
+                              value: route.isEmpty ? '-' : route,
+                              isDark: isDark,
+                            ),
+                            const SizedBox(height: 12),
+                            _DetailRow(
+                              icon: Icons.access_time,
+                              iconBg: const Color(0xFFEFF6FF),
+                              label: 'Departure',
+                              value: departure.isEmpty ? '-' : departure,
+                              isDark: isDark,
+                            ),
+                            const SizedBox(height: 12),
+                            _DetailRow(
+                              icon: Icons.attach_money,
+                              iconBg: const Color(0xFFF3ECFF),
+                              label: 'Total Price',
+                              value: '\$${total.toStringAsFixed(0)}',
+                              isDark: isDark,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _Card(
+                        isDark: isDark,
+                        child: Column(
+                          children: [
+                            Text(
+                              'Booking Reference',
+                              style: TextStyle(
+                                color: muted,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              ref.isEmpty ? '-' : ref,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                                color: textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      SizedBox(
+                        height: 52,
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => Get.offAllNamed(
+                            AppRoutes.shell,
+                            arguments: const {'tab': 'rides'},
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.passengerPrimary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: Text(
+                            isConfirmed ? 'View My Rides' : 'View My Requests',
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 52,
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () => Get.offAllNamed(
+                            AppRoutes.shell,
+                            arguments: const {'tab': 'home'},
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            side: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF232836)
+                                  : const Color(0xFFE2E6EF),
+                            ),
+                          ),
+                          child: const Text(
+                            'Back to Home',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-
-              const Spacer(),
-
-              SizedBox(
-                height: 52,
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Get.offAllNamed(
-                    AppRoutes.shell,
-                    arguments: const {'tab': 'rides'},
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.passengerPrimary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text(
-                    isConfirmed ? 'View My Rides' : 'View My Requests',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 52,
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Get.offAllNamed(
-                    AppRoutes.shell,
-                    arguments: const {'tab': 'home'},
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    side: BorderSide(
-                      color: isDark
-                          ? const Color(0xFF232836)
-                          : const Color(0xFFE2E6EF),
-                    ),
-                  ),
-                  child: const Text(
-                    'Back to Home',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

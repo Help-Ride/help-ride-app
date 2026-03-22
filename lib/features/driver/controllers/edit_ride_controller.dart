@@ -7,6 +7,7 @@ import '../../../shared/utils/input_validators.dart';
 import '../../../shared/widgets/place_picker_field.dart';
 import '../services/driver_rides_api.dart';
 import '../utils/ride_payload_utils.dart';
+import '../widgets/my_rides/ride_scope_sheet.dart';
 
 class EditRideController extends GetxController {
   late final DriverRidesApi _driverApi;
@@ -40,6 +41,31 @@ class EditRideController extends GetxController {
   }.obs;
 
   String get rideId => Get.parameters['id'] ?? '';
+
+  String? get initialEditScope {
+    final args = Get.arguments;
+    if (args is Map) {
+      final value = (args['editScope'] ?? '').toString().trim().toLowerCase();
+      if (value == 'future' || value == 'series' || value == 'occurrence') {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  String get editScopeMessage {
+    final scope = initialEditScope;
+    if (ride.value?.isRecurring != true) {
+      return 'Changes here only update this ride.';
+    }
+    if (scope == 'future') {
+      return 'Changes here update this occurrence and future rides in the series.';
+    }
+    if (scope == 'series') {
+      return 'Changes here update the entire recurring series.';
+    }
+    return 'When you save, choose whether to update this occurrence, future rides, or the full series.';
+  }
 
   @override
   Future<void> onInit() async {
@@ -190,7 +216,7 @@ class EditRideController extends GetxController {
     amenities.refresh();
   }
 
-  Future<void> save() async {
+  Future<void> save(BuildContext context) async {
     submitAttempted.value = true;
     error.value = null;
 
@@ -198,6 +224,9 @@ class EditRideController extends GetxController {
       error.value = 'Please fix highlighted fields.';
       return;
     }
+
+    final scope = await _resolveScope(context);
+    if (scope == null) return;
 
     final startLocal = startDateTimeLocal!;
     final seats = int.parse(seatsCtrl.text.trim());
@@ -227,6 +256,7 @@ class EditRideController extends GetxController {
         stops: stops,
         amenities: selectedAmenities,
         additionalNotes: additionalNotes,
+        scope: scope,
       );
 
       Get.back();
@@ -240,5 +270,24 @@ class EditRideController extends GetxController {
     } finally {
       loading.value = false;
     }
+  }
+
+  Future<String?> _resolveScope(BuildContext context) async {
+    if (ride.value?.isRecurring != true) {
+      return 'occurrence';
+    }
+
+    final preset = initialEditScope;
+    if (preset != null && preset.isNotEmpty) {
+      return preset;
+    }
+
+    return showRideScopeSheet(
+      context: context,
+      title: 'Apply changes to',
+      subtitle:
+          'Choose how broadly these ride updates should be applied across the recurring schedule.',
+      recommendedScope: 'occurrence',
+    );
   }
 }

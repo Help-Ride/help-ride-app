@@ -106,7 +106,7 @@ class _MessagesViewState extends State<MessagesView> {
                     child: ListView.separated(
                       padding: const EdgeInsets.only(bottom: 24),
                       itemCount: items.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final conversation = items[index];
                         final label = _roleLabel(conversation, roleFallback);

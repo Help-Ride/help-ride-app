@@ -1,48 +1,13 @@
 import 'package:get/get.dart';
+
 import '../../../shared/services/api_client.dart';
+import '../models/driver_ride_management.dart';
 import '../services/driver_rides_api.dart';
-
-enum DriverRidesTab { upcoming, past }
-
-class DriverRideItem {
-  final String id;
-  final String from;
-  final String to;
-  final DateTime startTime;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-  final int seatsTotal;
-  final int seatsAvailable;
-  final double pricePerSeat;
-  final String status; // open/ongoing/completed/cancelled
-  final String rideType;
-  final String? recurringSeriesId;
-  final List<String> recurrenceDays;
-  final DateTime? recurrenceEndDate;
-
-  DriverRideItem({
-    required this.id,
-    required this.from,
-    required this.to,
-    required this.startTime,
-    this.createdAt,
-    this.updatedAt,
-    required this.seatsTotal,
-    required this.seatsAvailable,
-    required this.pricePerSeat,
-    required this.status,
-    this.rideType = 'one-time',
-    this.recurringSeriesId,
-    this.recurrenceDays = const [],
-    this.recurrenceEndDate,
-  });
-
-  int get booked => (seatsTotal - seatsAvailable).clamp(0, seatsTotal);
-  bool get isRecurring => rideType.trim().toLowerCase() == 'recurring';
-}
+import '../utils/driver_ride_grouping.dart';
 
 class DriverMyRidesController extends GetxController {
   final tab = DriverRidesTab.upcoming.obs;
+  final listFilter = DriverRideListFilter.all.obs;
   final loading = false.obs;
   final error = RxnString();
 
@@ -59,18 +24,103 @@ class DriverMyRidesController extends GetxController {
     await refreshAll();
   }
 
-  void setTab(DriverRidesTab t) => tab.value = t;
+  void setTab(DriverRidesTab value) => tab.value = value;
+  void setListFilter(DriverRideListFilter value) => listFilter.value = value;
 
-  List<DriverRideItem> get filtered {
+  List<DriverRideSeriesSummary> get recurringSeries =>
+      buildDriverRideSeriesSummaries(rides);
+
+  List<DriverRideListEntry> get filteredEntries {
+    final seriesEntries = recurringSeries
+        .where(_matchesSeriesTab)
+        .where(_matchesSeriesFilter)
+        .map(DriverRideListEntry.series)
+        .toList(growable: false);
+
+    final occurrenceEntries = rides
+        .where(_matchesOccurrenceTab)
+        .where(_matchesOccurrenceFilter)
+        .map(DriverRideListEntry.occurrence)
+        .toList(growable: false);
+
+    final entries = switch (listFilter.value) {
+      DriverRideListFilter.all => <DriverRideListEntry>[
+        ...occurrenceEntries.where((entry) => !(entry.ride?.isRecurring ?? false)),
+        ...seriesEntries,
+      ],
+      DriverRideListFilter.oneTime => occurrenceEntries
+          .where((entry) => !(entry.ride?.isRecurring ?? false))
+          .toList(growable: false),
+      DriverRideListFilter.recurring => seriesEntries,
+      DriverRideListFilter.cancelled => <DriverRideListEntry>[
+        ...occurrenceEntries.where((entry) => entry.ride?.isCancelled ?? false),
+        ...seriesEntries,
+      ],
+      DriverRideListFilter.occurrences => occurrenceEntries,
+    };
+
+    entries.sort((left, right) {
+      final leftTime = _entrySortTime(left);
+      final rightTime = _entrySortTime(right);
+      if (tab.value == DriverRidesTab.upcoming) {
+        return leftTime.compareTo(rightTime);
+      }
+      return rightTime.compareTo(leftTime);
+    });
+
+    return entries;
+  }
+
+  bool _matchesOccurrenceTab(DriverRideItem ride) {
     final now = DateTime.now();
+    return tab.value == DriverRidesTab.upcoming
+        ? ride.startTime.isAfter(now)
+        : !ride.startTime.isAfter(now);
+  }
 
-    final upcoming = rides.where((r) => r.startTime.isAfter(now)).toList()
-      ..sort((a, b) => _rideSortTime(b).compareTo(_rideSortTime(a)));
+  bool _matchesSeriesTab(DriverRideSeriesSummary series) {
+    if (tab.value == DriverRidesTab.upcoming) {
+      return series.upcomingCount > 0;
+    }
+    return series.upcomingCount == 0;
+  }
 
-    final past = rides.where((r) => !r.startTime.isAfter(now)).toList()
-      ..sort((a, b) => _rideSortTime(b).compareTo(_rideSortTime(a)));
+  bool _matchesOccurrenceFilter(DriverRideItem ride) {
+    switch (listFilter.value) {
+      case DriverRideListFilter.all:
+        return true;
+      case DriverRideListFilter.oneTime:
+        return !ride.isRecurring;
+      case DriverRideListFilter.recurring:
+        return false;
+      case DriverRideListFilter.cancelled:
+        return ride.isCancelled;
+      case DriverRideListFilter.occurrences:
+        return true;
+    }
+  }
 
-    return tab.value == DriverRidesTab.upcoming ? upcoming : past;
+  bool _matchesSeriesFilter(DriverRideSeriesSummary series) {
+    switch (listFilter.value) {
+      case DriverRideListFilter.all:
+      case DriverRideListFilter.recurring:
+        return true;
+      case DriverRideListFilter.cancelled:
+        return series.cancelledCount > 0;
+      case DriverRideListFilter.oneTime:
+      case DriverRideListFilter.occurrences:
+        return false;
+    }
+  }
+
+  DateTime _entrySortTime(DriverRideListEntry entry) {
+    if (entry.isSeries) {
+      final series = entry.series!;
+      return tab.value == DriverRidesTab.upcoming
+          ? (series.nextUpcomingOccurrence?.startTime ?? series.endDate)
+          : series.endDate;
+    }
+    return entry.ride!.startTime;
   }
 
   Future<void> refreshAll() async {
@@ -88,8 +138,8 @@ class DriverMyRidesController extends GetxController {
 
       final parsed = raw
           .whereType<Map>()
-          .map((m) => _mapRide(m.cast<String, dynamic>()))
-          .toList();
+          .map((item) => mapDriverRideItem(item.cast<String, dynamic>()))
+          .toList(growable: false);
 
       rides.assignAll(parsed);
     } catch (e) {
@@ -99,75 +149,27 @@ class DriverMyRidesController extends GetxController {
     }
   }
 
-  Future<void> cancelRide(String rideId) async {
+  Future<void> cancelRide(
+    String rideId, {
+    String scope = 'occurrence',
+  }) async {
     loading.value = true;
     error.value = null;
 
     try {
-      await _driverApi.deleteRide(rideId);
+      await _driverApi.cancelRide(rideId, scope: scope);
       await refreshAll();
-      Get.snackbar('Cancelled', 'Ride cancelled successfully');
+      Get.snackbar(
+        'Cancelled',
+        scope == 'occurrence'
+            ? 'Ride occurrence cancelled successfully.'
+            : 'Recurring ride schedule updated successfully.',
+      );
     } catch (e) {
       error.value = e.toString();
       Get.snackbar('Cancel failed', error.value ?? 'Failed');
     } finally {
       loading.value = false;
     }
-  }
-
-  DriverRideItem _mapRide(Map<String, dynamic> j) {
-    double toDouble(dynamic v) {
-      if (v is num) return v.toDouble();
-      return double.tryParse(v?.toString() ?? '') ?? 0;
-    }
-
-    DateTime parseDate(dynamic v) {
-      final s = (v ?? '').toString();
-      final dt = DateTime.tryParse(s);
-      return (dt ?? DateTime.now()).toLocal();
-    }
-
-    DateTime? readDate(dynamic v) {
-      if (v == null) return null;
-      final dt = DateTime.tryParse(v.toString());
-      return dt?.toLocal();
-    }
-
-    List<String> readStringList(dynamic v) {
-      if (v is List) {
-        return v
-            .map((item) => item?.toString().trim() ?? '')
-            .where((item) => item.isNotEmpty)
-            .toList();
-      }
-      return const <String>[];
-    }
-
-    return DriverRideItem(
-      id: (j['id'] ?? '').toString(),
-      from: (j['fromCity'] ?? j['from_city'] ?? '').toString(),
-      to: (j['toCity'] ?? j['to_city'] ?? '').toString(),
-      startTime: parseDate(j['startTime'] ?? j['start_time']),
-      createdAt: readDate(j['createdAt'] ?? j['created_at']),
-      updatedAt: readDate(j['updatedAt'] ?? j['updated_at']),
-      seatsTotal: ((j['seatsTotal'] ?? j['seats_total']) as num?)?.toInt() ?? 0,
-      seatsAvailable:
-          ((j['seatsAvailable'] ?? j['seats_available']) as num?)?.toInt() ?? 0,
-      pricePerSeat: toDouble(j['pricePerSeat'] ?? j['price_per_seat']),
-      status: (j['status'] ?? 'open').toString(),
-      rideType: (j['rideType'] ?? j['ride_type'] ?? 'one-time').toString(),
-      recurringSeriesId:
-          (j['recurringSeriesId'] ?? j['recurring_series_id'])?.toString(),
-      recurrenceDays: readStringList(
-        j['recurrenceDays'] ?? j['recurrence_days'],
-      ),
-      recurrenceEndDate: readDate(
-        j['recurrenceEndDate'] ?? j['recurrence_end_date'],
-      ),
-    );
-  }
-
-  DateTime _rideSortTime(DriverRideItem ride) {
-    return ride.updatedAt ?? ride.createdAt ?? ride.startTime;
   }
 }

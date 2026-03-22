@@ -89,6 +89,7 @@ class DriverRidesApi {
     required List<String> stops,
     required List<String> amenities,
     String? additionalNotes,
+    String scope = 'occurrence',
   }) async {
     final id = rideId.trim();
     if (id.isEmpty) {
@@ -121,9 +122,25 @@ class DriverRidesApi {
         'stops': cleanedStops,
         'amenities': cleanedAmenities,
         'additionalNotes': notes?.isEmpty ?? true ? null : notes,
+        'scope': scope,
       },
     );
     return res.data ?? {};
+  }
+
+  Future<Map<String, dynamic>> cancelRide(
+    String rideId, {
+    String scope = 'occurrence',
+  }) async {
+    final id = rideId.trim();
+    if (id.isEmpty) {
+      throw ArgumentError('ride id can not be empty');
+    }
+    final res = await _client.post<Map<String, dynamic>>(
+      '/rides/$id/cancel',
+      data: {'scope': scope},
+    );
+    return res.data ?? <String, dynamic>{};
   }
 
   Future<void> deleteRide(String rideId) async {
