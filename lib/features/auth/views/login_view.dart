@@ -33,8 +33,12 @@ class LoginView extends GetView<AuthController> {
       final socialForeground = isDark
           ? AppColors.darkText
           : AppColors.lightText;
-
+      final sectionBg = isDark ? const Color(0xFF151B25) : Colors.white;
+      final sectionBorder = isDark
+          ? const Color(0xFF232836)
+          : const Color(0xFFE1E6F0);
       return AuthScreenFrame(
+        fillHeight: true,
         child: AutofillGroup(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -42,87 +46,130 @@ class LoginView extends GetView<AuthController> {
               Text(
                 'Get started',
                 style: TextStyle(
-                  fontSize: 34,
+                  fontSize: 40,
                   fontWeight: FontWeight.w800,
                   color: isDark ? AppColors.darkText : AppColors.lightText,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Text(
                 'Enter your phone number to continue.',
                 style: TextStyle(
                   color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                  fontSize: 17,
+                  fontSize: 18,
                   height: 1.45,
                 ),
               ),
-              const SizedBox(height: 26),
-              AuthPhoneField(
-                controller: controller.phoneTextController,
-                value: controller.phone.value,
-                activeDialCode: controller.activeDialCodeOption,
-                options: controller.dialCodeOptions,
-                onChanged: controller.setPhone,
-                onDialCodeChanged: controller.setDialCode,
-                helperText: 'We will text a 6-digit code to this number.',
-                errorText: controller.phone.value.trim().isEmpty
-                    ? null
-                    : controller.entryPhoneError,
-              ),
-              if (controller.entryMessage.value != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  controller.entryMessage.value!,
-                  style: TextStyle(color: primary, fontWeight: FontWeight.w600),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: sectionBg,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: sectionBorder),
+                  boxShadow: isDark
+                      ? null
+                      : const [
+                          BoxShadow(
+                            blurRadius: 24,
+                            offset: Offset(0, 16),
+                            color: Color(0x120E1628),
+                          ),
+                        ],
                 ),
-              ],
-              if (controller.entryError.value != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  controller.entryError.value!,
-                  style: const TextStyle(
-                    color: AppColors.error,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: controller.canContinueWithPhone
-                      ? controller.sendPhoneContinueOtp
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primary,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: isDark
-                        ? const Color(0xFF1C2331)
-                        : const Color(0xFFE9EEF6),
-                    disabledForegroundColor: isDark
-                        ? AppColors.darkMuted
-                        : const Color(0xFF9AA3B2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AuthPhoneField(
+                      controller: controller.phoneTextController,
+                      value: controller.phone.value,
+                      activeDialCode: controller.activeDialCodeOption,
+                      options: controller.dialCodeOptions,
+                      onChanged: controller.setPhone,
+                      onDialCodeChanged: controller.setDialCode,
+                      helperText:
+                          'US and Canada numbers auto-format to +1. Use + country code for others.',
+                      errorText: controller.phone.value.trim().isEmpty
+                          ? null
+                          : controller.entryPhoneError,
+                      singleField: true,
                     ),
-                    elevation: 0,
-                  ),
-                  child: controller.isSendingPhoneOtp.value
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Continue',
-                          style: TextStyle(fontWeight: FontWeight.w700),
+                    if (controller.entryMessage.value != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        controller.entryMessage.value!,
+                        style: TextStyle(
+                          color: primary,
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
+                    ],
+                    if (controller.entryError.value != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        controller.entryError.value!,
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: controller.canContinueWithPhone
+                            ? controller.sendPhoneContinueOtp
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primary,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: isDark
+                              ? const Color(0xFF1C2331)
+                              : const Color(0xFFE9EEF6),
+                          disabledForegroundColor: isDark
+                              ? AppColors.darkMuted
+                              : const Color(0xFF9AA3B2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: controller.isSendingPhoneOtp.value
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text(
+                                'Continue',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 22),
-              _OrDivider(isDark: isDark),
               const SizedBox(height: 14),
+              Center(
+                child: TextButton(
+                  onPressed: () => _showEmailSheet(context, primary, isDark),
+                  style: TextButton.styleFrom(foregroundColor: primary),
+                  child: const Text('Use email instead'),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Other ways to continue',
+                style: TextStyle(
+                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const SizedBox(height: 12),
               if (Platform.isIOS) ...[
                 SizedBox(
                   width: double.infinity,
@@ -183,20 +230,15 @@ class LoginView extends GetView<AuthController> {
               ),
               const SizedBox(height: 14),
               Center(
-                child: TextButton(
-                  onPressed: () => _showEmailSheet(context, primary, isDark),
-                  child: const Text('Use email instead'),
+                child: Text(
+                  'By continuing, you agree to our Terms of Service and Privacy Policy.',
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                    fontSize: 11,
+                    height: 1.45,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'By continuing, you agree to our Terms of Service and Privacy Policy.',
-                style: TextStyle(
-                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                  fontSize: 11,
-                  height: 1.45,
-                ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -322,42 +364,6 @@ class LoginView extends GetView<AuthController> {
           ),
         );
       },
-    );
-  }
-}
-
-class _OrDivider extends StatelessWidget {
-  const _OrDivider({required this.isDark});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Divider(
-            height: 1,
-            color: isDark ? const Color(0xFF232836) : const Color(0xFFE2E6EF),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Text(
-            'or continue with',
-            style: TextStyle(
-              color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-              fontSize: 13,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Divider(
-            height: 1,
-            color: isDark ? const Color(0xFF232836) : const Color(0xFFE2E6EF),
-          ),
-        ),
-      ],
     );
   }
 }

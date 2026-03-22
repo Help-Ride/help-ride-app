@@ -30,7 +30,6 @@ class AuthCodeController extends GetxController {
   String _deviceId = '';
   String _channel = 'phone';
   String _identifier = '';
-  String _dialCode = '+1';
   Timer? _resendTimer;
 
   String get channel => _channel;
@@ -74,9 +73,6 @@ class AuthCodeController extends GetxController {
         : const <String, dynamic>{};
     _channel = args['channel']?.toString() == 'email' ? 'email' : 'phone';
     _identifier = args['identifier']?.toString().trim() ?? '';
-    _dialCode = args['dialCode']?.toString().trim().isNotEmpty == true
-        ? args['dialCode'].toString().trim()
-        : '+1';
     final resendDelay =
         int.tryParse('${args['resendAvailableInSeconds'] ?? 30}') ?? 30;
     AuthAnalytics.track('auth_code_viewed', {'channel': _channel});
@@ -175,7 +171,6 @@ class AuthCodeController extends GetxController {
             'channel': _channel,
             if (isPhoneChannel) 'phone': _identifier,
             if (!isPhoneChannel) 'email': _identifier,
-            'dialCode': _dialCode,
             'hint': isPhoneChannel
                 ? 'Phone verified. Add a few details to finish.'
                 : 'Email verified. Add a few details to finish.',
@@ -201,7 +196,6 @@ class AuthCodeController extends GetxController {
       arguments: {
         if (isPhoneChannel) 'phone': _identifier,
         if (!isPhoneChannel) 'email': _identifier,
-        'dialCode': _dialCode,
       },
     );
   }

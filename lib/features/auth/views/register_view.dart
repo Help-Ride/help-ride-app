@@ -123,8 +123,9 @@ class RegisterView extends GetView<AuthController> {
                   onChanged: controller.setOnboardingPhone,
                   onDialCodeChanged: controller.setDialCode,
                   label: 'Mobile number (optional)',
-                  hint: '415 555 1234',
-                  helperText: 'Add this now if you want SMS ride updates.',
+                  hint: '(416) 555-1234',
+                  helperText:
+                      'US and Canada numbers auto-format to +1. Use + country code for others.',
                   errorText: controller.onboardingPhone.value.trim().isEmpty
                       ? null
                       : controller.onboardingPhoneError,

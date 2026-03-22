@@ -9,6 +9,7 @@ import 'package:help_ride/shared/services/token_storage.dart';
 import 'package:help_ride/shared/utils/input_validators.dart';
 import 'package:help_ride/shared/utils/phone_number_utils.dart';
 import '../../profile/services/profile_api.dart';
+import '../routes/auth_routes.dart';
 import '../services/auth_api.dart';
 
 class PhoneVerificationController extends GetxController {
@@ -107,6 +108,41 @@ class PhoneVerificationController extends GetxController {
 
   void setPhone(String value) {
     _setField(phoneInput, phoneTextController, value);
+  }
+
+  Future<void> goBack() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final canPop = Get.key.currentState?.canPop() ?? false;
+    final hasSession = _session.status.value == SessionStatus.authenticated;
+
+    if (allowBackToLogin && canPop && hasSession) {
+      Get.back<void>();
+      return;
+    }
+
+    if (allowBackToLogin) {
+      Get.offAllNamed(
+        AuthRoutes.login,
+        arguments: {
+          if (_phone.value.isNotEmpty) 'phone': _phone.value,
+          if (_email.value.isNotEmpty) 'email': _email.value,
+        },
+      );
+      return;
+    }
+
+    await _session.logout();
+    Get.offAllNamed(
+      AuthRoutes.login,
+      arguments: {
+        if (_phone.value.isNotEmpty) 'phone': _phone.value,
+        if (_email.value.isNotEmpty) 'email': _email.value,
+      },
+    );
+  }
+
+  Future<void> closeFlow() async {
+    await goBack();
   }
 
   Future<void> savePhoneAndSendOtp() async {

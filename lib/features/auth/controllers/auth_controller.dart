@@ -150,13 +150,10 @@ class AuthController extends GetxController {
         : null;
   }
 
-  String? get normalizedEntryPhone =>
-      _normalizePhoneWithDialCode(phone.value, selectedDialCode.value);
+  String? get normalizedEntryPhone => _normalizePhoneInput(phone.value);
 
-  String? get normalizedOnboardingPhone => _normalizePhoneWithDialCode(
-    onboardingPhone.value,
-    selectedDialCode.value,
-  );
+  String? get normalizedOnboardingPhone =>
+      _normalizePhoneInput(onboardingPhone.value);
 
   String? get verifiedPhone => _verifiedPhone;
   String? get verifiedEmail => _verifiedEmail;
@@ -188,15 +185,11 @@ class AuthController extends GetxController {
     _entryArgsSignature = signature;
     AuthAnalytics.track('auth_entry_viewed');
 
-    if (args['dialCode'] is String && '${args['dialCode']}'.trim().isNotEmpty) {
-      selectedDialCode.value = '${args['dialCode']}'.trim();
-    }
-
     final phoneArg = args['phone']?.toString().trim() ?? '';
     _setField(
       phone,
       phoneTextController,
-      phoneArg,
+      _displayPhoneInput(phoneArg),
       clearEntryFeedback: false,
     );
 
@@ -290,7 +283,7 @@ class AuthController extends GetxController {
       _setField(
         onboardingPhone,
         onboardingPhoneTextController,
-        '${args['suggestedPhone']}'.trim(),
+        _displayPhoneInput('${args['suggestedPhone']}'.trim()),
         clearOnboardingFeedback: false,
       );
     }
@@ -361,10 +354,7 @@ class AuthController extends GetxController {
     clearEntryFeedback();
 
     try {
-      AuthAnalytics.track('auth_phone_entered', {
-        'channel': 'phone',
-        'dial_code': selectedDialCode.value,
-      });
+      AuthAnalytics.track('auth_phone_entered', {'channel': 'phone'});
       final result = await _authApi.sendContinuePhoneOtp(
         phone: normalizedEntryPhone!,
         deviceId: _deviceId,
@@ -377,7 +367,6 @@ class AuthController extends GetxController {
           'channel': 'phone',
           'identifier': normalizedEntryPhone,
           'resendAvailableInSeconds': result.resendAvailableInSeconds,
-          'dialCode': selectedDialCode.value,
         },
       );
       return true;
@@ -671,28 +660,15 @@ class AuthController extends GetxController {
     return null;
   }
 
-  String? _normalizePhoneWithDialCode(String rawValue, String dialCode) {
+  String? _normalizePhoneInput(String rawValue) {
     final trimmed = rawValue.trim();
     if (trimmed.isEmpty) return null;
+    return PhoneNumberUtils.normalizeToE164(trimmed);
+  }
 
-    if (trimmed.startsWith('+')) {
-      return PhoneNumberUtils.normalizeToE164(trimmed);
-    }
-
-    final digits = PhoneNumberUtils.digitsOnly(trimmed);
-    if (digits.isEmpty) return null;
-
-    final normalizedDial = PhoneNumberUtils.digitsOnly(dialCode);
-    if (normalizedDial.isEmpty) return null;
-
-    if (normalizedDial == '1') {
-      if (digits.length == 10) return '+1$digits';
-      if (digits.length == 11 && digits.startsWith('1')) return '+$digits';
-      return null;
-    }
-
-    if (digits.length < 6 || digits.length > 14) return null;
-    return '+$normalizedDial$digits';
+  String _displayPhoneInput(String value) {
+    if (value.trim().isEmpty) return '';
+    return PhoneNumberUtils.formatForDisplay(value);
   }
 
   void _setField(
