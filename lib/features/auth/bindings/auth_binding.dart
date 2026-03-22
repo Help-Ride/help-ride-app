@@ -5,7 +5,7 @@ class AuthBinding extends Bindings {
   @override
   void dependencies() {
     if (!Get.isRegistered<AuthController>()) {
-      Get.lazyPut<AuthController>(() => AuthController(), fenix: true);
+      Get.put<AuthController>(AuthController(), permanent: true);
     }
   }
 }

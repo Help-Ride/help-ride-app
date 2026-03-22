@@ -1,13 +1,16 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:uuid/uuid.dart';
 
 class TokenStorage {
   static const _accessKey = 'access_token';
   static const _refreshKey = 'refresh_token';
   static const _providerKey = 'auth_provider';
+  static const _authDeviceIdKey = 'auth_device_id';
   static const _deviceTokenKey = 'device_token_registered';
   static const _deviceTokenCachedKey = 'device_token_cached';
   static const _deviceTokenRegisteredAtKey = 'device_token_registered_at';
   final _storage = const FlutterSecureStorage();
+  static const _uuid = Uuid();
 
   Future<void> saveAccessToken(String token) =>
       _storage.write(key: _accessKey, value: token);
@@ -27,6 +30,17 @@ class TokenStorage {
   Future<String?> getAuthProvider() => _storage.read(key: _providerKey);
 
   Future<void> deleteAuthProvider() => _storage.delete(key: _providerKey);
+
+  Future<String> getOrCreateAuthDeviceId() async {
+    final existing = await _storage.read(key: _authDeviceIdKey);
+    if (existing != null && existing.trim().isNotEmpty) {
+      return existing.trim();
+    }
+
+    final generated = _uuid.v4();
+    await _storage.write(key: _authDeviceIdKey, value: generated);
+    return generated;
+  }
 
   Future<void> saveDeviceToken(String token) =>
       _storage.write(key: _deviceTokenKey, value: token);

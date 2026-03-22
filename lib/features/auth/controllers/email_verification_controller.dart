@@ -80,7 +80,7 @@ class EmailVerificationController extends GetxController {
 
     try {
       await _authApi.sendVerifyEmailOtp(email: _email.value);
-      message.value = 'We sent a verification code to your email.';
+      message.value = 'Code sent to your email.';
     } catch (e) {
       error.value = _prettyError(e);
     } finally {

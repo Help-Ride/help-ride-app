@@ -103,9 +103,13 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
           user.roleDefault == 'driver' ||
           theme.role.value == AppRole.driver;
       final roleLabel = isDriver ? 'Driver' : 'Passenger';
+      final hasPhone = user.phone?.trim().isNotEmpty ?? false;
+      final needsEmailVerification = !user.emailVerified;
+      final needsPhoneVerification = hasPhone && !user.phoneVerified;
+      final hasPendingContactVerification =
+          needsEmailVerification || needsPhoneVerification;
       final isVerified =
-          (user.emailVerified &&
-              (user.phone?.trim().isNotEmpty != true || user.phoneVerified)) ||
+          (user.emailVerified && (!hasPhone || user.phoneVerified)) ||
           user.driverProfile?.isVerified == true;
 
       return Scaffold(
@@ -132,6 +136,9 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                 isVerified: isVerified,
                 isDark: isDark,
                 onEdit: () => _openUserEditSheet(context, user),
+                onOpenVerificationDrawer: hasPendingContactVerification
+                    ? () => _openVerificationDrawer(context, user)
+                    : null,
               ),
               const SizedBox(height: 12),
               _ContactMethodsCard(
@@ -154,6 +161,9 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                           'autoSend': true,
                         },
                       )
+                    : null,
+                onOpenVerificationDrawer: hasPendingContactVerification
+                    ? () => _openVerificationDrawer(context, user)
                     : null,
               ),
               const SizedBox(height: 16),
@@ -678,6 +688,104 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
       context,
     ).showSnackBar(SnackBar(content: Text(e.toString())));
   }
+
+  void _openVerificationDrawer(BuildContext context, User user) {
+    final hasPhone = user.phone?.trim().isNotEmpty ?? false;
+    final needsEmailVerification = !user.emailVerified;
+    final needsPhoneVerification = hasPhone && !user.phoneVerified;
+    if (!needsEmailVerification && !needsPhoneVerification) return;
+
+    final isDark = Get.find<ThemeController>().isDark.value;
+    final phoneEnding = PhoneNumberUtils.endingDigits(user.phone);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _surfaceCard(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE6EAF2),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Complete verification',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary(isDark),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Choose what you want to verify now.',
+                  style: TextStyle(
+                    color: _mutedText(isDark),
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (needsEmailVerification)
+                  _VerificationActionTile(
+                    icon: Icons.mail_outline,
+                    title: 'Verify email',
+                    subtitle: user.email,
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      Get.toNamed(
+                        AuthRoutes.verifyEmail,
+                        arguments: {'email': user.email},
+                      );
+                    },
+                  ),
+                if (needsPhoneVerification)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      top: needsEmailVerification ? 10 : 0,
+                    ),
+                    child: _VerificationActionTile(
+                      icon: Icons.phone_iphone_outlined,
+                      title: 'Verify mobile number',
+                      subtitle: phoneEnding.isEmpty
+                          ? 'Send a code by SMS'
+                          : 'Send a code to the number ending in $phoneEnding',
+                      isDark: isDark,
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        Get.toNamed(
+                          AuthRoutes.verifyPhone,
+                          arguments: {
+                            'phone': user.phone,
+                            'email': user.email,
+                            'autoSend': true,
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _UserCard extends StatelessWidget {
@@ -688,6 +796,7 @@ class _UserCard extends StatelessWidget {
     required this.isVerified,
     required this.isDark,
     required this.onEdit,
+    this.onOpenVerificationDrawer,
   });
 
   final User user;
@@ -696,6 +805,7 @@ class _UserCard extends StatelessWidget {
   final bool isVerified;
   final bool isDark;
   final VoidCallback onEdit;
+  final VoidCallback? onOpenVerificationDrawer;
 
   @override
   Widget build(BuildContext context) {
@@ -794,28 +904,33 @@ class _UserCard extends StatelessWidget {
                 textColor: roleColor,
                 background: roleColor.withValues(alpha: isDark ? 0.22 : 0.12),
               ),
-              _OutlinedTagChip(
-                label: isVerified ? 'Contact verified' : 'Verification needed',
-                textColor: isVerified
-                    ? AppColors.passengerPrimary
-                    : const Color(0xFF8A5A00),
-                background: isVerified
-                    ? (isDark
-                          ? const Color(0xFF14382B)
-                          : const Color(0xFFE8FAF3))
-                    : (isDark
-                          ? const Color(0xFF3C2E07)
-                          : const Color(0xFFFFF4D6)),
-                borderColor: isVerified
-                    ? (isDark
-                          ? const Color(0xFF1E5B45)
-                          : const Color(0xFFD7F1E4))
-                    : (isDark
-                          ? const Color(0xFF5C4411)
-                          : const Color(0xFFF1D98C)),
-                icon: isVerified
-                    ? Icons.verified_outlined
-                    : Icons.pending_outlined,
+              GestureDetector(
+                onTap: isVerified ? null : onOpenVerificationDrawer,
+                child: _OutlinedTagChip(
+                  label: isVerified
+                      ? 'Contact verified'
+                      : 'Verification needed',
+                  textColor: isVerified
+                      ? AppColors.passengerPrimary
+                      : const Color(0xFF8A5A00),
+                  background: isVerified
+                      ? (isDark
+                            ? const Color(0xFF14382B)
+                            : const Color(0xFFE8FAF3))
+                      : (isDark
+                            ? const Color(0xFF3C2E07)
+                            : const Color(0xFFFFF4D6)),
+                  borderColor: isVerified
+                      ? (isDark
+                            ? const Color(0xFF1E5B45)
+                            : const Color(0xFFD7F1E4))
+                      : (isDark
+                            ? const Color(0xFF5C4411)
+                            : const Color(0xFFF1D98C)),
+                  icon: isVerified
+                      ? Icons.verified_outlined
+                      : Icons.pending_outlined,
+                ),
               ),
             ],
           ),
@@ -841,12 +956,14 @@ class _ContactMethodsCard extends StatelessWidget {
     required this.isDark,
     this.onVerifyEmail,
     this.onVerifyPhone,
+    this.onOpenVerificationDrawer,
   });
 
   final User user;
   final bool isDark;
   final VoidCallback? onVerifyEmail;
   final VoidCallback? onVerifyPhone;
+  final VoidCallback? onOpenVerificationDrawer;
 
   @override
   Widget build(BuildContext context) {
@@ -921,6 +1038,32 @@ class _ContactMethodsCard extends StatelessWidget {
                 height: 1.45,
               ),
             ),
+            if (needsAnyVerification && onOpenVerificationDrawer != null) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onOpenVerificationDrawer,
+                  icon: const Icon(Icons.verified_user_outlined, size: 18),
+                  label: const Text(
+                    'Review verification',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.passengerPrimary,
+                    side: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF1E5B45)
+                          : const Color(0xFFD7F1E4),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ],
       ),
@@ -1329,6 +1472,79 @@ class _CompactBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _VerificationActionTile extends StatelessWidget {
+  const _VerificationActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _surfaceBg(isDark),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _cardBorder(isDark)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: _surfaceCard(isDark),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _cardBorder(isDark)),
+              ),
+              child: Icon(icon, size: 18, color: AppColors.passengerPrimary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: _textPrimary(isDark),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _mutedText(isDark),
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: _mutedText(isDark)),
+          ],
+        ),
       ),
     );
   }

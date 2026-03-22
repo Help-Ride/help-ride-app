@@ -67,7 +67,7 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'We sent a 6-digit code to ${controller.email}.',
+                        'Enter the 6-digit code from your email.',
                         style: TextStyle(
                           color: isDark
                               ? AppColors.darkMuted

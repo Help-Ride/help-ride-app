@@ -1,15 +1,12 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart' as apple_sign_in;
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
-import '../../../shared/utils/phone_number_utils.dart';
 import '../controllers/auth_controller.dart';
+import '../widgets/auth_phone_field.dart';
+import '../widgets/auth_screen_frame.dart';
 import '../widgets/auth_text_field.dart';
-import '../widgets/social_auth_button.dart';
 
 class RegisterView extends GetView<AuthController> {
   const RegisterView({super.key});
@@ -18,269 +15,234 @@ class RegisterView extends GetView<AuthController> {
   Widget build(BuildContext context) {
     final theme = Get.find<ThemeController>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = Theme.of(context).scaffoldBackgroundColor;
-    final surface = Theme.of(context).colorScheme.surface;
 
     return Obx(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (Get.isRegistered<AuthController>()) {
+          controller.prepareOnboardingFromRouteArgs();
+        }
+      });
+
       final primary = theme.role.value == AppRole.driver
           ? AppColors.driverPrimary
           : AppColors.passengerPrimary;
 
-      return Scaffold(
-        backgroundColor: bg,
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: surface,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: isDark
-                          ? const Color(0xFF232836)
-                          : const Color(0xFFE6EAF2),
-                    ),
-                    boxShadow: isDark
-                        ? []
-                        : const [
-                            BoxShadow(
-                              blurRadius: 30,
-                              offset: Offset(0, 18),
-                              color: Color(0x14000000),
-                            ),
-                          ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Create account',
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          color: isDark
-                              ? AppColors.darkText
-                              : AppColors.lightText,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        Platform.isIOS
-                            ? 'Create your account with Sign in with Apple, Google, or email and password. We will verify your mobile number before your account goes live.'
-                            : 'Create your account with Google or email and password. We will verify your mobile number before your account goes live.',
-                        style: TextStyle(
-                          color: isDark
-                              ? AppColors.darkMuted
-                              : AppColors.lightMuted,
-                          fontSize: 14,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 22),
-                      AuthTextField(
-                        label: 'Full Name',
-                        hint: 'Rishhi Patel',
-                        onChanged: controller.setName,
-                        textInputAction: TextInputAction.next,
-                        errorText: controller.name.value.trim().isEmpty
-                            ? null
-                            : controller.nameError,
-                      ),
-                      const SizedBox(height: 14),
-                      AuthTextField(
-                        label: 'Mobile Number',
-                        hint: '(416) 555-1234',
-                        keyboardType: TextInputType.phone,
-                        onChanged: controller.setPhone,
-                        textInputAction: TextInputAction.next,
-                        inputFormatters: const [PhoneTextInputFormatter()],
-                        helperText:
-                            'Required for ride alerts, OTP sign-in, and SMS updates when a new ride is available.',
-                        errorText: controller.phone.value.trim().isEmpty
-                            ? null
-                            : controller.registerPhoneError,
-                      ),
-                      const SizedBox(height: 14),
-                      AuthTextField(
-                        label: 'Email Address',
-                        hint: 'you@example.com',
-                        keyboardType: TextInputType.emailAddress,
-                        onChanged: controller.setEmail,
-                        textInputAction: TextInputAction.next,
-                        errorText: controller.email.value.trim().isEmpty
-                            ? null
-                            : controller.emailError,
-                      ),
-                      const SizedBox(height: 14),
-                      AuthTextField(
-                        label: 'Password',
-                        hint: 'Min 8 characters',
-                        obscureText: true,
-                        onChanged: controller.setPassword,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => controller.registerWithEmail(),
-                        errorText: controller.password.value.trim().isEmpty
-                            ? null
-                            : controller.passwordError,
-                      ),
-                      const SizedBox(height: 10),
-                      if (controller.error.value != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            controller.error.value!,
-                            style: const TextStyle(color: AppColors.error),
-                          ),
-                        ),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: ElevatedButton(
-                          onPressed:
-                              controller.canRegister &&
-                                  !controller.isLoading.value
-                              ? controller.registerWithEmail
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primary,
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: isDark
-                                ? const Color(0xFF1C2331)
-                                : const Color(0xFFE9EEF6),
-                            disabledForegroundColor: isDark
-                                ? AppColors.darkMuted
-                                : const Color(0xFF9AA3B2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: controller.isLoading.value
-                              ? const SizedBox(
-                                  height: 18,
-                                  width: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'Create Account',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'We will text a verification code right after signup. US/Canada numbers auto-normalize to +1.',
-                        style: TextStyle(
-                          color: isDark
-                              ? AppColors.darkMuted
-                              : AppColors.lightMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          const Expanded(child: Divider(height: 1)),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              Platform.isIOS
-                                  ? 'Or sign up with'
-                                  : 'Or continue with',
-                              style: TextStyle(
-                                color: isDark
-                                    ? AppColors.darkMuted
-                                    : AppColors.lightMuted,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          const Expanded(child: Divider(height: 1)),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      if (Platform.isIOS) ...[
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              apple_sign_in.SignInWithAppleButton(
-                                onPressed: controller.canStartAppleOauth
-                                    ? controller.loginWithApple
-                                    : null,
-                                height: 52,
-                                borderRadius: BorderRadius.circular(14),
-                                style: isDark
-                                    ? apple_sign_in
-                                          .SignInWithAppleButtonStyle
-                                          .whiteOutlined
-                                    : apple_sign_in
-                                          .SignInWithAppleButtonStyle
-                                          .black,
-                                iconAlignment: apple_sign_in.IconAlignment.left,
-                              ),
-                              if (controller.appleOauthLoading.value)
-                                SizedBox(
-                                  height: 18,
-                                  width: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      isDark ? Colors.black : Colors.white,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      SocialAuthButton(
-                        label: 'Sign up with Google',
-                        icon: const Text(
-                          'G',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            height: 1,
-                          ),
-                        ),
-                        onPressed: controller.canStartGoogleOauth
-                            ? controller.loginWithGoogle
-                            : null,
-                        borderColor: isDark
-                            ? const Color(0xFF232836)
-                            : const Color(0xFFE2E6EF),
-                        backgroundColor: surface,
-                        isLoading: controller.googleOauthLoading.value,
-                      ),
-                      const SizedBox(height: 14),
-                      Center(
-                        child: TextButton(
-                          onPressed: () => Get.back(),
-                          child: Text(
-                            'Already have an account? Sign in',
-                            style: TextStyle(color: primary),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+      return AuthScreenFrame(
+        child: AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Complete your account',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? AppColors.darkText : AppColors.lightText,
                 ),
               ),
-            ),
+              const SizedBox(height: 10),
+              Text(
+                controller.onboardingHint.value ??
+                    'Add a few details so we can finish setting up your account.',
+                style: TextStyle(
+                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  fontSize: 16,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (controller.verifiedPhone != null)
+                _VerifiedCard(
+                  title: 'Phone verified',
+                  value: controller.verifiedPhone!,
+                  isDark: isDark,
+                ),
+              if (controller.verifiedEmail != null) ...[
+                if (controller.verifiedPhone != null) const SizedBox(height: 12),
+                _VerifiedCard(
+                  title: 'Email verified',
+                  value: controller.verifiedEmail!,
+                  isDark: isDark,
+                ),
+              ],
+              if (controller.verifiedPhone != null ||
+                  controller.verifiedEmail != null)
+                const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: AuthTextField(
+                      label: 'First name',
+                      hint: 'Rishi',
+                      controller: controller.firstNameTextController,
+                      onChanged: controller.setFirstName,
+                      textCapitalization: TextCapitalization.words,
+                      autofillHints: const [AutofillHints.givenName],
+                      errorText: controller.firstName.value.trim().isEmpty
+                          ? null
+                          : controller.firstNameError,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AuthTextField(
+                      label: 'Last name',
+                      hint: 'Patel',
+                      controller: controller.lastNameTextController,
+                      onChanged: controller.setLastName,
+                      textCapitalization: TextCapitalization.words,
+                      autofillHints: const [AutofillHints.familyName],
+                      errorText: controller.lastName.value.trim().isEmpty
+                          ? null
+                          : controller.lastNameError,
+                    ),
+                  ),
+                ],
+              ),
+              if (controller.shouldShowOnboardingEmailField) ...[
+                const SizedBox(height: 14),
+                AuthTextField(
+                  label: 'Email address (optional)',
+                  hint: 'you@example.com',
+                  controller: controller.onboardingEmailTextController,
+                  keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.email],
+                  onChanged: controller.setOnboardingEmail,
+                  errorText: controller.onboardingEmail.value.trim().isEmpty
+                      ? null
+                      : controller.onboardingEmailError,
+                ),
+              ],
+              if (controller.shouldShowOnboardingPhoneField) ...[
+                const SizedBox(height: 14),
+                AuthPhoneField(
+                  controller: controller.onboardingPhoneTextController,
+                  value: controller.onboardingPhone.value,
+                  activeDialCode: controller.activeDialCodeOption,
+                  options: controller.dialCodeOptions,
+                  onChanged: controller.setOnboardingPhone,
+                  onDialCodeChanged: controller.setDialCode,
+                  label: 'Mobile number (optional)',
+                  hint: '415 555 1234',
+                  helperText: 'Add this now if you want SMS ride updates.',
+                  errorText: controller.onboardingPhone.value.trim().isEmpty
+                      ? null
+                      : controller.onboardingPhoneError,
+                ),
+              ],
+              if (controller.onboardingError.value != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  controller.onboardingError.value!,
+                  style: const TextStyle(
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              if (controller.onboardingMessage.value != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  controller.onboardingMessage.value!,
+                  style: TextStyle(color: primary, fontWeight: FontWeight.w600),
+                ),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: controller.canCompleteOnboarding
+                      ? controller.completeOnboarding
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: isDark
+                        ? const Color(0xFF1C2331)
+                        : const Color(0xFFE9EEF6),
+                    disabledForegroundColor: isDark
+                        ? AppColors.darkMuted
+                        : const Color(0xFF9AA3B2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: controller.isCompletingOnboarding.value
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text(
+                          'Finish',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'You can update the rest later from your profile.',
+                style: TextStyle(
+                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  fontSize: 12,
+                  height: 1.45,
+                ),
+              ),
+            ],
           ),
         ),
       );
     });
+  }
+}
+
+class _VerifiedCard extends StatelessWidget {
+  const _VerifiedCard({
+    required this.title,
+    required this.value,
+    required this.isDark,
+  });
+
+  final String title;
+  final String value;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151B25) : const Color(0xFFF6F8FC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A3242) : const Color(0xFFDCE3EE),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.darkText : AppColors.lightText,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

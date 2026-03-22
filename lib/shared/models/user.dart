@@ -8,6 +8,8 @@ class User {
   final String? authProvider;
   final String roleDefault;
   final String? avatarUrl;
+  final List<String> authMethods;
+  final String accountStatus;
   final String? stripeAccountId;
   final bool stripeOnboarded;
   final DriverProfile? driverProfile;
@@ -22,6 +24,8 @@ class User {
     this.authProvider,
     required this.roleDefault,
     this.avatarUrl,
+    this.authMethods = const [],
+    this.accountStatus = 'active',
     this.stripeAccountId,
     this.stripeOnboarded = false,
     this.driverProfile,
@@ -33,8 +37,8 @@ class User {
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'],
-      name: json['name'],
-      email: json['email'],
+      name: json['name']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
       phone: json['phone']?.toString(),
       phoneVerified: _parseBool(
         json['phoneVerified'] ??
@@ -51,6 +55,10 @@ class User {
           .trim(),
       roleDefault: json['roleDefault'],
       avatarUrl: json['providerAvatarUrl'],
+      authMethods: ((json['authMethods'] as List?) ?? const [])
+          .map((item) => item.toString())
+          .toList(),
+      accountStatus: json['accountStatus']?.toString() ?? 'active',
       stripeAccountId: (json['stripeAccountId'] ?? json['stripe_account_id'])
           ?.toString(),
       stripeOnboarded: _parseBool(

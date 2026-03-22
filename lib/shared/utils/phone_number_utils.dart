@@ -61,6 +61,14 @@ class PhoneNumberUtils {
     return '${normalized.substring(0, math.min(3, normalized.length - 4))}•••$last4';
   }
 
+  static String endingDigits(String? value, {int count = 4}) {
+    final normalized = normalizeToE164(value ?? '');
+    final digits = digitsOnly(normalized ?? value ?? '');
+    if (digits.isEmpty) return '';
+    if (digits.length <= count) return digits;
+    return digits.substring(digits.length - count);
+  }
+
   static String formatNorthAmericaDraft(String digits) {
     if (digits.isEmpty) return '';
 

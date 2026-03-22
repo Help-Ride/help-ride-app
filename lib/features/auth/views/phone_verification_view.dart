@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../shared/utils/phone_number_utils.dart';
 import '../controllers/phone_verification_controller.dart';
 import '../routes/auth_routes.dart';
 import '../widgets/auth_text_field.dart';
@@ -56,7 +57,9 @@ class PhoneVerificationView extends GetView<PhoneVerificationController> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Verify your mobile number',
+                        controller.hasPhone
+                            ? 'Verify your mobile number'
+                            : 'Add your mobile number',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
@@ -67,7 +70,11 @@ class PhoneVerificationView extends GetView<PhoneVerificationController> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Enter the 6-digit code we sent to ${controller.maskedPhone}. Verified numbers receive ride alerts and SMS sign-in codes.',
+                        controller.hasPhone
+                            ? (controller.phoneEndingDigits.isEmpty
+                                  ? 'Enter the 6-digit code from your text message.'
+                                  : 'Enter the 6-digit code sent to the number ending in ${controller.phoneEndingDigits}.')
+                            : 'Add your mobile number to get a 6-digit code by SMS.',
                         style: TextStyle(
                           color: isDark
                               ? AppColors.darkMuted
@@ -77,22 +84,44 @@ class PhoneVerificationView extends GetView<PhoneVerificationController> {
                         ),
                       ),
                       const SizedBox(height: 22),
-                      AuthTextField(
-                        label: 'Verification code',
-                        hint: 'Enter 6-digit code',
-                        keyboardType: TextInputType.number,
-                        onChanged: controller.setOtp,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => controller.verifyOtp(),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(6),
-                        ],
-                        maxLength: 6,
-                        errorText: controller.otp.value.trim().isEmpty
-                            ? null
-                            : controller.otpError,
-                      ),
+                      if (!controller.hasPhone) ...[
+                        AuthTextField(
+                          key: const ValueKey('phone-verification-phone'),
+                          label: 'Mobile number',
+                          hint: '(416) 555-1234',
+                          controller: controller.phoneTextController,
+                          keyboardType: TextInputType.phone,
+                          onChanged: controller.setPhone,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => controller.savePhoneAndSendOtp(),
+                          inputFormatters: const [PhoneTextInputFormatter()],
+                          helperText:
+                              'US and Canada phone numbers auto-format to +1.',
+                          helperMaxLines: 2,
+                          errorText: controller.phoneInput.value.trim().isEmpty
+                              ? null
+                              : controller.phoneError,
+                        ),
+                      ] else ...[
+                        AuthTextField(
+                          key: const ValueKey('phone-verification-otp'),
+                          label: 'Verification code',
+                          hint: 'Enter 6-digit code',
+                          controller: controller.otpTextController,
+                          keyboardType: TextInputType.number,
+                          onChanged: controller.setOtp,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => controller.verifyOtp(),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(6),
+                          ],
+                          maxLength: 6,
+                          errorText: controller.otp.value.trim().isEmpty
+                              ? null
+                              : controller.otpError,
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       Obx(() {
                         final msg = controller.message.value;
@@ -114,14 +143,22 @@ class PhoneVerificationView extends GetView<PhoneVerificationController> {
                         );
                       }),
                       Obx(() {
-                        final loading = controller.isVerifying.value;
-                        final enabled = controller.canVerify && !loading;
+                        final loading = controller.hasPhone
+                            ? controller.isVerifying.value
+                            : controller.isSavingPhone.value;
+                        final enabled = controller.hasPhone
+                            ? (controller.canVerify && !loading)
+                            : controller.canSubmitPhone;
 
                         return SizedBox(
                           width: double.infinity,
                           height: 52,
                           child: ElevatedButton(
-                            onPressed: enabled ? controller.verifyOtp : null,
+                            onPressed: enabled
+                                ? (controller.hasPhone
+                                      ? controller.verifyOtp
+                                      : controller.savePhoneAndSendOtp)
+                                : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primary,
                               foregroundColor: Colors.white,
@@ -144,8 +181,10 @@ class PhoneVerificationView extends GetView<PhoneVerificationController> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Text(
-                                    'Verify Mobile Number',
+                                : Text(
+                                    controller.hasPhone
+                                        ? 'Verify Mobile Number'
+                                        : 'Text Me a Code',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -154,23 +193,25 @@ class PhoneVerificationView extends GetView<PhoneVerificationController> {
                         );
                       }),
                       const SizedBox(height: 10),
-                      Obx(() {
-                        final sending = controller.isSending.value;
-                        return Center(
+                      if (controller.hasPhone)
+                        Obx(() {
+                          final sending = controller.isSending.value;
+                          return Center(
+                            child: TextButton(
+                              onPressed: sending ? null : controller.sendOtp,
+                              child: sending
+                                  ? const Text('Sending...')
+                                  : const Text('Resend code'),
+                            ),
+                          );
+                        }),
+                      if (controller.allowBackToLogin)
+                        Center(
                           child: TextButton(
-                            onPressed: sending ? null : controller.sendOtp,
-                            child: sending
-                                ? const Text('Sending...')
-                                : const Text('Resend code'),
+                            onPressed: () => Get.offAllNamed(AuthRoutes.login),
+                            child: const Text('Back to login'),
                           ),
-                        );
-                      }),
-                      Center(
-                        child: TextButton(
-                          onPressed: () => Get.offAllNamed(AuthRoutes.login),
-                          child: const Text('Back to login'),
                         ),
-                      ),
                     ],
                   ),
                 ),

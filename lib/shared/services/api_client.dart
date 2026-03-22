@@ -300,7 +300,7 @@ class ApiClient {
           (data['message'] ?? data['error'] ?? data['detail'] ?? data['msg'])
               ?.toString();
     } else if (data is String && data.trim().isNotEmpty) {
-      serverMsg = data;
+      serverMsg = _normalizeServerStringMessage(data);
     }
 
     // Network / timeout
@@ -375,6 +375,26 @@ class ApiClient {
           details: data,
         );
     }
+  }
+
+  static String? _normalizeServerStringMessage(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+
+    final lower = trimmed.toLowerCase();
+    if (lower.contains('<!doctype html') || lower.contains('<html')) {
+      return null;
+    }
+
+    if (lower.startsWith('cannot post ') ||
+        lower.startsWith('cannot get ') ||
+        lower.startsWith('cannot put ') ||
+        lower.startsWith('cannot patch ') ||
+        lower.startsWith('cannot delete ')) {
+      return null;
+    }
+
+    return trimmed;
   }
 
   void _logRequest(RequestOptions options) {
