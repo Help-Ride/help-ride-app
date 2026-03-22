@@ -1345,6 +1345,9 @@ class _ContactMethodRow extends StatelessWidget {
               const SizedBox(height: 3),
               Text(
                 value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,

@@ -100,8 +100,9 @@ class SearchRidesView extends GetView<SearchRidesController> {
                               width: 56,
                               height: 56,
                               decoration: BoxDecoration(
-                                color: AppColors.passengerPrimary
-                                    .withOpacity(isDark ? 0.25 : 0.12),
+                                color: AppColors.passengerPrimary.withValues(
+                                  alpha: isDark ? 0.25 : 0.12,
+                                ),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: const Icon(

@@ -130,6 +130,13 @@ class _MessagesViewState extends State<MessagesView> {
   }
 
   Future<void> _openThread(ChatConversation conversation) async {
+    if (conversation.paymentRequired) {
+      Get.snackbar(
+        'Chat locked',
+        'Complete payment for this booking to open chat.',
+      );
+      return;
+    }
     _controller.setActiveConversation(conversation.id);
     await Get.to(() => ChatThreadView(conversation: conversation));
     _controller.setActiveConversation(null);

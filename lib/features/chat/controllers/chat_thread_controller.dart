@@ -26,6 +26,7 @@ class ChatThreadController extends GetxController {
   final draft = ''.obs;
   final blockedByMe = false.obs;
   final blockedByOtherUser = false.obs;
+  final paymentRequired = false.obs;
   bool _markingRead = false;
   late final SupportApi _supportApi;
 
@@ -44,7 +45,8 @@ class ChatThreadController extends GetxController {
     return 'passenger';
   }
 
-  bool get chatDisabled => blockedByMe.value || blockedByOtherUser.value;
+  bool get chatDisabled =>
+      blockedByMe.value || blockedByOtherUser.value || paymentRequired.value;
 
   String get participantId => conversation.participant.id.trim();
 
@@ -57,6 +59,7 @@ class ChatThreadController extends GetxController {
     _supportApi = SupportApi(client);
     blockedByMe.value = conversation.blockedByMe;
     blockedByOtherUser.value = conversation.blockedByOtherUser;
+    paymentRequired.value = conversation.paymentRequired;
     await fetch();
     await _pusher.subscribeToConversation(
       conversation.id,
@@ -77,7 +80,7 @@ class ChatThreadController extends GetxController {
       }
       await _markConversationRead();
     } catch (e) {
-      error.value = e.toString();
+      error.value = _normalizeError(e);
     } finally {
       loading.value = false;
     }

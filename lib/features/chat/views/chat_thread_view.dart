@@ -236,6 +236,9 @@ class _ChatThreadViewState extends State<ChatThreadView> {
   }
 
   String _chatDisabledMessage(ChatConversation conversation) {
+    if (conversation.paymentRequired) {
+      return 'Chat unlocks after payment is completed for this booking.';
+    }
     if (conversation.blockedByMe) {
       return 'You blocked this user. Unblock them to send more messages.';
     }

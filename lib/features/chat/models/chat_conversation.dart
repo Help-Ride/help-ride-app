@@ -19,6 +19,7 @@ class ChatConversation {
   final DateTime? rideStartTime;
   final bool blockedByMe;
   final bool blockedByOtherUser;
+  final bool paymentRequired;
   final bool chatDisabled;
 
   ChatConversation({
@@ -40,6 +41,7 @@ class ChatConversation {
     this.rideStartTime,
     this.blockedByMe = false,
     this.blockedByOtherUser = false,
+    this.paymentRequired = false,
     this.chatDisabled = false,
   });
 
@@ -147,6 +149,7 @@ class ChatConversation {
       blockedByOtherUser: _readBool(json, [
         'blockedByOtherUser',
       ], fallback: false),
+      paymentRequired: _readBool(json, ['paymentRequired'], fallback: false),
       chatDisabled: _readBool(json, ['chatDisabled'], fallback: false),
     );
   }
@@ -170,6 +173,7 @@ class ChatConversation {
     DateTime? rideStartTime,
     bool? blockedByMe,
     bool? blockedByOtherUser,
+    bool? paymentRequired,
     bool? chatDisabled,
   }) {
     return ChatConversation(
@@ -191,6 +195,7 @@ class ChatConversation {
       rideStartTime: rideStartTime ?? this.rideStartTime,
       blockedByMe: blockedByMe ?? this.blockedByMe,
       blockedByOtherUser: blockedByOtherUser ?? this.blockedByOtherUser,
+      paymentRequired: paymentRequired ?? this.paymentRequired,
       chatDisabled: chatDisabled ?? this.chatDisabled,
     );
   }

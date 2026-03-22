@@ -40,6 +40,7 @@ class ChatConversationTile extends StatelessWidget {
     final moderationLabel = conversation.blockedByMe
         ? 'Blocked'
         : (conversation.blockedByOtherUser ? 'Unavailable' : '');
+    final paymentLabel = conversation.paymentRequired ? 'Payment required' : '';
 
     final badgeColor = accentColor;
     final avatarBg = accentColor.withValues(alpha: isDark ? 0.25 : 0.15);
@@ -205,6 +206,15 @@ class ChatConversationTile extends StatelessWidget {
                         runSpacing: 8,
                         children: [
                           _RoleChip(label: roleLabel, color: accentColor),
+                          if (paymentLabel.isNotEmpty)
+                            _MetaChip(
+                              label: paymentLabel,
+                              background: isDark
+                                  ? const Color(0xFF332714)
+                                  : const Color(0xFFFFF4E6),
+                              foreground: const Color(0xFFB96A12),
+                              icon: Icons.lock_outline_rounded,
+                            ),
                           if (moderationLabel.isNotEmpty)
                             _MetaChip(
                               label: moderationLabel,
