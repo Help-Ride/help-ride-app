@@ -11,6 +11,8 @@ class SocialAuthButton extends StatelessWidget {
     this.isLoading = false,
     this.backgroundColor,
     this.foregroundColor,
+    this.height = 52,
+    this.radius = 14,
   });
 
   final String label;
@@ -20,6 +22,8 @@ class SocialAuthButton extends StatelessWidget {
   final bool isLoading;
   final Color? backgroundColor;
   final Color? foregroundColor;
+  final double height;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +33,7 @@ class SocialAuthButton extends StatelessWidget {
 
     return SizedBox(
       width: double.infinity,
-      height: 52,
+      height: height,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
@@ -37,7 +41,7 @@ class SocialAuthButton extends StatelessWidget {
           foregroundColor: resolvedForeground,
           side: BorderSide(color: borderColor),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(radius),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 18),
         ),

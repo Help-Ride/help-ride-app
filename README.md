@@ -72,9 +72,28 @@ The app entry point initializes environment variables, Stripe, Firebase, storage
 flutter test
 ```
 
+## Versioning
+
+Flutter already drives both store versions from `pubspec.yaml`:
+
+- `1.0.1` becomes iOS `CFBundleShortVersionString`
+- `3` becomes iOS `CFBundleVersion` and Android `versionCode`
+
+Use the version helper before release builds instead of editing `pubspec.yaml` by hand:
+
+```bash
+dart run tool/bump_version.dart build   # 1.0.1+3 -> 1.0.1+4
+dart run tool/bump_version.dart patch   # 1.0.1+3 -> 1.0.2+4
+dart run tool/bump_version.dart minor
+dart run tool/bump_version.dart major
+dart run tool/bump_version.dart set 1.2.0
+```
+
+Use `build` when you need another upload for the same release train. Use `patch` (or higher) when App Store Connect says the previous version is already approved and the train is closed, like the `1.0.1` rejection shown in Xcode Organizer.
+
 ## Android publishing
 
-The Android app is currently configured with package ID `ca.helpride.mobile` and version `1.0.1+3`. Bump the version in `pubspec.yaml` before every new Play upload.
+The Android app is currently configured with package ID `ca.helpride.mobile` and version `1.0.1+3`. Run the version helper before every Play upload so `versionCode` stays ahead of the last release.
 
 1. Create an upload keystore for Play signing:
    ```bash

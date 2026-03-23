@@ -18,6 +18,8 @@ class AuthPhoneField extends StatelessWidget {
     this.errorText,
     this.helperText,
     this.singleField = false,
+    this.radius = 14,
+    this.contentPadding,
   });
 
   final TextEditingController controller;
@@ -31,6 +33,8 @@ class AuthPhoneField extends StatelessWidget {
   final String? errorText;
   final String? helperText;
   final bool singleField;
+  final double radius;
+  final EdgeInsetsGeometry? contentPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -80,14 +84,16 @@ class AuthPhoneField extends StatelessWidget {
       onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
       inputFormatters: const [PhoneTextInputFormatter()],
       cursorColor: AppColors.passengerPrimary,
-      decoration: appInputDecoration(
-        context,
-        hintText: hint,
-        radius: 14,
-      ).copyWith(
-        errorText: errorText == null ? null : ' ',
-        errorStyle: const TextStyle(fontSize: 0, height: 0),
-      ),
+      decoration:
+          appInputDecoration(
+            context,
+            hintText: hint,
+            radius: radius,
+            contentPadding: contentPadding,
+          ).copyWith(
+            errorText: errorText == null ? null : ' ',
+            errorStyle: const TextStyle(fontSize: 0, height: 0),
+          ),
     );
   }
 }
