@@ -11,6 +11,7 @@ class RideDetailsBottomBar extends GetView<RideDetailsController> {
     return Obx(() {
       final ride = controller.ride.value;
       if (ride == null) return const SizedBox.shrink();
+      if (controller.hasBookingContext) return const SizedBox.shrink();
 
       final total = controller.totalPrice;
       final isDark = Theme.of(context).brightness == Brightness.dark;

@@ -149,6 +149,7 @@ class ChatConversationsController extends GetxController {
       rideStartTime: incoming.rideStartTime,
       blockedByMe: incoming.blockedByMe,
       blockedByOtherUser: incoming.blockedByOtherUser,
+      paymentRequired: incoming.paymentRequired,
       chatDisabled: incoming.chatDisabled,
     );
 
@@ -259,6 +260,9 @@ class ChatConversationsController extends GetxController {
     final futures = list
         .map((conversation) async {
           final isActive = activeId == conversation.id;
+          if (conversation.paymentRequired) {
+            return conversation.copyWith(unreadCount: 0);
+          }
           try {
             final unreadCount = await _api.countUnreadMessages(
               conversationId: conversation.id,

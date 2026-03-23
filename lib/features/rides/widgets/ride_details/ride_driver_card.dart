@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:help_ride/features/rides/controllers/ride_details_controller.dart';
 import 'package:help_ride/features/rides/models/ride.dart';
 import 'package:help_ride/features/rides/widgets/ride_formatters.dart';
 import 'package:help_ride/features/rides/widgets/ride_details/ride_ui.dart';
-import 'package:help_ride/features/chat/services/chat_api.dart';
-import 'package:help_ride/features/chat/views/chat_thread_view.dart';
-import 'package:help_ride/shared/controllers/session_controller.dart';
-import 'package:help_ride/shared/services/api_client.dart';
 import '../../../../../core/theme/app_colors.dart';
 
-class RideDriverCard extends StatelessWidget {
+class RideDriverCard extends GetView<RideDetailsController> {
   const RideDriverCard({super.key, required this.ride});
   final Ride ride;
 
@@ -19,10 +16,11 @@ class RideDriverCard extends StatelessWidget {
     final driver = ride.driver;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final avatarUrl = driver?.avatarUrl ?? '';
-    final email = (driver?.email ?? '').trim();
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
     return AppCard(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
             radius: 22,
@@ -67,72 +65,67 @@ class RideDriverCard extends StatelessWidget {
                   Text(
                     _driverMetaText(driver)!,
                     style: TextStyle(
-                      color:
-                          isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      color: muted,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                if (email.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    email,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => Get.snackbar('Call', 'Later'),
-                        icon: const Icon(Icons.call, size: 18),
-                        label: const Text('Call'),
+                if (controller.canOpenBookingChat)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: controller.openBookingChat,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.passengerPrimary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        minimumSize: const Size.fromHeight(44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                      label: const Text(
+                        'Chat',
+                        style: TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final session = Get.isRegistered<SessionController>()
-                              ? Get.find<SessionController>()
-                              : null;
-                          final userId = session?.user.value?.id ?? '';
-                          if (userId.isEmpty) {
-                            Get.snackbar('Message', 'Please sign in to chat.');
-                            return;
-                          }
-
-                          try {
-                            final client = await ApiClient.create();
-                            final api = ChatApi(client);
-                            final conversation =
-                                await api.createOrGetConversation(
-                              rideId: ride.id,
-                              passengerId: userId,
-                              currentUserId: userId,
-                              currentRole: session?.user.value?.roleDefault,
-                            );
-                            Get.to(
-                              () => ChatThreadView(conversation: conversation),
-                            );
-                          } catch (e) {
-                            Get.snackbar(
-                              'Message',
-                              'Unable to start chat right now.',
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                        label: const Text('Message'),
+                  )
+                else
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF151B25)
+                          : const Color(0xFFF7FAFD),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF232836)
+                            : const Color(0xFFE6EAF2),
                       ),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.lock_outline, size: 16, color: muted),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            controller.bookingInfoMessage,
+                            style: TextStyle(
+                              color: muted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),

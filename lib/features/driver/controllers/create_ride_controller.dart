@@ -7,6 +7,7 @@ import '../../rides/utils/ride_recurrence.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/utils/input_validators.dart';
 import '../../../shared/widgets/place_picker_field.dart';
+import '../routes/driver_routes.dart';
 import '../services/driver_rides_api.dart';
 import '../utils/ride_payload_utils.dart';
 
@@ -507,7 +508,16 @@ class CreateRideController extends GetxController {
         }
       }
 
-      Get.back();
+      if (isRecurring &&
+          recurringSeriesId != null &&
+          recurringSeriesId.isNotEmpty) {
+        await Get.offNamed(
+          DriverRoutes.rideSeries.replaceFirst(':seriesId', recurringSeriesId),
+          arguments: {'seriesId': recurringSeriesId},
+        );
+      } else {
+        Get.back();
+      }
       _showPublishSuccess(
         inputPrice: basePrice,
         finalPrice: resolvedPrice,

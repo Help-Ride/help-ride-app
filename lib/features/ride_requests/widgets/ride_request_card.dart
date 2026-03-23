@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:help_ride/features/chat/services/chat_api.dart';
-import 'package:help_ride/features/chat/views/chat_thread_view.dart';
 import '../../bookings/utils/booking_formatters.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../shared/controllers/session_controller.dart';
 import '../../../shared/services/api_client.dart';
 import '../models/ride_request.dart';
 import '../models/ride_request_offer.dart';
@@ -305,7 +302,6 @@ Future<void> _openOffersSheet(BuildContext context, RideRequest request) async {
                               setState,
                               loadOffers,
                             ),
-                            onMessage: () => _openOfferChat(request, o),
                           ),
                         )
                         .toList(),
@@ -345,55 +341,16 @@ Future<void> _handleOfferAction(
   }
 }
 
-Future<void> _openOfferChat(RideRequest request, RideRequestOffer offer) async {
-  final session = Get.isRegistered<SessionController>()
-      ? Get.find<SessionController>()
-      : null;
-  final currentUserId = session?.user.value?.id ?? '';
-  if (currentUserId.isEmpty) {
-    Get.snackbar('Message', 'Please sign in to chat.');
-    return;
-  }
-
-  final rideId = offer.rideId.trim().isNotEmpty
-      ? offer.rideId.trim()
-      : (offer.ride?.id ?? '').trim();
-  if (rideId.isEmpty) {
-    Get.snackbar('Message', 'Ride details not available.');
-    return;
-  }
-
-  final passengerId = request.passengerId.trim().isNotEmpty
-      ? request.passengerId.trim()
-      : currentUserId;
-
-  try {
-    final client = await ApiClient.create();
-    final api = ChatApi(client);
-    final conversation = await api.createOrGetConversation(
-      rideId: rideId,
-      passengerId: passengerId,
-      currentUserId: currentUserId,
-      currentRole: session?.user.value?.roleDefault,
-    );
-    await Get.to(() => ChatThreadView(conversation: conversation));
-  } catch (_) {
-    Get.snackbar('Message', 'Unable to start chat right now.');
-  }
-}
-
 class _OfferTile extends StatelessWidget {
   const _OfferTile({
     required this.offer,
     required this.onAccept,
     required this.onReject,
-    required this.onMessage,
   });
 
   final RideRequestOffer offer;
   final VoidCallback onAccept;
   final VoidCallback onReject;
-  final Future<void> Function() onMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -403,7 +360,7 @@ class _OfferTile extends StatelessWidget {
     final ride = offer.ride;
     final driver = offer.driver;
     final canAct = offer.isOpen;
-    final canMessage = offer.rideId.trim().isNotEmpty || ride != null;
+    final canShowChat = offer.rideId.trim().isNotEmpty || ride != null;
     final pricePerSeat = offer.displayPricePerSeat;
 
     return Container(
@@ -442,14 +399,12 @@ class _OfferTile extends StatelessWidget {
               style: TextStyle(color: muted),
             ),
           ],
-          if (canMessage) ...[
+          if (canShowChat) ...[
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () async {
-                  await onMessage();
-                },
+                onPressed: null,
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(40),
                   shape: RoundedRectangleBorder(
@@ -457,7 +412,7 @@ class _OfferTile extends StatelessWidget {
                   ),
                 ),
                 icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                label: Text(driver != null ? 'Message Driver' : 'Message'),
+                label: const Text('Chat After Payment'),
               ),
             ),
           ],

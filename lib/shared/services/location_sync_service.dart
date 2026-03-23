@@ -1,6 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:get/get.dart';
 
 import '../models/location_sample.dart';
+import '../../features/auth/routes/auth_routes.dart';
+import 'api_exception.dart';
 import 'api_client.dart';
 import 'token_storage.dart';
 
@@ -43,6 +47,14 @@ class LocationSyncService {
   static const Duration _defaultTimeout = Duration(seconds: 10);
   static const Duration _minSyncInterval = Duration(minutes: 2);
   static const double _minMoveMeters = 100;
+  static const Set<String> _authRoutes = {
+    AuthRoutes.login,
+    AuthRoutes.code,
+    AuthRoutes.register,
+    AuthRoutes.verifyEmail,
+    AuthRoutes.verifyPhone,
+    AuthRoutes.passwordReset,
+  };
 
   final TokenStorage _tokenStorage = TokenStorage();
 
@@ -99,6 +111,11 @@ class LocationSyncService {
       return null;
     }
 
+    final currentRoute = Get.currentRoute.trim();
+    if (!force && _authRoutes.contains(currentRoute)) {
+      return null;
+    }
+
     final resolvedSample =
         sample ??
         await captureCurrentLocation(
@@ -112,17 +129,30 @@ class LocationSyncService {
     }
 
     final client = await _getClient();
-    final res = await client.put<Map<String, dynamic>>(
-      '/users/me/location',
-      data: resolvedSample.toApiJson(),
-    );
+    try {
+      final res = await client.put<Map<String, dynamic>>(
+        '/users/me/location',
+        skipAuthLogout: true,
+        skipAuthRefresh: true,
+        data: resolvedSample.toApiJson(),
+      );
 
-    final data = _unwrapMap(res.data);
-    final update = UserLocationUpdate.fromJson(data);
+      final data = _unwrapMap(res.data);
+      final update = UserLocationUpdate.fromJson(data);
 
-    _lastSyncedAt = DateTime.now().toUtc();
-    _lastSyncedSample = resolvedSample;
-    return update;
+      _lastSyncedAt = DateTime.now().toUtc();
+      _lastSyncedSample = resolvedSample;
+      return update;
+    } on DioException catch (error) {
+      final apiError = error.error;
+      final statusCode = apiError is ApiException
+          ? apiError.statusCode
+          : error.response?.statusCode;
+      if (statusCode == 401 || statusCode == 403) {
+        return null;
+      }
+      rethrow;
+    }
   }
 
   Future<bool> _ensureLocationAccess({required bool requestPermission}) async {

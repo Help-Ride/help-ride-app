@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../controllers/driver_my_rides_controller.dart';
+import '../../models/driver_ride_management.dart';
 
 class DriverRidesTabs extends StatelessWidget {
   const DriverRidesTabs({
@@ -80,7 +80,7 @@ class _Pill extends StatelessWidget {
                     blurRadius: 12,
                     offset: const Offset(0, 6),
                     color: isDark
-                        ? Colors.black.withOpacity(0.4)
+                        ? Colors.black.withValues(alpha: 0.4)
                         : const Color(0x12000000),
                   ),
                 ]

@@ -1,9 +1,11 @@
 import 'package:get/get.dart';
+import 'package:help_ride/features/auth/bindings/auth_code_binding.dart';
 import 'package:help_ride/features/auth/views/register_view.dart';
 import '../bindings/auth_binding.dart';
 import '../bindings/email_verification_binding.dart';
 import '../bindings/password_reset_binding.dart';
 import '../bindings/phone_verification_binding.dart';
+import '../views/auth_code_view.dart';
 import '../views/email_verification_view.dart';
 import '../views/login_view.dart';
 import '../views/password_reset_view.dart';
@@ -11,6 +13,7 @@ import '../views/phone_verification_view.dart';
 
 class AuthRoutes {
   static const login = '/login';
+  static const code = '/auth/code';
   static const register = '/register';
   static const verifyEmail = '/verify-email';
   static const verifyPhone = '/verify-phone';
@@ -19,9 +22,14 @@ class AuthRoutes {
   static final pages = [
     GetPage(name: login, page: () => const LoginView(), binding: AuthBinding()),
     GetPage(
+      name: code,
+      page: () => const AuthCodeView(),
+      binding: AuthCodeBinding(),
+    ),
+    GetPage(
       name: register,
       page: () => const RegisterView(),
-      binding: AuthBinding(), // ✅ add this
+      binding: AuthBinding(),
     ),
     GetPage(
       name: verifyEmail,

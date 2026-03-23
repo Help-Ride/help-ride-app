@@ -1,41 +1,51 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/core/routes/app_routes.dart';
+import 'package:help_ride/features/auth/models/dial_code_option.dart';
+import 'package:help_ride/features/auth/services/auth_analytics.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_exception.dart';
+import 'package:help_ride/shared/services/api_client.dart';
 import 'package:help_ride/shared/services/location_sync_service.dart';
+import 'package:help_ride/shared/services/token_storage.dart';
 import 'package:help_ride/shared/utils/input_validators.dart';
 import 'package:help_ride/shared/utils/phone_number_utils.dart';
-import '../../../shared/services/api_client.dart';
-import '../../../shared/services/token_storage.dart';
 import '../routes/auth_routes.dart';
 import '../services/apple_oauth_service.dart';
 import '../services/auth_api.dart';
 import '../services/google_oauth_service.dart';
 import '../services/oauth_api.dart';
 
-enum AuthLoginMethod { password, otp }
-
 class AuthController extends GetxController {
-  final email = ''.obs;
-  final password = ''.obs;
-  final name = ''.obs;
   final phone = ''.obs;
-  final otpIdentifier = ''.obs;
-  final loginOtp = ''.obs;
+  final email = ''.obs;
+  final selectedDialCode = authDialCodeOptions.first.dialCode.obs;
 
-  final loginMethod = AuthLoginMethod.password.obs;
+  final firstName = ''.obs;
+  final lastName = ''.obs;
+  final onboardingEmail = ''.obs;
+  final onboardingPhone = ''.obs;
+  final onboardingHint = RxnString();
 
-  final isLoading = false.obs;
+  final phoneTextController = TextEditingController();
+  final emailTextController = TextEditingController();
+  final firstNameTextController = TextEditingController();
+  final lastNameTextController = TextEditingController();
+  final onboardingEmailTextController = TextEditingController();
+  final onboardingPhoneTextController = TextEditingController();
+
+  final isReady = false.obs;
+  final isSendingPhoneOtp = false.obs;
+  final isSendingEmailOtp = false.obs;
+  final isCompletingOnboarding = false.obs;
   final googleOauthLoading = false.obs;
   final appleOauthLoading = false.obs;
-  final isSendingOtp = false.obs;
-  final isVerifyingOtp = false.obs;
-  final otpSent = false.obs;
 
-  final error = RxnString();
-  final message = RxnString();
-  final isReady = false.obs;
+  final entryError = RxnString();
+  final entryMessage = RxnString();
+  final onboardingError = RxnString();
+  final onboardingMessage = RxnString();
 
   late final TokenStorage _tokenStorage;
   late final AuthApi _authApi;
@@ -43,64 +53,110 @@ class AuthController extends GetxController {
   late final GoogleOAuthService _googleOAuth;
   late final AppleOAuthService _appleOAuth;
 
-  String? get emailError => InputValidators.email(email.value);
-  String? get passwordError => InputValidators.password(password.value);
-  String? get nameError => InputValidators.optionalName(name.value);
-  String? get registerPhoneError => InputValidators.optionalPhone(phone.value);
-  String? get otpIdentifierError =>
-      InputValidators.emailOrPhone(otpIdentifier.value);
-  String? get loginOtpError => InputValidators.otpCode(loginOtp.value);
+  String _deviceId = '';
+  String? _entryArgsSignature;
+  String? _onboardingArgsSignature;
+  String? _onboardingToken;
+  String _verifiedChannel = '';
+  String? _verifiedPhone;
+  String? _verifiedEmail;
 
-  bool get isOtpLogin => loginMethod.value == AuthLoginMethod.otp;
+  List<DialCodeOption> get dialCodeOptions => authDialCodeOptions;
 
-  bool get isOtpPhoneInput =>
-      otpIdentifierError == null && normalizedOtpPhone != null;
-  bool get isOtpEmailInput =>
-      otpIdentifierError == null &&
-      otpIdentifier.value.trim().isNotEmpty &&
-      normalizedOtpPhone == null;
-
-  bool get canSubmit =>
-      isReady.value &&
-      emailError == null &&
-      passwordError == null &&
-      !isLoading.value &&
-      !isOauthBusy;
-
-  bool get canRegister =>
-      isReady.value &&
-      nameError == null &&
-      emailError == null &&
-      passwordError == null &&
-      registerPhoneError == null &&
-      !isLoading.value &&
-      !isOauthBusy;
-
-  bool get canSendLoginOtp {
-    if (!isReady.value || isLoading.value || isOauthBusy) return false;
-    if (isSendingOtp.value || isVerifyingOtp.value) return false;
-    return otpIdentifierError == null;
-  }
-
-  bool get canVerifyLoginOtp {
-    if (!otpSent.value || isVerifyingOtp.value || isSendingOtp.value) {
-      return false;
+  DialCodeOption get activeDialCodeOption {
+    for (final option in authDialCodeOptions) {
+      if (option.dialCode == selectedDialCode.value) {
+        return option;
+      }
     }
-    return otpIdentifierError == null && loginOtpError == null;
+    return authDialCodeOptions.first;
   }
 
-  String? get normalizedPhone => PhoneNumberUtils.normalizeToE164(phone.value);
-  String? get normalizedOtpPhone =>
-      PhoneNumberUtils.normalizeToE164(otpIdentifier.value);
-  String get normalizedOtpEmail => otpIdentifier.value.trim();
-  bool get isOauthBusy => googleOauthLoading.value || appleOauthLoading.value;
+  bool get isOauthBusy =>
+      googleOauthLoading.value || appleOauthLoading.value;
+
+  bool get canContinueWithPhone =>
+      isReady.value &&
+      !isSendingPhoneOtp.value &&
+      !isOauthBusy &&
+      entryPhoneError == null;
+
+  bool get canContinueWithEmail =>
+      isReady.value &&
+      !isSendingEmailOtp.value &&
+      !isOauthBusy &&
+      entryEmailError == null;
+
   bool get canStartGoogleOauth =>
       isReady.value &&
-      !isLoading.value &&
-      !isSendingOtp.value &&
-      !isVerifyingOtp.value &&
+      !isSendingPhoneOtp.value &&
+      !isSendingEmailOtp.value &&
       !isOauthBusy;
+
   bool get canStartAppleOauth => canStartGoogleOauth;
+
+  bool get shouldShowOnboardingEmailField => _verifiedChannel != 'email';
+  bool get shouldShowOnboardingPhoneField => _verifiedChannel != 'phone';
+
+  bool get canCompleteOnboarding =>
+      isReady.value &&
+      !isCompletingOnboarding.value &&
+      firstNameError == null &&
+      lastNameError == null &&
+      onboardingEmailError == null &&
+      onboardingPhoneError == null &&
+      (_onboardingToken?.isNotEmpty ?? false);
+
+  String? get entryPhoneError {
+    if (phone.value.trim().isEmpty) {
+      return 'Enter your phone number.';
+    }
+    return normalizedEntryPhone == null
+        ? 'Enter a valid phone number.'
+        : null;
+  }
+
+  String? get entryEmailError {
+    if (email.value.trim().isEmpty) {
+      return 'Enter your email address.';
+    }
+    return InputValidators.email(email.value);
+  }
+
+  String? get firstNameError => _requiredNamePart(
+    firstName.value,
+    fieldLabel: 'First name',
+  );
+
+  String? get lastNameError => _requiredNamePart(
+    lastName.value,
+    fieldLabel: 'Last name',
+  );
+
+  String? get onboardingEmailError {
+    if (!shouldShowOnboardingEmailField || onboardingEmail.value.trim().isEmpty) {
+      return null;
+    }
+    return InputValidators.email(onboardingEmail.value);
+  }
+
+  String? get onboardingPhoneError {
+    if (!shouldShowOnboardingPhoneField ||
+        onboardingPhone.value.trim().isEmpty) {
+      return null;
+    }
+    return normalizedOnboardingPhone == null
+        ? 'Enter a valid mobile number.'
+        : null;
+  }
+
+  String? get normalizedEntryPhone => _normalizePhoneInput(phone.value);
+
+  String? get normalizedOnboardingPhone =>
+      _normalizePhoneInput(onboardingPhone.value);
+
+  String? get verifiedPhone => _verifiedPhone;
+  String? get verifiedEmail => _verifiedEmail;
 
   @override
   void onInit() {
@@ -115,145 +171,318 @@ class AuthController extends GetxController {
     _oauthApi = OAuthApi(apiClient);
     _googleOAuth = GoogleOAuthService();
     _appleOAuth = AppleOAuthService();
+    _deviceId = await _tokenStorage.getOrCreateAuthDeviceId();
     isReady.value = true;
   }
 
-  void setEmail(String value) {
-    email.value = value;
-    _clearFeedback();
+  void prepareEntryFromRouteArgs() {
+    final args = Get.arguments is Map
+        ? Map<String, dynamic>.from(Get.arguments)
+        : const <String, dynamic>{};
+    final signature =
+        '${args['phone'] ?? ''}|${args['email'] ?? ''}|${args['dialCode'] ?? ''}';
+    if (_entryArgsSignature == signature) return;
+    _entryArgsSignature = signature;
+    AuthAnalytics.track('auth_entry_viewed');
+
+    final phoneArg = args['phone']?.toString().trim() ?? '';
+    _setField(
+      phone,
+      phoneTextController,
+      _displayPhoneInput(phoneArg),
+      clearEntryFeedback: false,
+    );
+
+    final emailArg = args['email']?.toString().trim() ?? '';
+    _setField(
+      email,
+      emailTextController,
+      emailArg,
+      clearEntryFeedback: false,
+    );
   }
 
-  void setPassword(String value) {
-    password.value = value;
-    _clearFeedback();
-  }
+  void prepareOnboardingFromRouteArgs() {
+    final args = Get.arguments is Map
+        ? Map<String, dynamic>.from(Get.arguments)
+        : const <String, dynamic>{};
+    final signature =
+        '${args['onboardingToken'] ?? ''}|${args['channel'] ?? ''}|${args['hint'] ?? ''}';
+    if (_onboardingArgsSignature == signature) return;
+    _onboardingArgsSignature = signature;
+    AuthAnalytics.track('auth_onboarding_viewed');
 
-  void setName(String value) {
-    name.value = value;
-    _clearFeedback();
+    _setField(
+      firstName,
+      firstNameTextController,
+      '',
+      clearEntryFeedback: false,
+      clearOnboardingFeedback: false,
+    );
+    _setField(
+      lastName,
+      lastNameTextController,
+      '',
+      clearEntryFeedback: false,
+      clearOnboardingFeedback: false,
+    );
+    _setField(
+      onboardingEmail,
+      onboardingEmailTextController,
+      '',
+      clearEntryFeedback: false,
+      clearOnboardingFeedback: false,
+    );
+    _setField(
+      onboardingPhone,
+      onboardingPhoneTextController,
+      '',
+      clearEntryFeedback: false,
+      clearOnboardingFeedback: false,
+    );
+
+    _onboardingToken = args['onboardingToken']?.toString();
+    _verifiedChannel = args['channel']?.toString() ?? '';
+    onboardingHint.value = args['hint']?.toString();
+
+    final verifiedPhoneArg = args['phone']?.toString().trim();
+    final verifiedEmailArg = args['email']?.toString().trim();
+    _verifiedPhone = verifiedPhoneArg?.isEmpty ?? true ? null : verifiedPhoneArg;
+    _verifiedEmail = verifiedEmailArg?.isEmpty ?? true ? null : verifiedEmailArg;
+
+    if (_verifiedChannel == 'phone' && _verifiedPhone != null) {
+      _setField(
+        onboardingPhone,
+        onboardingPhoneTextController,
+        '',
+        clearOnboardingFeedback: false,
+      );
+    }
+
+    if (_verifiedChannel == 'email' && _verifiedEmail != null) {
+      _setField(
+        onboardingEmail,
+        onboardingEmailTextController,
+        '',
+        clearOnboardingFeedback: false,
+      );
+    }
+
+    if (args['suggestedEmail'] is String &&
+        '${args['suggestedEmail']}'.trim().isNotEmpty) {
+      _setField(
+        onboardingEmail,
+        onboardingEmailTextController,
+        '${args['suggestedEmail']}'.trim(),
+        clearOnboardingFeedback: false,
+      );
+    }
+
+    if (args['suggestedPhone'] is String &&
+        '${args['suggestedPhone']}'.trim().isNotEmpty) {
+      _setField(
+        onboardingPhone,
+        onboardingPhoneTextController,
+        _displayPhoneInput('${args['suggestedPhone']}'.trim()),
+        clearOnboardingFeedback: false,
+      );
+    }
   }
 
   void setPhone(String value) {
-    phone.value = value;
-    _clearFeedback();
+    _setField(phone, phoneTextController, value);
   }
 
-  void setOtpIdentifier(String value) {
-    otpIdentifier.value = value;
-    _clearFeedback();
-    if (isOtpLogin) {
-      _resetOtpState();
+  void setEmail(String value) {
+    _setField(email, emailTextController, value);
+  }
+
+  void setFirstName(String value) {
+    _setField(
+      firstName,
+      firstNameTextController,
+      value,
+      clearEntryFeedback: false,
+      clearOnboardingFeedback: true,
+    );
+  }
+
+  void setLastName(String value) {
+    _setField(
+      lastName,
+      lastNameTextController,
+      value,
+      clearEntryFeedback: false,
+      clearOnboardingFeedback: true,
+    );
+  }
+
+  void setOnboardingEmail(String value) {
+    _setField(
+      onboardingEmail,
+      onboardingEmailTextController,
+      value,
+      clearEntryFeedback: false,
+      clearOnboardingFeedback: true,
+    );
+  }
+
+  void setOnboardingPhone(String value) {
+    _setField(
+      onboardingPhone,
+      onboardingPhoneTextController,
+      value,
+      clearEntryFeedback: false,
+      clearOnboardingFeedback: true,
+    );
+  }
+
+  void setDialCode(DialCodeOption option) {
+    if (selectedDialCode.value == option.dialCode) return;
+    selectedDialCode.value = option.dialCode;
+    clearEntryFeedback();
+    clearOnboardingFeedback();
+  }
+
+  Future<bool> sendPhoneContinueOtp() async {
+    if (!canContinueWithPhone || normalizedEntryPhone == null) {
+      entryError.value = entryPhoneError ?? 'Enter your phone number.';
+      return false;
     }
-  }
 
-  void setLoginOtp(String value) {
-    loginOtp.value = value;
-    error.value = null;
-    message.value = null;
-  }
-
-  void selectLoginMethod(AuthLoginMethod method) {
-    if (loginMethod.value == method) return;
-    loginMethod.value = method;
-    _clearFeedback();
-    _resetOtpState();
-  }
-
-  Future<void> loginWithEmail() async {
-    if (!canSubmit) {
-      error.value =
-          emailError ?? passwordError ?? 'Please fix highlighted fields.';
-      return;
-    }
-
-    isLoading.value = true;
-    _clearFeedback();
+    isSendingPhoneOtp.value = true;
+    clearEntryFeedback();
 
     try {
-      final authLocation = await LocationSyncService.instance
-          .captureCurrentLocation(requestPermission: false);
-      final result = await _authApi.loginWithEmail(
+      AuthAnalytics.track('auth_phone_entered', {'channel': 'phone'});
+      final result = await _authApi.sendContinuePhoneOtp(
+        phone: normalizedEntryPhone!,
+        deviceId: _deviceId,
+      );
+      AuthAnalytics.track('auth_otp_sent', {'channel': 'phone'});
+      entryMessage.value = result.message ?? 'Code sent.';
+      Get.toNamed(
+        AuthRoutes.code,
+        arguments: {
+          'channel': 'phone',
+          'identifier': normalizedEntryPhone,
+          'resendAvailableInSeconds': result.resendAvailableInSeconds,
+        },
+      );
+      return true;
+    } catch (e) {
+      AuthAnalytics.track('auth_otp_send_failed', {'channel': 'phone'});
+      entryError.value = _prettyError(e);
+      return false;
+    } finally {
+      isSendingPhoneOtp.value = false;
+    }
+  }
+
+  Future<bool> sendEmailContinueOtp() async {
+    if (!canContinueWithEmail) {
+      entryError.value = entryEmailError ?? 'Enter your email address.';
+      return false;
+    }
+
+    isSendingEmailOtp.value = true;
+    clearEntryFeedback();
+
+    try {
+      AuthAnalytics.track('auth_email_fallback_tapped');
+      final result = await _authApi.sendContinueEmailOtp(
         email: email.value.trim(),
-        password: password.value.trim(),
-        location: authLocation,
+        deviceId: _deviceId,
       );
-
-      await _persistTokens(
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
+      AuthAnalytics.track('auth_otp_sent', {'channel': 'email'});
+      entryMessage.value = result.message ?? 'Code sent.';
+      Get.toNamed(
+        AuthRoutes.code,
+        arguments: {
+          'channel': 'email',
+          'identifier': email.value.trim(),
+          'resendAvailableInSeconds': result.resendAvailableInSeconds,
+        },
       );
-      await _finishAuthenticatedFlow();
+      return true;
     } catch (e) {
-      error.value = _prettyError(e);
+      AuthAnalytics.track('auth_email_fallback_failed');
+      entryError.value = _prettyError(e);
+      return false;
     } finally {
-      isLoading.value = false;
+      isSendingEmailOtp.value = false;
     }
   }
 
-  Future<void> sendLoginOtp() async {
-    if (!canSendLoginOtp) {
-      error.value =
-          otpIdentifierError ??
-          'Please enter a valid email address or mobile number.';
+  Future<void> completeOnboarding() async {
+    if (!canCompleteOnboarding || _onboardingToken == null) {
+      onboardingError.value =
+          firstNameError ??
+          lastNameError ??
+          onboardingEmailError ??
+          onboardingPhoneError ??
+          'Complete the required fields to continue.';
       return;
     }
 
-    isSendingOtp.value = true;
-    _clearFeedback();
+    isCompletingOnboarding.value = true;
+    clearOnboardingFeedback();
 
     try {
-      if (isOtpPhoneInput) {
-        final phoneNumber = normalizedOtpPhone!;
-        await _authApi.sendVerifyPhoneOtp(phone: phoneNumber);
-        message.value =
-            'We texted a 6-digit sign-in code to ${PhoneNumberUtils.maskForDisplay(phoneNumber)}.';
-      } else {
-        await _authApi.sendVerifyEmailOtp(email: normalizedOtpEmail);
-        message.value = 'We sent a 6-digit sign-in code to your email.';
-      }
-      otpSent.value = true;
-    } catch (e) {
-      error.value = _prettyError(e);
-    } finally {
-      isSendingOtp.value = false;
-    }
-  }
+      final result = await _authApi.completeOnboarding(
+        onboardingToken: _onboardingToken!,
+        firstName: firstName.value.trim(),
+        lastName: lastName.value.trim(),
+        deviceId: _deviceId,
+        email: shouldShowOnboardingEmailField
+            ? onboardingEmail.value.trim()
+            : null,
+        phone: shouldShowOnboardingPhoneField ? normalizedOnboardingPhone : null,
+      );
 
-  Future<void> verifyLoginOtp() async {
-    if (!canVerifyLoginOtp) {
-      error.value =
-          loginOtpError ?? 'Please enter the 6-digit verification code.';
-      return;
-    }
-
-    isVerifyingOtp.value = true;
-    _clearFeedback();
-
-    try {
-      final result = isOtpPhoneInput
-          ? await _authApi.verifyPhoneOtp(
-              phone: normalizedOtpPhone!,
-              otp: loginOtp.value.trim(),
-            )
-          : await _authApi.verifyEmailOtp(
-              email: normalizedOtpEmail,
-              otp: loginOtp.value.trim(),
-            );
-
-      final tokens = result?.tokens;
+      final tokens = result.tokens;
       if (tokens == null) {
-        throw Exception('Missing access token in OTP response');
+        throw Exception('Missing session tokens in onboarding response.');
       }
 
       await _persistTokens(
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
+        provider: _verifiedChannel == 'phone' ? 'phone' : 'email',
       );
-      await _finishAuthenticatedFlow();
+
+      AuthAnalytics.track('auth_new_user_created', {
+        'channel': _verifiedChannel,
+      });
+
+      final session = Get.find<SessionController>();
+      await session.bootstrap();
+
+      final user = session.user.value;
+      final needsPhoneVerification =
+          result.needsPhoneVerification &&
+          (user?.phone?.trim().isNotEmpty ?? false) &&
+          !(user?.phoneVerified ?? false);
+
+      if (needsPhoneVerification) {
+        Get.offAllNamed(
+          AuthRoutes.verifyPhone,
+          arguments: {
+            'phone': user?.phone,
+            'email': user?.email ?? '',
+            'autoSend': true,
+            'allowBackToLogin': false,
+            'provider': _verifiedChannel == 'email' ? 'email' : 'phone',
+          },
+        );
+        return;
+      }
+
+      Get.offAllNamed(AppRoutes.shell);
     } catch (e) {
-      error.value = _prettyError(e);
+      onboardingError.value = _prettyError(e);
     } finally {
-      isVerifyingOtp.value = false;
+      isCompletingOnboarding.value = false;
     }
   }
 
@@ -261,11 +490,15 @@ class AuthController extends GetxController {
     if (!canStartGoogleOauth) return;
 
     googleOauthLoading.value = true;
-    _clearFeedback();
+    clearEntryFeedback();
+    AuthAnalytics.track('auth_google_tapped');
 
     try {
       final acc = await _googleOAuth.signIn();
-      if (acc == null) return;
+      if (acc == null) {
+        AuthAnalytics.track('auth_google_failed', {'reason': 'cancelled'});
+        return;
+      }
 
       final authLocation = await LocationSyncService.instance
           .captureCurrentLocation(requestPermission: false);
@@ -284,9 +517,14 @@ class AuthController extends GetxController {
         refreshToken: tokens.refreshToken,
         provider: 'google',
       );
-      await _finishAuthenticatedFlow();
+      AuthAnalytics.track('auth_google_success');
+      await _finishAuthenticatedFlow(
+        enforcePhoneVerification: true,
+        provider: 'google',
+      );
     } catch (e) {
-      error.value = _prettyError(e);
+      AuthAnalytics.track('auth_google_failed');
+      entryError.value = _prettyError(e);
     } finally {
       googleOauthLoading.value = false;
     }
@@ -296,11 +534,15 @@ class AuthController extends GetxController {
     if (!canStartAppleOauth) return;
 
     appleOauthLoading.value = true;
-    _clearFeedback();
+    clearEntryFeedback();
+    AuthAnalytics.track('auth_apple_tapped');
 
     try {
       final credential = await _appleOAuth.signIn();
-      if (credential == null) return;
+      if (credential == null) {
+        AuthAnalytics.track('auth_apple_failed', {'reason': 'cancelled'});
+        return;
+      }
 
       final authLocation = await LocationSyncService.instance
           .captureCurrentLocation(requestPermission: false);
@@ -321,73 +563,36 @@ class AuthController extends GetxController {
         refreshToken: tokens.refreshToken,
         provider: 'apple',
       );
-      await _finishAuthenticatedFlow();
+      AuthAnalytics.track('auth_apple_success');
+      await _finishAuthenticatedFlow(
+        enforcePhoneVerification: true,
+        provider: 'apple',
+      );
     } catch (e) {
-      error.value = _prettyError(e);
+      AuthAnalytics.track('auth_apple_failed');
+      entryError.value = _prettyError(e);
     } finally {
       appleOauthLoading.value = false;
     }
   }
 
-  Future<void> registerWithEmail() async {
-    if (!canRegister) {
-      error.value =
-          nameError ??
-          registerPhoneError ??
-          emailError ??
-          passwordError ??
-          'Please fix highlighted fields.';
+  void openLogin({Map<String, dynamic>? arguments, bool replace = false}) {
+    clearEntryFeedback();
+    clearOnboardingFeedback();
+    if (replace) {
+      Get.offAllNamed(AuthRoutes.login, arguments: arguments);
       return;
     }
-
-    isLoading.value = true;
-    _clearFeedback();
-
-    try {
-      final normalized = normalizedPhone;
-      final result = await _authApi.registerWithEmail(
-        email: email.value.trim(),
-        password: password.value.trim(),
-        phone: normalized,
-        name: name.value.trim().isEmpty ? null : name.value.trim(),
-      );
-
-      final user = result.user;
-      final userPhone = user?['phone']?.toString().trim();
-      final phoneVerified = _readBool(user?['phoneVerified']);
-
-      if ((userPhone?.isNotEmpty ?? false) && !phoneVerified) {
-        Get.toNamed(
-          AuthRoutes.verifyPhone,
-          arguments: {
-            'phone': userPhone,
-            'email': email.value.trim(),
-            'autoSend': true,
-            'contextLabel': 'register',
-          },
-        );
-        return;
-      }
-
-      await _persistTokens(
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      );
-      await _finishAuthenticatedFlow();
-    } catch (e) {
-      error.value = _prettyError(e);
-    } finally {
-      isLoading.value = false;
-    }
+    Get.offNamed(AuthRoutes.login, arguments: arguments);
   }
 
   Future<void> _persistTokens({
     required String accessToken,
     String? refreshToken,
-    String provider = 'email',
+    required String provider,
   }) async {
     await _tokenStorage.saveAccessToken(accessToken.trim());
-    await _tokenStorage.saveAuthProvider(provider);
+    await _tokenStorage.saveAuthProvider(provider.trim());
     if (refreshToken != null && refreshToken.trim().isNotEmpty) {
       await _tokenStorage.saveRefreshToken(refreshToken.trim());
     } else {
@@ -395,41 +600,107 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> _finishAuthenticatedFlow() async {
+  Future<void> _finishAuthenticatedFlow({
+    required bool enforcePhoneVerification,
+    required String provider,
+  }) async {
     final session = Get.find<SessionController>();
     await session.bootstrap();
+
+    if (enforcePhoneVerification) {
+      final user = session.user.value;
+      final phoneValue = user?.phone?.trim() ?? '';
+      final phoneVerified = user?.phoneVerified ?? false;
+      if (phoneValue.isEmpty || !phoneVerified) {
+        Get.offAllNamed(
+          AuthRoutes.verifyPhone,
+          arguments: {
+            'phone': phoneValue.isEmpty ? null : phoneValue,
+            'email': user?.email ?? '',
+            'provider': provider,
+            'autoSend': phoneValue.isNotEmpty,
+            'allowBackToLogin': false,
+          },
+        );
+        return;
+      }
+    }
+
     Get.offAllNamed(AppRoutes.shell);
   }
 
-  void _resetOtpState() {
-    otpSent.value = false;
-    loginOtp.value = '';
+  void clearEntryFeedback() {
+    entryError.value = null;
+    entryMessage.value = null;
   }
 
-  void _clearFeedback() {
-    error.value = null;
-    message.value = null;
+  void clearOnboardingFeedback() {
+    onboardingError.value = null;
+    onboardingMessage.value = null;
   }
 
-  bool _readBool(dynamic value) {
-    if (value is bool) return value;
-    if (value is num) return value != 0;
-    if (value is String) {
-      final normalized = value.trim().toLowerCase();
-      return normalized == 'true' || normalized == '1';
+  String _prettyError(Object error) {
+    if (error is DioException && error.error is ApiException) {
+      return (error.error as ApiException).message;
     }
-    return false;
-  }
-
-  String _prettyError(Object e) {
-    if (e is DioException && e.error is ApiException) {
-      return (e.error as ApiException).message;
-    }
-
-    if (e is DioException) {
+    if (error is DioException) {
       return 'Network error. Please try again.';
     }
-
     return 'Something went wrong. Please try again.';
+  }
+
+  String? _requiredNamePart(String value, {required String fieldLabel}) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return '$fieldLabel is required.';
+    }
+    if (trimmed.length < 2) {
+      return '$fieldLabel must be at least 2 characters.';
+    }
+    return null;
+  }
+
+  String? _normalizePhoneInput(String rawValue) {
+    final trimmed = rawValue.trim();
+    if (trimmed.isEmpty) return null;
+    return PhoneNumberUtils.normalizeToE164(trimmed);
+  }
+
+  String _displayPhoneInput(String value) {
+    if (value.trim().isEmpty) return '';
+    return PhoneNumberUtils.formatForDisplay(value);
+  }
+
+  void _setField(
+    RxString target,
+    TextEditingController controller,
+    String value, {
+    bool clearEntryFeedback = true,
+    bool clearOnboardingFeedback = false,
+  }) {
+    target.value = value;
+    if (controller.text != value) {
+      controller.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+      );
+    }
+    if (clearEntryFeedback) {
+      this.clearEntryFeedback();
+    }
+    if (clearOnboardingFeedback) {
+      this.clearOnboardingFeedback();
+    }
+  }
+
+  @override
+  void onClose() {
+    phoneTextController.dispose();
+    emailTextController.dispose();
+    firstNameTextController.dispose();
+    lastNameTextController.dispose();
+    onboardingEmailTextController.dispose();
+    onboardingPhoneTextController.dispose();
+    super.onClose();
   }
 }

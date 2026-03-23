@@ -1,16 +1,21 @@
-import 'dart:ui';
-
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
+import 'package:help_ride/features/bookings/utils/booking_formatters.dart';
+import 'package:help_ride/features/chat/services/chat_api.dart';
+import 'package:help_ride/features/chat/views/chat_thread_view.dart';
 import 'package:help_ride/features/rides/models/ride.dart';
 import 'package:help_ride/features/rides/services/rides_api.dart';
 import 'package:help_ride/features/rides/widgets/confirm_booking_sheet.dart';
+import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_client.dart';
+import 'package:help_ride/shared/services/api_exception.dart';
 
 import 'package:help_ride/features/bookings/services/bookings_api.dart';
 
 class RideDetailsController extends GetxController {
   late final RidesApi _ridesApi;
   late final BookingsApi _bookingsApi;
+  late final ChatApi _chatApi;
 
   final loading = false.obs;
   final error = RxnString();
@@ -23,11 +28,25 @@ class RideDetailsController extends GetxController {
   final bookingDropoffName = RxnString();
   final bookingDropoffLat = Rxn<double>();
   final bookingDropoffLng = Rxn<double>();
+  bool _openConfirmSheetOnLoad = false;
+  bool _didAutoOpenConfirmSheet = false;
+  String? _bookingId;
+  String? _bookingStatus;
+  String? _bookingPaymentStatus;
+  String? _bookingPassengerId;
 
   String get rideId => Get.parameters['id'] ?? '';
+  bool get hasBookingContext => _nonEmpty(_bookingId) != null;
   bool get hasBookingRouteContext =>
       _nonEmpty(bookingPickupName.value) != null ||
       _nonEmpty(bookingDropoffName.value) != null;
+  bool get isBookingConfirmed =>
+      _isConfirmedBookingStatus(_bookingStatus ?? '');
+  bool get isBookingPaid => isPaymentPaidStatus(_bookingPaymentStatus ?? '');
+  bool get canOpenBookingChat =>
+      hasBookingContext && isBookingConfirmed && isBookingPaid;
+  String get bookingInfoMessage =>
+      'Information will be shared once ride confirmed.';
 
   String get tripPickupName =>
       _nonEmpty(bookingPickupName.value) ??
@@ -55,6 +74,7 @@ class RideDetailsController extends GetxController {
     final client = await ApiClient.create();
     _ridesApi = RidesApi(client);
     _bookingsApi = BookingsApi(client);
+    _chatApi = ChatApi(client);
 
     // seats from previous screen
     final args = (Get.arguments as Map?) ?? const <String, dynamic>{};
@@ -64,6 +84,7 @@ class RideDetailsController extends GetxController {
         : int.tryParse('${rawSeats ?? 1}') ?? 1;
     selectedSeats.value = s <= 0 ? 1 : s;
     _applyBookingContextArgs(args);
+    _openConfirmSheetOnLoad = args['openConfirmSheet'] == true;
 
     if (rideId.trim().isEmpty) {
       error.value = 'Missing ride id.';
@@ -74,6 +95,10 @@ class RideDetailsController extends GetxController {
   }
 
   void _applyBookingContextArgs(Map<dynamic, dynamic> args) {
+    _bookingId = _nonEmpty(_asString(args['bookingId']));
+    _bookingStatus = _nonEmpty(_asString(args['bookingStatus']));
+    _bookingPaymentStatus = _nonEmpty(_asString(args['bookingPaymentStatus']));
+    _bookingPassengerId = _nonEmpty(_asString(args['bookingPassengerId']));
     bookingPickupName.value = _nonEmpty(
       _asString(args['bookingPickupName'] ?? args['passengerPickupName']),
     );
@@ -105,6 +130,18 @@ class RideDetailsController extends GetxController {
       final max = data.seatsAvailable;
       if (selectedSeats.value > max) {
         selectedSeats.value = max <= 0 ? 1 : max;
+      }
+
+      if (_openConfirmSheetOnLoad &&
+          !_didAutoOpenConfirmSheet &&
+          data.seatsAvailable > 0 &&
+          data.startTime.isAfter(DateTime.now())) {
+        _didAutoOpenConfirmSheet = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!(Get.isBottomSheetOpen ?? false)) {
+            openConfirmSheet();
+          }
+        });
       }
     } catch (e) {
       error.value = e.toString();
@@ -250,6 +287,41 @@ class RideDetailsController extends GetxController {
       loading.value = false;
     }
   }
+
+  Future<void> openBookingChat() async {
+    if (!canOpenBookingChat) return;
+
+    final session = Get.isRegistered<SessionController>()
+        ? Get.find<SessionController>()
+        : null;
+    final currentUserId = session?.user.value?.id ?? '';
+    if (currentUserId.isEmpty) {
+      Get.snackbar('Chat', 'Please sign in to chat.');
+      return;
+    }
+
+    final passengerId = _nonEmpty(_bookingPassengerId) ?? currentUserId;
+    final activeRideId = _nonEmpty(ride.value?.id) ?? rideId.trim();
+    if (activeRideId.isEmpty) {
+      Get.snackbar('Chat unavailable', 'Ride details are missing.');
+      return;
+    }
+
+    try {
+      final conversation = await _chatApi.createOrGetConversation(
+        rideId: activeRideId,
+        passengerId: passengerId,
+        currentUserId: currentUserId,
+        currentRole: session?.user.value?.roleDefault,
+      );
+      Get.to(() => ChatThreadView(conversation: conversation));
+    } catch (e) {
+      final message = e is ApiException
+          ? e.message
+          : 'Unable to open chat right now.';
+      Get.snackbar('Chat unavailable', message);
+    }
+  }
 }
 
 String _asString(dynamic value) => value?.toString() ?? '';
@@ -264,6 +336,11 @@ double? _asNullableDouble(dynamic value) {
   if (value == null) return null;
   if (value is num) return value.toDouble();
   return double.tryParse(value.toString());
+}
+
+bool _isConfirmedBookingStatus(String value) {
+  final status = value.toLowerCase().trim();
+  return status.contains('confirm') || status.contains('accept');
 }
 
 String _formatDateTime(DateTime dt) {

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/core/routes/app_routes.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
@@ -20,14 +21,18 @@ class EmailVerificationController extends GetxController {
   final isVerifying = false.obs;
   final error = RxnString();
   final message = RxnString();
+  final otpTextController = TextEditingController();
 
   final _email = ''.obs;
+  final _allowBackToLogin = true.obs;
   var _autoSent = false;
 
   late final TokenStorage _tokenStorage;
   late final AuthApi _authApi;
+  late final SessionController _session;
 
   String get email => _email.value;
+  bool get allowBackToLogin => _allowBackToLogin.value;
   String? get otpError => InputValidators.otpCode(otp.value);
   bool get canVerify => otpError == null && !isVerifying.value;
 
@@ -41,12 +46,16 @@ class EmailVerificationController extends GetxController {
     _tokenStorage = TokenStorage();
     final apiClient = await ApiClient.create();
     _authApi = AuthApi(apiClient);
+    _session = Get.find<SessionController>();
 
-    final argEmail = (Get.arguments is Map) ? Get.arguments['email'] : null;
-    final session = Get.find<SessionController>();
+    final args = Get.arguments is Map
+        ? Map<String, dynamic>.from(Get.arguments)
+        : const <String, dynamic>{};
+    final argEmail = args['email'];
+    _allowBackToLogin.value = args['allowBackToLogin'] != false;
     _email.value = (argEmail?.toString().trim().isNotEmpty ?? false)
         ? argEmail.toString().trim()
-        : (session.user.value?.email ?? '');
+        : (_session.user.value?.email ?? '');
 
     if (_email.value.isEmpty) {
       error.value = 'Missing email for verification.';
@@ -68,8 +77,38 @@ class EmailVerificationController extends GetxController {
   }
 
   void setOtp(String value) {
-    otp.value = value;
+    final trimmed = value.trim();
+    otp.value = trimmed;
+    if (otpTextController.text != trimmed) {
+      otpTextController.value = TextEditingValue(
+        text: trimmed,
+        selection: TextSelection.collapsed(offset: trimmed.length),
+      );
+    }
     error.value = null;
+  }
+
+  Future<void> goBack() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final canPop = Get.key.currentState?.canPop() ?? false;
+    final hasSession = _session.status.value == SessionStatus.authenticated;
+
+    if (canPop && hasSession) {
+      Get.back<void>();
+      return;
+    }
+
+    if (allowBackToLogin) {
+      Get.offAllNamed(AuthRoutes.login, arguments: {'email': _email.value});
+      return;
+    }
+
+    await _session.logout();
+    Get.offAllNamed(AuthRoutes.login, arguments: {'email': _email.value});
+  }
+
+  Future<void> closeFlow() async {
+    await goBack();
   }
 
   Future<void> sendOtp() async {
@@ -80,7 +119,7 @@ class EmailVerificationController extends GetxController {
 
     try {
       await _authApi.sendVerifyEmailOtp(email: _email.value);
-      message.value = 'We sent a verification code to your email.';
+      message.value = 'Code sent to your email.';
     } catch (e) {
       error.value = _prettyError(e);
     } finally {
@@ -159,5 +198,11 @@ class EmailVerificationController extends GetxController {
     }
 
     return 'Something went wrong. Please try again.';
+  }
+
+  @override
+  void onClose() {
+    otpTextController.dispose();
+    super.onClose();
   }
 }

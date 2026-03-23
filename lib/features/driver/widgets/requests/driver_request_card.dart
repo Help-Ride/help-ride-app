@@ -6,6 +6,7 @@ import 'package:help_ride/features/chat/services/chat_api.dart';
 import 'package:help_ride/features/chat/views/chat_thread_view.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_client.dart';
+import 'package:help_ride/shared/services/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'request_formatters.dart';
 
@@ -54,6 +55,7 @@ class DriverRequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canChatPassenger = isPaymentPaidStatus(booking.paymentStatus);
     final passenger = booking.passenger;
     final name = passenger?.name ?? 'Passenger';
     final pickupName = (booking.passengerPickupName ?? '').trim();
@@ -270,7 +272,7 @@ class DriverRequestCard extends StatelessWidget {
             const SizedBox(height: 14),
             _uiState == _DriverRequestUiState.offered
                 ? OutlinedButton.icon(
-                    onPressed: busy
+                    onPressed: busy || !canChatPassenger
                         ? null
                         : () async {
                             final passengerId = booking.passenger?.id ?? '';
@@ -308,15 +310,22 @@ class DriverRequestCard extends StatelessWidget {
                                 () =>
                                     ChatThreadView(conversation: conversation),
                               );
-                            } catch (_) {
+                            } catch (e) {
+                              final message = e is ApiException
+                                  ? e.message
+                                  : 'Unable to start chat right now.';
                               Get.snackbar(
-                                'Message',
-                                'Unable to start chat right now.',
+                                'Chat unavailable',
+                                message,
                               );
                             }
                           },
                     icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                    label: const Text('Message Passenger'),
+                    label: Text(
+                      canChatPassenger
+                          ? 'Message Passenger'
+                          : 'Chat After Payment',
+                    ),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(44),
                       shape: RoundedRectangleBorder(

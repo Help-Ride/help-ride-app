@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../features/rides/widgets/ride_details/ride_ui.dart';
 import '../../controllers/driver_my_rides_controller.dart';
 import '../../controllers/driver_ride_details_controller.dart';
+import '../../models/driver_ride_management.dart';
 import '../requests/driver_request_card.dart';
 import '../requests/driver_ride_requests_tabs.dart';
 import 'ride_formatters.dart';

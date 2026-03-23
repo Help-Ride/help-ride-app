@@ -8,6 +8,7 @@ InputDecoration appInputDecoration(
   Widget? prefixIcon,
   String? errorText,
   String? helperText,
+  int? helperMaxLines,
   EdgeInsetsGeometry? contentPadding,
   double radius = 14,
 }) {
@@ -30,6 +31,7 @@ InputDecoration appInputDecoration(
     prefixIcon: prefixIcon,
     errorText: errorText,
     helperText: helperText,
+    helperMaxLines: helperMaxLines,
     hintStyle: TextStyle(
       color: isDark ? AppColors.darkMuted : const Color(0xFF8B95A7),
       fontWeight: FontWeight.w500,

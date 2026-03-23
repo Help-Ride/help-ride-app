@@ -119,7 +119,7 @@ class EditRideView extends GetView<EditRideController> {
                   child: Text(
                     'Recurring ride on ${controller.ride.value!.recurrenceLabel}'
                     '${controller.ride.value!.recurrenceEndDate == null ? '' : ' until ${_fmtDate(controller.ride.value!.recurrenceEndDate!)}'}. '
-                    'Changes here only update this occurrence.',
+                    '${controller.editScopeMessage}',
                     style: TextStyle(color: muted, height: 1.4),
                   ),
                 ),
@@ -276,7 +276,7 @@ class EditRideView extends GetView<EditRideController> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: radius),
                         side: BorderSide(
-                          color: AppColors.driverPrimary.withOpacity(0.35),
+                          color: AppColors.driverPrimary.withValues(alpha: 0.35),
                           width: 1.4,
                         ),
                         foregroundColor: AppColors.driverPrimary,
@@ -292,7 +292,9 @@ class EditRideView extends GetView<EditRideController> {
                     child: ElevatedButton(
                       onPressed: controller.loading.value
                           ? null
-                          : (controller.canSave ? controller.save : null),
+                          : (controller.canSave
+                                ? () => controller.save(context)
+                                : null),
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size.fromHeight(52),
                         padding: const EdgeInsets.symmetric(vertical: 14),

@@ -106,7 +106,7 @@ class _MessagesViewState extends State<MessagesView> {
                     child: ListView.separated(
                       padding: const EdgeInsets.only(bottom: 24),
                       itemCount: items.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final conversation = items[index];
                         final label = _roleLabel(conversation, roleFallback);
@@ -130,6 +130,13 @@ class _MessagesViewState extends State<MessagesView> {
   }
 
   Future<void> _openThread(ChatConversation conversation) async {
+    if (conversation.paymentRequired) {
+      Get.snackbar(
+        'Chat locked',
+        'Complete payment for this booking to open chat.',
+      );
+      return;
+    }
     _controller.setActiveConversation(conversation.id);
     await Get.to(() => ChatThreadView(conversation: conversation));
     _controller.setActiveConversation(null);

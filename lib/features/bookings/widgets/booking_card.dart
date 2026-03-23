@@ -9,24 +9,28 @@ class BookingCard extends StatelessWidget {
     required this.b,
     this.showPay = false,
     this.showCancel = false,
+    this.showChat = false,
     this.isPaying = false,
     this.isCanceling = false,
     this.payButtonLabel = 'Pay now',
     this.paymentStateLabel,
     this.onPay,
     this.onCancel,
+    this.onChat,
     this.onDetails,
   });
 
   final Booking b;
   final bool showPay;
   final bool showCancel;
+  final bool showChat;
   final bool isPaying;
   final bool isCanceling;
   final String payButtonLabel;
   final String? paymentStateLabel;
   final VoidCallback? onPay;
   final VoidCallback? onCancel;
+  final VoidCallback? onChat;
   final VoidCallback? onDetails;
 
   @override
@@ -128,24 +132,71 @@ class BookingCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: OutlinedButton(
-              onPressed: onDetails,
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          if (showChat)
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: OutlinedButton(
+                      onPressed: onDetails,
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(
+                          color: isDark
+                              ? const Color(0xFF232836)
+                              : const Color(0xFFE2E6EF),
+                        ),
+                      ),
+                      child: const Text('Details'),
+                    ),
+                  ),
                 ),
-                side: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF232836)
-                      : const Color(0xFFE2E6EF),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: ElevatedButton.icon(
+                      onPressed: onChat,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.passengerPrimary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                      label: const Text(
+                        'Chat',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
                 ),
+              ],
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton(
+                onPressed: onDetails,
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  side: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF232836)
+                        : const Color(0xFFE2E6EF),
+                  ),
+                ),
+                child: const Text('Details'),
               ),
-              child: const Text('Details'),
             ),
-          ),
           if (showCancel) ...[
             const SizedBox(height: 10),
             SizedBox(

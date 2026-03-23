@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 
 class SocialAuthButton extends StatelessWidget {
   const SocialAuthButton({
@@ -9,6 +10,7 @@ class SocialAuthButton extends StatelessWidget {
     required this.borderColor,
     this.isLoading = false,
     this.backgroundColor,
+    this.foregroundColor,
   });
 
   final String label;
@@ -17,9 +19,14 @@ class SocialAuthButton extends StatelessWidget {
   final Color borderColor;
   final bool isLoading;
   final Color? backgroundColor;
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final resolvedForeground =
+        foregroundColor ?? (isDark ? AppColors.darkText : AppColors.lightText);
+
     return SizedBox(
       width: double.infinity,
       height: 52,
@@ -27,6 +34,7 @@ class SocialAuthButton extends StatelessWidget {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           backgroundColor: backgroundColor,
+          foregroundColor: resolvedForeground,
           side: BorderSide(color: borderColor),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -50,9 +58,10 @@ class SocialAuthButton extends StatelessWidget {
                   ),
                   Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
+                      color: resolvedForeground,
                     ),
                   ),
                 ],

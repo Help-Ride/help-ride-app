@@ -19,6 +19,9 @@ class AuthTextField extends StatelessWidget {
     this.autofocus = false,
     this.maxLength,
     this.helperText,
+    this.helperMaxLines,
+    this.autofillHints,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final String label;
@@ -35,11 +38,15 @@ class AuthTextField extends StatelessWidget {
   final bool autofocus;
   final int? maxLength;
   final String? helperText;
+  final int? helperMaxLines;
+  final Iterable<String>? autofillHints;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
     final primary = AppColors.passengerPrimary;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isEmailField = keyboardType == TextInputType.emailAddress;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,12 +71,17 @@ class AuthTextField extends StatelessWidget {
           inputFormatters: inputFormatters,
           autofocus: autofocus,
           maxLength: maxLength,
+          autofillHints: autofillHints,
+          textCapitalization: textCapitalization,
+          autocorrect: !obscureText && !isEmailField,
+          enableSuggestions: !obscureText && !isEmailField,
           cursorColor: primary,
           decoration: appInputDecoration(
             context,
             hintText: hint,
             errorText: errorText,
             helperText: helperText,
+            helperMaxLines: helperMaxLines,
             radius: 14,
           ).copyWith(counterText: maxLength == null ? null : ''),
         ),
