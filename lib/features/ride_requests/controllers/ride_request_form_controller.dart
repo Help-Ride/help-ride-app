@@ -391,6 +391,8 @@ class RideRequestFormController extends GetxController {
     await Stripe.instance.initPaymentSheet(
       paymentSheetParameters: SetupPaymentSheetParameters(
         paymentIntentClientSecret: intent.clientSecret,
+        customerId: intent.customerId,
+        customerEphemeralKeySecret: intent.customerEphemeralKeySecret,
         merchantDisplayName: 'HelpRide',
         applePay: const PaymentSheetApplePay(merchantCountryCode: 'CA'),
         style: ThemeMode.system,

@@ -344,6 +344,8 @@ class MyRidesController extends GetxController {
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: session.clientSecret,
+          customerId: session.customerId,
+          customerEphemeralKeySecret: session.customerEphemeralKeySecret,
           merchantDisplayName: 'HelpRide',
           applePay: const PaymentSheetApplePay(merchantCountryCode: 'CA'),
           style: ThemeMode.system,
@@ -505,6 +507,8 @@ class MyRidesController extends GetxController {
           : status.paymentIntentId.trim(),
       amount: status.amount ?? current?.amount,
       currency: status.currency ?? current?.currency,
+      customerId: current?.customerId,
+      customerEphemeralKeySecret: current?.customerEphemeralKeySecret,
     );
     paymentSessions.refresh();
   }

@@ -1,9 +1,12 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/models/user.dart';
+import '../../bookings/services/payments_api.dart';
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/utils/phone_number_utils.dart';
@@ -14,6 +17,7 @@ import '../services/stripe_connect_api.dart';
 class ProfileController extends GetxController {
   late final ProfileApi _api;
   late final StripeConnectApi _stripeConnectApi;
+  late final PaymentsApi _paymentsApi;
   late final SessionController _session;
   bool _servicesReady = false;
 
@@ -27,6 +31,7 @@ class ProfileController extends GetxController {
   final avatarUploading = false.obs;
   final avatarUploadError = RxnString();
   final deleteAccountLoading = false.obs;
+  final paymentMethodsLoading = false.obs;
   final stripeConnectStatus = const StripeConnectStatus.empty().obs;
   final stripeStatusLoading = false.obs;
   final stripeOnboardingLoading = false.obs;
@@ -41,6 +46,7 @@ class ProfileController extends GetxController {
     final client = await ApiClient.create();
     _api = ProfileApi(client);
     _stripeConnectApi = StripeConnectApi(client);
+    _paymentsApi = PaymentsApi(client);
     _servicesReady = true;
     driverProfile.value = _session.user.value?.driverProfile;
     await refreshDriverProfile();
@@ -223,6 +229,44 @@ class ProfileController extends GetxController {
       throw Exception(_normalizeError(error));
     } finally {
       deleteAccountLoading.value = false;
+    }
+  }
+
+  Future<bool> openPaymentMethodsSheet() async {
+    if (!_servicesReady) {
+      throw Exception('Profile service is still initializing.');
+    }
+
+    paymentMethodsLoading.value = true;
+    try {
+      final session = await _paymentsApi.createCustomerSheetSession();
+      await Stripe.instance.initCustomerSheet(
+        customerSheetInitParams: CustomerSheetInitParams.adapter(
+          setupIntentClientSecret: session.setupIntentClientSecret,
+          customerId: session.customerId,
+          customerEphemeralKeySecret: session.customerEphemeralKeySecret,
+          merchantDisplayName: 'HelpRide',
+          style: ThemeMode.system,
+          headerTextForSelectionScreen: 'Payment methods',
+          applePayEnabled: false,
+          googlePayEnabled: false,
+        ),
+      );
+      await Stripe.instance.presentCustomerSheet();
+      return true;
+    } on StripeException catch (error) {
+      final code = error.error.code.toString().toLowerCase();
+      if (code.contains('cancel')) {
+        return false;
+      }
+
+      final message = error.error.message?.trim();
+      if (message != null && message.isNotEmpty) {
+        throw Exception(message);
+      }
+      throw Exception('Could not open payment methods.');
+    } finally {
+      paymentMethodsLoading.value = false;
     }
   }
 

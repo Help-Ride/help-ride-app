@@ -14,6 +14,8 @@ class JitIntentResponse {
     required this.currency,
     required this.quotedPricePerSeat,
     required this.requestMode,
+    this.customerId,
+    this.customerEphemeralKeySecret,
   });
 
   final String clientSecret;
@@ -22,6 +24,8 @@ class JitIntentResponse {
   final String currency;
   final double quotedPricePerSeat;
   final RideRequestMode requestMode;
+  final String? customerId;
+  final String? customerEphemeralKeySecret;
 
   factory JitIntentResponse.fromJson(Map<String, dynamic> json) {
     return JitIntentResponse(
@@ -31,6 +35,13 @@ class JitIntentResponse {
       ),
       amount: _readInt(json['amount']),
       currency: _readString(json['currency']).toUpperCase(),
+      customerId: _readOptionalString(
+        json['customerId'] ?? json['customer_id'],
+      ),
+      customerEphemeralKeySecret: _readOptionalString(
+        json['customerEphemeralKeySecret'] ??
+            json['customer_ephemeral_key_secret'],
+      ),
       quotedPricePerSeat: _readDouble(
         json['quotedPricePerSeat'] ?? json['quoted_price_per_seat'],
       ),
@@ -39,6 +50,14 @@ class JitIntentResponse {
       ),
     );
   }
+}
+
+String? _readOptionalString(dynamic value) {
+  final normalized = value?.toString().trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+  return normalized;
 }
 
 class RideRequestJitRequiredException implements Exception {

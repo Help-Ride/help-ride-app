@@ -167,6 +167,23 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                     : null,
               ),
               const SizedBox(height: 16),
+              _SectionLabel(label: 'PAYMENTS', isDark: isDark),
+              const SizedBox(height: 8),
+              _ActionGroup(
+                items: [
+                  _ActionItem(
+                    icon: Icons.credit_card_outlined,
+                    label: _controller.paymentMethodsLoading.value
+                        ? 'Opening Payment Methods...'
+                        : 'Payment Methods',
+                    onTap: _controller.paymentMethodsLoading.value
+                        ? null
+                        : () => unawaited(_openPaymentMethods()),
+                  ),
+                ],
+                isDark: isDark,
+              ),
+              const SizedBox(height: 16),
               if (isDriver || _controller.driverProfile.value != null) ...[
                 _DriverProfileCard(
                   controller: _controller,
@@ -245,6 +262,23 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
     if (_didAutoOpenDriverEditor || !widget.openDriverEditorOnLoad) return;
     _didAutoOpenDriverEditor = true;
     await _openDriverEditSheet(context, _controller.driverProfile.value);
+  }
+
+  Future<void> _openPaymentMethods() async {
+    try {
+      final updated = await _controller.openPaymentMethodsSheet();
+      if (!updated) return;
+      Get.snackbar(
+        'Payment methods updated',
+        'Saved cards will be available during checkout.',
+      );
+    } catch (error) {
+      final message = error.toString().replaceFirst('Exception: ', '').trim();
+      Get.snackbar(
+        'Payment methods unavailable',
+        message.isEmpty ? 'Could not open payment methods.' : message,
+      );
+    }
   }
 
   Future<void> _confirmDeleteAccount(BuildContext context) async {
