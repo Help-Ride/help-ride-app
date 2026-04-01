@@ -1063,16 +1063,23 @@ class _ContactMethodsCardState extends State<_ContactMethodsCard> {
           'If you change your email, you will need to verify the new address before it becomes active.',
       onSave: () async {
         final beforeEmail = widget.user.email.trim().toLowerCase();
+        final beforePendingEmail = pendingEmail.toLowerCase();
+        final nextEmail = emailCtrl.text.trim().toLowerCase();
+        if (nextEmail == beforeEmail ||
+            (beforePendingEmail.isNotEmpty &&
+                nextEmail == beforePendingEmail)) {
+          return _ContactEditResult.noChanges();
+        }
         final updatedUser = await widget.controller.updateUserProfile(
           name: widget.user.name,
           email: emailCtrl.text,
           phone: PhoneNumberUtils.formatForDisplay(widget.user.phone),
           avatarUrl: widget.user.avatarUrl ?? '',
         );
-        final pendingEmail = updatedUser.pendingEmail?.trim() ?? '';
-        return pendingEmail.isNotEmpty &&
-                pendingEmail.toLowerCase() != beforeEmail
-            ? _ContactEditResult.verifyEmail(pendingEmail)
+        final updatedPendingEmail = updatedUser.pendingEmail?.trim() ?? '';
+        return updatedPendingEmail.isNotEmpty &&
+                updatedPendingEmail.toLowerCase() != beforeEmail
+            ? _ContactEditResult.verifyEmail(updatedPendingEmail)
             : _ContactEditResult.saved();
       },
     );
@@ -1133,16 +1140,26 @@ class _ContactMethodsCardState extends State<_ContactMethodsCard> {
         final beforePhone = PhoneNumberUtils.normalizeToE164(
           widget.user.phone ?? '',
         );
+        final beforePendingPhone = PhoneNumberUtils.normalizeToE164(
+          pendingPhone,
+        );
+        final nextPhone = PhoneNumberUtils.normalizeToE164(phoneCtrl.text);
+        if (nextPhone == null ||
+            nextPhone == beforePhone ||
+            (beforePendingPhone != null && nextPhone == beforePendingPhone)) {
+          return _ContactEditResult.noChanges();
+        }
         final updatedUser = await widget.controller.updateUserProfile(
           name: widget.user.name,
           email: widget.user.email,
           phone: phoneCtrl.text,
           avatarUrl: widget.user.avatarUrl ?? '',
         );
-        final pendingPhone = updatedUser.pendingPhone?.trim() ?? '';
-        return beforePhone != pendingPhone && pendingPhone.isNotEmpty
+        final updatedPendingPhone = updatedUser.pendingPhone?.trim() ?? '';
+        return beforePhone != updatedPendingPhone &&
+                updatedPendingPhone.isNotEmpty
             ? _ContactEditResult.verifyPhone(
-                phone: pendingPhone,
+                phone: updatedPendingPhone,
                 email: updatedUser.email,
               )
             : _ContactEditResult.saved();
@@ -1255,6 +1272,7 @@ class _ContactMethodsCardState extends State<_ContactMethodsCard> {
     final isDark = widget.isDark;
     final formKey = GlobalKey<FormState>();
     final messenger = ScaffoldMessenger.of(context);
+    String? apiError;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1265,127 +1283,139 @@ class _ContactMethodsCardState extends State<_ContactMethodsCard> {
       ),
       builder: (sheetContext) {
         final viewInsets = MediaQuery.of(sheetContext).viewInsets.bottom;
-        return AnimatedPadding(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          padding: EdgeInsets.only(bottom: viewInsets),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE6EAF2),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: _textPrimary(isDark),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    helperText,
-                    style: TextStyle(
-                      color: _mutedText(isDark),
-                      fontSize: 13,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _EditField(
-                    controller: controller,
-                    label: fieldLabel,
-                    keyboardType: keyboardType,
-                    inputFormatters: inputFormatters,
-                    validator: validator,
-                    helperText: 'Verification will be required after saving.',
-                  ),
-                  const SizedBox(height: 16),
-                  Obx(() {
-                    final saving = widget.controller.loading.value;
-                    return SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: saving
-                            ? null
-                            : () async {
-                                if (!(formKey.currentState?.validate() ??
-                                    false)) {
-                                  return;
-                                }
-                                try {
-                                  final result = await onSave();
-                                  if (!mounted || !sheetContext.mounted) return;
-                                  Navigator.of(sheetContext).pop();
-                                  if (result.routeName != null) {
-                                    Get.toNamed(
-                                      result.routeName!,
-                                      arguments: result.arguments,
-                                    );
-                                  } else {
-                                    messenger.showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Contact details updated.',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                } catch (e) {
-                                  if (!sheetContext.mounted) return;
-                                  messenger.showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        e.toString().replaceFirst(
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: viewInsets),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6EAF2),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: _textPrimary(isDark),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        helperText,
+                        style: TextStyle(
+                          color: _mutedText(isDark),
+                          fontSize: 13,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _EditField(
+                        controller: controller,
+                        label: fieldLabel,
+                        keyboardType: keyboardType,
+                        inputFormatters: inputFormatters,
+                        validator: validator,
+                        helperText:
+                            'Verification will be required after saving.',
+                        forceErrorText: apiError,
+                        onChanged: (_) {
+                          if (apiError != null) {
+                            setSheetState(() => apiError = null);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Obx(() {
+                        final saving = widget.controller.loading.value;
+                        return SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: saving
+                                ? null
+                                : () async {
+                                    if (!(formKey.currentState?.validate() ??
+                                        false)) {
+                                      return;
+                                    }
+                                    try {
+                                      final result = await onSave();
+                                      if (!mounted || !sheetContext.mounted) {
+                                        return;
+                                      }
+                                      Navigator.of(sheetContext).pop();
+                                      if (result.routeName != null) {
+                                        Get.toNamed(
+                                          result.routeName!,
+                                          arguments: result.arguments,
+                                        );
+                                      } else if (result.snackBarMessage !=
+                                          null) {
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              result.snackBarMessage!,
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (!sheetContext.mounted) return;
+                                      setSheetState(() {
+                                        apiError = e.toString().replaceFirst(
                                           'Exception: ',
                                           '',
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.passengerPrimary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: saving
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                'Save changes',
-                                style: TextStyle(fontWeight: FontWeight.w700),
+                                        );
+                                      });
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.passengerPrimary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                      ),
-                    );
-                  }),
-                ],
+                            ),
+                            child: saving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Save changes',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -1830,9 +1860,12 @@ class _ContactMethodDisplayRow extends StatelessWidget {
 }
 
 class _ContactEditResult {
-  _ContactEditResult._({this.routeName, this.arguments});
+  _ContactEditResult._({this.routeName, this.arguments, this.snackBarMessage});
 
-  _ContactEditResult.saved() : this._();
+  _ContactEditResult.saved()
+    : this._(snackBarMessage: 'Contact details updated.');
+
+  _ContactEditResult.noChanges() : this._();
 
   _ContactEditResult.verifyEmail(String email)
     : this._(routeName: AuthRoutes.verifyEmail, arguments: {'email': email});
@@ -1845,6 +1878,7 @@ class _ContactEditResult {
 
   final String? routeName;
   final Map<String, dynamic>? arguments;
+  final String? snackBarMessage;
 }
 
 class _InlineStatusChip extends StatelessWidget {
@@ -2260,19 +2294,19 @@ class _StripeConnectSection extends StatelessWidget {
     Uri uri, {
     required String failureMessage,
   }) async {
+    final openedInBrowserView = await launchUrl(
+      uri,
+      mode: LaunchMode.inAppBrowserView,
+    );
+    if (openedInBrowserView) return;
+
     final openedInExternalBrowser = await launchUrl(
       uri,
       mode: LaunchMode.externalApplication,
     );
     if (openedInExternalBrowser) return;
 
-    final openedInBrowserView = await launchUrl(
-      uri,
-      mode: LaunchMode.inAppBrowserView,
-    );
-    if (!openedInBrowserView) {
-      throw Exception(failureMessage);
-    }
+    throw Exception(failureMessage);
   }
 
   List<Widget> _buildRequirementRows(
@@ -3023,18 +3057,22 @@ class _EditField extends StatelessWidget {
   const _EditField({
     required this.controller,
     required this.label,
+    this.onChanged,
     this.keyboardType,
     this.inputFormatters,
     this.validator,
     this.helperText,
+    this.forceErrorText,
   });
 
   final TextEditingController controller;
   final String label;
+  final ValueChanged<String>? onChanged;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final String? Function(String?)? validator;
   final String? helperText;
+  final String? forceErrorText;
 
   @override
   Widget build(BuildContext context) {
@@ -3043,12 +3081,14 @@ class _EditField extends StatelessWidget {
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+      onChanged: onChanged,
       validator: validator,
       autovalidateMode: AutovalidateMode.onUserInteraction,
       decoration: appInputDecoration(
         context,
         labelText: label,
         helperText: helperText,
+        errorText: forceErrorText,
         radius: 14,
       ),
     );

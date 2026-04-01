@@ -226,6 +226,8 @@ class ProfileController extends GetxController {
       );
       await _session.bootstrap();
       return updatedUser;
+    } catch (error) {
+      throw Exception(_normalizeError(error));
     } finally {
       loading.value = false;
     }
