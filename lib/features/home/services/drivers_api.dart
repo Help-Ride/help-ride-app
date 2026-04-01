@@ -5,11 +5,11 @@ class DriversApi {
   final ApiClient _client;
 
   Future<void> createDriverProfile({
-    required String carMake,
-    required String carModel,
+    String? carMake,
+    String? carModel,
     String? carYear,
     String? carColor,
-    required String plateNumber,
+    String? plateNumber,
     required String licenseNumber,
     String? insuranceInfo,
   }) async {

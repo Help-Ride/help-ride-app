@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:help_ride/core/routes/app_routes.dart';
 import 'package:help_ride/features/auth/models/dial_code_option.dart';
 import 'package:help_ride/features/auth/services/auth_analytics.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
@@ -72,8 +71,7 @@ class AuthController extends GetxController {
     return authDialCodeOptions.first;
   }
 
-  bool get isOauthBusy =>
-      googleOauthLoading.value || appleOauthLoading.value;
+  bool get isOauthBusy => googleOauthLoading.value || appleOauthLoading.value;
 
   bool get canContinueWithPhone =>
       isReady.value &&
@@ -111,9 +109,7 @@ class AuthController extends GetxController {
     if (phone.value.trim().isEmpty) {
       return 'Enter your phone number.';
     }
-    return normalizedEntryPhone == null
-        ? 'Enter a valid phone number.'
-        : null;
+    return normalizedEntryPhone == null ? 'Enter a valid phone number.' : null;
   }
 
   String? get entryEmailError {
@@ -123,18 +119,15 @@ class AuthController extends GetxController {
     return InputValidators.email(email.value);
   }
 
-  String? get firstNameError => _requiredNamePart(
-    firstName.value,
-    fieldLabel: 'First name',
-  );
+  String? get firstNameError =>
+      _requiredNamePart(firstName.value, fieldLabel: 'First name');
 
-  String? get lastNameError => _requiredNamePart(
-    lastName.value,
-    fieldLabel: 'Last name',
-  );
+  String? get lastNameError =>
+      _requiredNamePart(lastName.value, fieldLabel: 'Last name');
 
   String? get onboardingEmailError {
-    if (!shouldShowOnboardingEmailField || onboardingEmail.value.trim().isEmpty) {
+    if (!shouldShowOnboardingEmailField ||
+        onboardingEmail.value.trim().isEmpty) {
       return null;
     }
     return InputValidators.email(onboardingEmail.value);
@@ -194,12 +187,7 @@ class AuthController extends GetxController {
     );
 
     final emailArg = args['email']?.toString().trim() ?? '';
-    _setField(
-      email,
-      emailTextController,
-      emailArg,
-      clearEntryFeedback: false,
-    );
+    _setField(email, emailTextController, emailArg, clearEntryFeedback: false);
   }
 
   void prepareOnboardingFromRouteArgs() {
@@ -247,8 +235,12 @@ class AuthController extends GetxController {
 
     final verifiedPhoneArg = args['phone']?.toString().trim();
     final verifiedEmailArg = args['email']?.toString().trim();
-    _verifiedPhone = verifiedPhoneArg?.isEmpty ?? true ? null : verifiedPhoneArg;
-    _verifiedEmail = verifiedEmailArg?.isEmpty ?? true ? null : verifiedEmailArg;
+    _verifiedPhone = verifiedPhoneArg?.isEmpty ?? true
+        ? null
+        : verifiedPhoneArg;
+    _verifiedEmail = verifiedEmailArg?.isEmpty ?? true
+        ? null
+        : verifiedEmailArg;
 
     if (_verifiedChannel == 'phone' && _verifiedPhone != null) {
       _setField(
@@ -437,7 +429,9 @@ class AuthController extends GetxController {
         email: shouldShowOnboardingEmailField
             ? onboardingEmail.value.trim()
             : null,
-        phone: shouldShowOnboardingPhoneField ? normalizedOnboardingPhone : null,
+        phone: shouldShowOnboardingPhoneField
+            ? normalizedOnboardingPhone
+            : null,
       );
 
       final tokens = result.tokens;
@@ -457,28 +451,7 @@ class AuthController extends GetxController {
 
       final session = Get.find<SessionController>();
       await session.bootstrap();
-
-      final user = session.user.value;
-      final needsPhoneVerification =
-          result.needsPhoneVerification &&
-          (user?.phone?.trim().isNotEmpty ?? false) &&
-          !(user?.phoneVerified ?? false);
-
-      if (needsPhoneVerification) {
-        Get.offAllNamed(
-          AuthRoutes.verifyPhone,
-          arguments: {
-            'phone': user?.phone,
-            'email': user?.email ?? '',
-            'autoSend': true,
-            'allowBackToLogin': false,
-            'provider': _verifiedChannel == 'email' ? 'email' : 'phone',
-          },
-        );
-        return;
-      }
-
-      Get.offAllNamed(AppRoutes.shell);
+      await session.openVerifiedAppDestination();
     } catch (e) {
       onboardingError.value = _prettyError(e);
     } finally {
@@ -518,10 +491,7 @@ class AuthController extends GetxController {
         provider: 'google',
       );
       AuthAnalytics.track('auth_google_success');
-      await _finishAuthenticatedFlow(
-        enforcePhoneVerification: true,
-        provider: 'google',
-      );
+      await _finishAuthenticatedFlow();
     } catch (e) {
       AuthAnalytics.track('auth_google_failed');
       entryError.value = _prettyError(e);
@@ -564,10 +534,7 @@ class AuthController extends GetxController {
         provider: 'apple',
       );
       AuthAnalytics.track('auth_apple_success');
-      await _finishAuthenticatedFlow(
-        enforcePhoneVerification: true,
-        provider: 'apple',
-      );
+      await _finishAuthenticatedFlow();
     } catch (e) {
       AuthAnalytics.track('auth_apple_failed');
       entryError.value = _prettyError(e);
@@ -600,33 +567,10 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> _finishAuthenticatedFlow({
-    required bool enforcePhoneVerification,
-    required String provider,
-  }) async {
+  Future<void> _finishAuthenticatedFlow() async {
     final session = Get.find<SessionController>();
     await session.bootstrap();
-
-    if (enforcePhoneVerification) {
-      final user = session.user.value;
-      final phoneValue = user?.phone?.trim() ?? '';
-      final phoneVerified = user?.phoneVerified ?? false;
-      if (phoneValue.isEmpty || !phoneVerified) {
-        Get.offAllNamed(
-          AuthRoutes.verifyPhone,
-          arguments: {
-            'phone': phoneValue.isEmpty ? null : phoneValue,
-            'email': user?.email ?? '',
-            'provider': provider,
-            'autoSend': phoneValue.isNotEmpty,
-            'allowBackToLogin': false,
-          },
-        );
-        return;
-      }
-    }
-
-    Get.offAllNamed(AppRoutes.shell);
+    await session.openVerifiedAppDestination();
   }
 
   void clearEntryFeedback() {

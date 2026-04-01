@@ -9,6 +9,7 @@ import 'package:help_ride/shared/models/user.dart';
 import '../../bookings/services/payments_api.dart';
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/services/api_client.dart';
+import '../../../shared/utils/input_validators.dart';
 import '../../../shared/utils/phone_number_utils.dart';
 import '../models/driver_document.dart';
 import '../services/profile_api.dart';
@@ -191,6 +192,7 @@ class ProfileController extends GetxController {
 
   Future<User> updateUserProfile({
     required String name,
+    String? email,
     required String phone,
     required String avatarUrl,
   }) async {
@@ -200,6 +202,14 @@ class ProfileController extends GetxController {
     }
     loading.value = true;
     try {
+      final trimmedEmail = email?.trim().toLowerCase() ?? '';
+      if (trimmedEmail.isNotEmpty) {
+        final emailError = InputValidators.email(trimmedEmail);
+        if (emailError != null) {
+          throw Exception(emailError);
+        }
+      }
+
       final normalizedPhone = phone.trim().isEmpty
           ? null
           : PhoneNumberUtils.normalizeToE164(phone.trim());
@@ -210,6 +220,7 @@ class ProfileController extends GetxController {
       final updatedUser = await _api.updateUserProfile(
         userId,
         name: name.trim().isEmpty ? null : name.trim(),
+        email: trimmedEmail.isEmpty ? null : trimmedEmail,
         phone: normalizedPhone,
         providerAvatarUrl: avatarUrl.trim().isEmpty ? null : avatarUrl.trim(),
       );

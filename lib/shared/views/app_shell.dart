@@ -28,6 +28,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int index = 0;
   bool _openDriverEditorOnLoad = false;
+  bool _redirectingToVerification = false;
   late final Worker _roleWorker;
 
   @override
@@ -133,6 +134,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       if (session.status.value != SessionStatus.authenticated) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
+
+      final requiredVerification = session.nextRequiredVerification;
+      if (requiredVerification != null) {
+        if (!_redirectingToVerification) {
+          _redirectingToVerification = true;
+          Future.microtask(() => session.openVerifiedAppDestination());
+        }
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      _redirectingToVerification = false;
 
       final uiRole = theme.role.value;
       final driverGate = Get.find<DriverGateController>();

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_constants.dart';
@@ -103,14 +104,16 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
           user.roleDefault == 'driver' ||
           theme.role.value == AppRole.driver;
       final roleLabel = isDriver ? 'Driver' : 'Passenger';
+      final hasEmail = user.email.trim().isNotEmpty;
       final hasPhone = user.phone?.trim().isNotEmpty ?? false;
-      final needsEmailVerification = !user.emailVerified;
+      final needsEmailVerification = hasEmail && !user.emailVerified;
       final needsPhoneVerification = hasPhone && !user.phoneVerified;
       final hasPendingContactVerification =
           needsEmailVerification || needsPhoneVerification;
       final isVerified =
-          (user.emailVerified && (!hasPhone || user.phoneVerified)) ||
-          user.driverProfile?.isVerified == true;
+          (((!hasEmail || user.emailVerified) &&
+              (!hasPhone || user.phoneVerified)) ||
+          user.driverProfile?.isVerified == true);
 
       return Scaffold(
         backgroundColor: _surfaceBg(isDark),
@@ -135,13 +138,21 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                     : AppColors.passengerPrimary,
                 isVerified: isVerified,
                 isDark: isDark,
-                onEdit: () => _openUserEditSheet(context, user),
+                avatarUploading:
+                    _controller.avatarUploading.value ||
+                    _controller.loading.value,
+                onUploadPhoto: () =>
+                    _captureAndUploadProfilePhoto(context, user),
                 onOpenVerificationDrawer: hasPendingContactVerification
                     ? () => _openVerificationDrawer(context, user)
                     : null,
               ),
               const SizedBox(height: 12),
               _ContactMethodsCard(
+                key: ValueKey(
+                  '${user.email}|${user.phone}|${user.emailVerified}|${user.phoneVerified}',
+                ),
+                controller: _controller,
                 user: user,
                 isDark: isDark,
                 onVerifyEmail: user.emailVerified
@@ -370,113 +381,51 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
     return normalizedHost == 'stripe' && normalizedPath == '/return';
   }
 
-  Future<void> _openUserEditSheet(BuildContext context, User user) async {
-    final nameCtrl = TextEditingController(text: user.name);
-    final emailCtrl = TextEditingController(text: user.email);
-    final phoneCtrl = TextEditingController(
-      text: PhoneNumberUtils.formatForDisplay(user.phone),
-    );
-    final avatarCtrl = TextEditingController(text: user.avatarUrl ?? '');
-    final formKey = GlobalKey<FormState>();
-    Map<String, dynamic>? pendingPhoneVerification;
+  Future<void> _captureAndUploadProfilePhoto(
+    BuildContext context,
+    User user,
+  ) async {
+    if (_controller.avatarUploading.value || _controller.loading.value) return;
+    final messenger = ScaffoldMessenger.of(context);
 
-    await _showEditSheet(
-      context,
-      title: 'Manage Contact & Profile',
-      formKey: formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SheetSectionTitle(
-            title: 'Profile Photo',
-            subtitle: 'Upload a profile image and save it with your account.',
-            isDark: Get.find<ThemeController>().isDark.value,
-          ),
-          const SizedBox(height: 12),
-          _ProfilePhotoUploadField(
-            controller: _controller,
-            avatarCtrl: avatarCtrl,
-            isDark: Get.find<ThemeController>().isDark.value,
-          ),
-          const SizedBox(height: 12),
-          _EditField(
-            controller: nameCtrl,
-            label: 'Full name',
-            validator: (value) => InputValidators.minLength(
-              value ?? '',
-              fieldLabel: 'Full name',
-              minChars: 2,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _SheetSectionTitle(
-            title: 'Contact Methods',
-            subtitle:
-                'Verified contact methods are used for ride alerts, OTP sign-in, and booking communication.',
-            isDark: Get.find<ThemeController>().isDark.value,
-          ),
-          const SizedBox(height: 12),
-          _ContactStatusSummary(
-            emailVerified: user.emailVerified,
-            phoneVerified: user.phoneVerified,
-            hasPhone: (user.phone?.trim().isNotEmpty ?? false),
-            isDark: Get.find<ThemeController>().isDark.value,
-          ),
-          const SizedBox(height: 12),
-          _EditField(
-            controller: emailCtrl,
-            label: 'Sign-in email',
-            readOnly: true,
-            helperText: user.emailVerified
-                ? 'Verified and stored as your account email.'
-                : 'Unverified. You can verify it from the profile card.',
-          ),
-          const SizedBox(height: 12),
-          _EditField(
-            controller: phoneCtrl,
-            label: 'Mobile number',
-            keyboardType: TextInputType.phone,
-            inputFormatters: const [PhoneTextInputFormatter()],
-            helperText:
-                'Changing this number will require a new SMS verification code before ride alerts resume.',
-            validator: (value) => InputValidators.optionalPhone(value ?? ''),
-          ),
-        ],
-      ),
-      onSave: () async {
-        try {
-          final beforePhone = PhoneNumberUtils.normalizeToE164(
-            user.phone ?? '',
-          );
-          final updatedUser = await _controller.updateUserProfile(
-            name: nameCtrl.text,
-            phone: phoneCtrl.text,
-            avatarUrl: avatarCtrl.text,
-          );
-          final afterPhone = PhoneNumberUtils.normalizeToE164(
-            updatedUser.phone ?? phoneCtrl.text,
-          );
-          final phoneChanged = beforePhone != afterPhone;
-          if (phoneChanged &&
-              (updatedUser.phone?.trim().isNotEmpty ?? false) &&
-              !updatedUser.phoneVerified) {
-            pendingPhoneVerification = {
-              'phone': updatedUser.phone,
-              'email': updatedUser.email,
-              'autoSend': true,
-            };
-          }
-          return true;
-        } catch (e) {
-          _showError(context, e);
-          return false;
-        }
-      },
-      isSaving: _controller.loading,
-    );
+    try {
+      final picker = ImagePicker();
+      final captured = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 86,
+        maxWidth: 1440,
+      );
+      if (!mounted || captured == null) return;
 
-    if (pendingPhoneVerification != null) {
-      Get.toNamed(AuthRoutes.verifyPhone, arguments: pendingPhoneVerification);
+      final uploadedValue = await _controller.uploadProfilePhoto(
+        filePath: captured.path,
+        fileName: captured.name.trim().isNotEmpty
+            ? captured.name.trim()
+            : captured.path.split('/').last,
+        mimeType: lookupMimeType(captured.path) ?? 'image/jpeg',
+      );
+      if (!mounted) return;
+
+      await _controller.updateUserProfile(
+        name: user.name,
+        email: user.email,
+        phone: PhoneNumberUtils.formatForDisplay(user.phone),
+        avatarUrl: uploadedValue,
+      );
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Profile photo updated.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '').trim();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            message.isEmpty ? 'Could not update profile photo.' : message,
+          ),
+        ),
+      );
     }
   }
 
@@ -583,7 +532,9 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
           );
           return true;
         } catch (e) {
-          _showError(context, e);
+          if (context.mounted) {
+            _showError(context, e);
+          }
           return false;
         }
       },
@@ -680,6 +631,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                                 }
                                 final ok = await onSave();
                                 if (!ok) return;
+                                if (!sheetContext.mounted) return;
                                 if (Navigator.of(sheetContext).canPop()) {
                                   Navigator.of(sheetContext).pop();
                                 }
@@ -725,7 +677,8 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
 
   void _openVerificationDrawer(BuildContext context, User user) {
     final hasPhone = user.phone?.trim().isNotEmpty ?? false;
-    final needsEmailVerification = !user.emailVerified;
+    final needsEmailVerification =
+        user.email.trim().isNotEmpty && !user.emailVerified;
     final needsPhoneVerification = hasPhone && !user.phoneVerified;
     if (!needsEmailVerification && !needsPhoneVerification) return;
 
@@ -829,7 +782,8 @@ class _UserCard extends StatelessWidget {
     required this.roleColor,
     required this.isVerified,
     required this.isDark,
-    required this.onEdit,
+    required this.avatarUploading,
+    required this.onUploadPhoto,
     this.onOpenVerificationDrawer,
   });
 
@@ -838,7 +792,8 @@ class _UserCard extends StatelessWidget {
   final Color roleColor;
   final bool isVerified;
   final bool isDark;
-  final VoidCallback onEdit;
+  final bool avatarUploading;
+  final VoidCallback onUploadPhoto;
   final VoidCallback? onOpenVerificationDrawer;
 
   @override
@@ -861,23 +816,71 @@ class _UserCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: isDark
-                    ? const Color(0xFF1C2331)
-                    : const Color(0xFFE9EEF6),
-                backgroundImage: avatarUrl.isNotEmpty
-                    ? NetworkImage(avatarUrl)
-                    : null,
-                child: avatarUrl.isEmpty
-                    ? Text(
-                        initials.toUpperCase(),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.lightText,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: isDark
+                        ? const Color(0xFF1C2331)
+                        : const Color(0xFFE9EEF6),
+                    backgroundImage: avatarUrl.isNotEmpty
+                        ? NetworkImage(avatarUrl)
+                        : null,
+                    child: avatarUrl.isEmpty
+                        ? Text(
+                            initials.toUpperCase(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.lightText,
+                            ),
+                          )
+                        : null,
+                  ),
+                  Positioned(
+                    right: -4,
+                    bottom: -4,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: avatarUploading ? null : onUploadPhoto,
+                        borderRadius: BorderRadius.circular(99),
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: _surfaceCard(isDark),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: _cardBorder(isDark)),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x14000000),
+                                blurRadius: 12,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: avatarUploading
+                                ? SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: _textPrimary(isDark),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.photo_camera_outlined,
+                                    size: 16,
+                                    color: AppColors.passengerPrimary,
+                                  ),
+                          ),
                         ),
-                      )
-                    : null,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -897,15 +900,6 @@ class _UserCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        IconButton(
-                          onPressed: onEdit,
-                          splashRadius: 20,
-                          tooltip: 'Edit personal information',
-                          constraints: const BoxConstraints(),
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.edit_outlined),
-                          color: AppColors.passengerPrimary,
-                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -923,6 +917,17 @@ class _UserCard extends StatelessWidget {
                           isDark: isDark,
                         ),
                       ),
+                    const SizedBox(height: 10),
+                    Text(
+                      avatarUploading
+                          ? 'Updating profile photo...'
+                          : 'Tap the camera to take a new profile photo.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _mutedText(isDark),
+                        height: 1.35,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -984,8 +989,10 @@ class _UserCard extends StatelessWidget {
   }
 }
 
-class _ContactMethodsCard extends StatelessWidget {
+class _ContactMethodsCard extends StatefulWidget {
   const _ContactMethodsCard({
+    super.key,
+    required this.controller,
     required this.user,
     required this.isDark,
     this.onVerifyEmail,
@@ -993,6 +1000,7 @@ class _ContactMethodsCard extends StatelessWidget {
     this.onOpenVerificationDrawer,
   });
 
+  final ProfileController controller;
   final User user;
   final bool isDark;
   final VoidCallback? onVerifyEmail;
@@ -1000,11 +1008,396 @@ class _ContactMethodsCard extends StatelessWidget {
   final VoidCallback? onOpenVerificationDrawer;
 
   @override
+  State<_ContactMethodsCard> createState() => _ContactMethodsCardState();
+}
+
+class _ContactMethodsCardState extends State<_ContactMethodsCard> {
+  Future<void> _openEmailSheet() async {
+    final currentEmail = widget.user.email.trim();
+    final pendingEmail = widget.user.pendingEmail?.trim() ?? '';
+    final hasPendingChange =
+        pendingEmail.isNotEmpty &&
+        pendingEmail.toLowerCase() != currentEmail.toLowerCase();
+    final needsVerification =
+        currentEmail.isNotEmpty && !widget.user.emailVerified;
+
+    if (hasPendingChange) {
+      await _showVerificationFirstSheet(
+        title: 'Verify your new email',
+        value: pendingEmail,
+        message:
+            'Your current email stays active until the new address is verified.',
+        actionLabel: 'Verify new email',
+        onAction: () => Get.toNamed(
+          AuthRoutes.verifyEmail,
+          arguments: {'email': pendingEmail},
+        ),
+      );
+      return;
+    }
+
+    if (needsVerification) {
+      await _showVerificationFirstSheet(
+        title: 'Verify email first',
+        value: currentEmail,
+        message:
+            'Verify your current email before changing it. This helps protect account recovery and important trip updates.',
+        actionLabel: 'Verify email',
+        onAction: widget.onVerifyEmail,
+      );
+      return;
+    }
+
+    final emailCtrl = TextEditingController(text: currentEmail);
+    await _showContactEditorSheet(
+      title: currentEmail.isEmpty ? 'Add email' : 'Edit email',
+      fieldLabel: 'Email',
+      controller: emailCtrl,
+      keyboardType: TextInputType.emailAddress,
+      validator: (value) {
+        final trimmed = value?.trim() ?? '';
+        if (trimmed.isEmpty) return 'Email is required.';
+        return InputValidators.email(trimmed);
+      },
+      helperText:
+          'If you change your email, you will need to verify the new address before it becomes active.',
+      onSave: () async {
+        final beforeEmail = widget.user.email.trim().toLowerCase();
+        final updatedUser = await widget.controller.updateUserProfile(
+          name: widget.user.name,
+          email: emailCtrl.text,
+          phone: PhoneNumberUtils.formatForDisplay(widget.user.phone),
+          avatarUrl: widget.user.avatarUrl ?? '',
+        );
+        final pendingEmail = updatedUser.pendingEmail?.trim() ?? '';
+        return pendingEmail.isNotEmpty &&
+                pendingEmail.toLowerCase() != beforeEmail
+            ? _ContactEditResult.verifyEmail(pendingEmail)
+            : _ContactEditResult.saved();
+      },
+    );
+    emailCtrl.dispose();
+  }
+
+  Future<void> _openPhoneSheet() async {
+    final hasPhone = widget.user.phone?.trim().isNotEmpty ?? false;
+    final formattedPhone = PhoneNumberUtils.formatForDisplay(widget.user.phone);
+    final pendingPhone = widget.user.pendingPhone?.trim() ?? '';
+    final hasPendingChange =
+        pendingPhone.isNotEmpty &&
+        pendingPhone != (widget.user.phone?.trim() ?? '');
+    final needsVerification = hasPhone && !widget.user.phoneVerified;
+
+    if (hasPendingChange) {
+      await _showVerificationFirstSheet(
+        title: 'Verify your new mobile',
+        value: PhoneNumberUtils.formatForDisplay(pendingPhone),
+        message:
+            'Your current mobile number stays active until the new number is verified.',
+        actionLabel: 'Verify new mobile',
+        onAction: () => Get.toNamed(
+          AuthRoutes.verifyPhone,
+          arguments: {
+            'phone': pendingPhone,
+            'email': widget.user.email,
+            'autoSend': true,
+          },
+        ),
+      );
+      return;
+    }
+
+    if (needsVerification) {
+      await _showVerificationFirstSheet(
+        title: 'Verify mobile first',
+        value: formattedPhone,
+        message:
+            'Verify your current mobile number before changing it. This protects ride alerts and SMS sign-in.',
+        actionLabel: 'Verify mobile',
+        onAction: widget.onVerifyPhone,
+      );
+      return;
+    }
+
+    final phoneCtrl = TextEditingController(text: formattedPhone);
+    await _showContactEditorSheet(
+      title: hasPhone ? 'Edit mobile number' : 'Add mobile number',
+      fieldLabel: 'Mobile number',
+      controller: phoneCtrl,
+      keyboardType: TextInputType.phone,
+      inputFormatters: const [PhoneTextInputFormatter()],
+      validator: (value) => InputValidators.optionalPhone(value ?? ''),
+      helperText:
+          'If you change your number, the new number must be verified before ride alerts and SMS sign-in use it.',
+      onSave: () async {
+        final beforePhone = PhoneNumberUtils.normalizeToE164(
+          widget.user.phone ?? '',
+        );
+        final updatedUser = await widget.controller.updateUserProfile(
+          name: widget.user.name,
+          email: widget.user.email,
+          phone: phoneCtrl.text,
+          avatarUrl: widget.user.avatarUrl ?? '',
+        );
+        final pendingPhone = updatedUser.pendingPhone?.trim() ?? '';
+        return beforePhone != pendingPhone && pendingPhone.isNotEmpty
+            ? _ContactEditResult.verifyPhone(
+                phone: pendingPhone,
+                email: updatedUser.email,
+              )
+            : _ContactEditResult.saved();
+      },
+    );
+    phoneCtrl.dispose();
+  }
+
+  Future<void> _showVerificationFirstSheet({
+    required String title,
+    required String value,
+    required String message,
+    required String actionLabel,
+    required VoidCallback? onAction,
+  }) {
+    final isDark = widget.isDark;
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _surfaceCard(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE6EAF2),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary(isDark),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary(isDark),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  style: TextStyle(
+                    color: _mutedText(isDark),
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: onAction == null
+                        ? null
+                        : () {
+                            Navigator.of(sheetContext).pop();
+                            onAction();
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.passengerPrimary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      actionLabel,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showContactEditorSheet({
+    required String title,
+    required String fieldLabel,
+    required TextEditingController controller,
+    required Future<_ContactEditResult> Function() onSave,
+    required String? Function(String?) validator,
+    required String helperText,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+  }) async {
+    final isDark = widget.isDark;
+    final formKey = GlobalKey<FormState>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _surfaceCard(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        final viewInsets = MediaQuery.of(sheetContext).viewInsets.bottom;
+        return AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(bottom: viewInsets),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE6EAF2),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: _textPrimary(isDark),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    helperText,
+                    style: TextStyle(
+                      color: _mutedText(isDark),
+                      fontSize: 13,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _EditField(
+                    controller: controller,
+                    label: fieldLabel,
+                    keyboardType: keyboardType,
+                    inputFormatters: inputFormatters,
+                    validator: validator,
+                    helperText: 'Verification will be required after saving.',
+                  ),
+                  const SizedBox(height: 16),
+                  Obx(() {
+                    final saving = widget.controller.loading.value;
+                    return SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                if (!(formKey.currentState?.validate() ??
+                                    false)) {
+                                  return;
+                                }
+                                try {
+                                  final result = await onSave();
+                                  if (!mounted || !sheetContext.mounted) return;
+                                  Navigator.of(sheetContext).pop();
+                                  if (result.routeName != null) {
+                                    Get.toNamed(
+                                      result.routeName!,
+                                      arguments: result.arguments,
+                                    );
+                                  } else {
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Contact details updated.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (!sheetContext.mounted) return;
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        e.toString().replaceFirst(
+                                          'Exception: ',
+                                          '',
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.passengerPrimary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Save changes',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final formattedPhone = PhoneNumberUtils.formatForDisplay(user.phone);
+    final formattedPhone = PhoneNumberUtils.formatForDisplay(widget.user.phone);
     final hasPhone = formattedPhone.trim().isNotEmpty;
-    final needsEmailVerification = !user.emailVerified;
-    final needsPhoneVerification = hasPhone && !user.phoneVerified;
+    final needsEmailVerification =
+        widget.user.email.trim().isNotEmpty && !widget.user.emailVerified;
+    final needsPhoneVerification = hasPhone && !widget.user.phoneVerified;
     final needsAnyVerification =
         needsEmailVerification || needsPhoneVerification;
 
@@ -1012,9 +1405,9 @@ class _ContactMethodsCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _surfaceCard(isDark),
+        color: _surfaceCard(widget.isDark),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _cardBorder(isDark)),
+        border: Border.all(color: _cardBorder(widget.isDark)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1024,60 +1417,63 @@ class _ContactMethodsCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w800,
-              color: _textPrimary(isDark),
+              color: _textPrimary(widget.isDark),
               letterSpacing: 0.2,
             ),
           ),
           const SizedBox(height: 14),
-          _ContactMethodRow(
+          _ContactMethodDisplayRow(
             icon: Icons.mail_outline,
             title: 'Email',
-            value: user.email,
-            statusLabel: user.emailVerified ? 'Verified' : 'Pending',
-            verified: user.emailVerified,
-            isDark: isDark,
-            actionLabel: needsEmailVerification ? 'Verify' : null,
-            onAction: needsEmailVerification ? onVerifyEmail : null,
+            value: widget.user.email.trim().isNotEmpty
+                ? widget.user.email
+                : 'Add your email address',
+            statusLabel: widget.user.email.trim().isNotEmpty
+                ? (widget.user.emailVerified ? 'Verified' : 'Pending')
+                : 'Missing',
+            verified:
+                widget.user.email.trim().isNotEmpty &&
+                widget.user.emailVerified,
+            isDark: widget.isDark,
+            onTap: _openEmailSheet,
           ),
           const SizedBox(height: 14),
-          Divider(height: 1, color: _cardBorder(isDark)),
+          Divider(height: 1, color: _cardBorder(widget.isDark)),
           const SizedBox(height: 14),
-          _ContactMethodRow(
+          _ContactMethodDisplayRow(
             icon: Icons.phone_iphone_outlined,
             title: 'Mobile',
-            value: hasPhone
-                ? formattedPhone
-                : 'Add a mobile number from Edit Profile',
+            value: hasPhone ? formattedPhone : 'Add your mobile number',
             statusLabel: hasPhone
-                ? (user.phoneVerified ? 'Verified' : 'Pending')
+                ? (widget.user.phoneVerified ? 'Verified' : 'Pending')
                 : 'Missing',
-            verified: hasPhone && user.phoneVerified,
-            isDark: isDark,
-            actionLabel: needsPhoneVerification ? 'Verify' : null,
-            onAction: needsPhoneVerification ? onVerifyPhone : null,
+            verified: hasPhone && widget.user.phoneVerified,
+            isDark: widget.isDark,
+            onTap: _openPhoneSheet,
           ),
           if (needsAnyVerification || !hasPhone) ...[
             const SizedBox(height: 14),
-            Divider(height: 1, color: _cardBorder(isDark)),
+            Divider(height: 1, color: _cardBorder(widget.isDark)),
             const SizedBox(height: 14),
             Text(
               !hasPhone
-                  ? 'Add and verify a mobile number to receive ride alerts and SMS sign-in codes.'
+                  ? 'Tap a field to manage it. Verified contact methods are required for ride alerts, OTP sign-in, and booking updates.'
                   : needsPhoneVerification
-                  ? 'Ride alerts and SMS sign-in stay paused until this mobile number is verified.'
-                  : 'Email verification is still pending for account recovery and important updates.',
+                  ? 'Verify your current mobile number before changing it or using it for ride alerts and SMS sign-in.'
+                  : 'Verify your current email before changing it or using it for account recovery and important updates.',
               style: TextStyle(
-                color: _mutedText(isDark),
+                color: _mutedText(widget.isDark),
                 fontSize: 12,
                 height: 1.45,
               ),
             ),
-            if (needsAnyVerification && onOpenVerificationDrawer != null) ...[
+            if (needsAnyVerification &&
+                widget.onOpenVerificationDrawer != null) ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: onOpenVerificationDrawer,
+                  onPressed: widget.onOpenVerificationDrawer,
                   icon: const Icon(Icons.verified_user_outlined, size: 18),
                   label: const Text(
                     'Review verification',
@@ -1086,7 +1482,7 @@ class _ContactMethodsCard extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.passengerPrimary,
                     side: BorderSide(
-                      color: isDark
+                      color: widget.isDark
                           ? const Color(0xFF1E5B45)
                           : const Color(0xFFD7F1E4),
                     ),
@@ -1327,16 +1723,15 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-class _ContactMethodRow extends StatelessWidget {
-  const _ContactMethodRow({
+class _ContactMethodDisplayRow extends StatelessWidget {
+  const _ContactMethodDisplayRow({
     required this.icon,
     required this.title,
     required this.value,
     required this.statusLabel,
     required this.verified,
     required this.isDark,
-    this.actionLabel,
-    this.onAction,
+    required this.onTap,
   });
 
   final IconData icon;
@@ -1345,77 +1740,111 @@ class _ContactMethodRow extends StatelessWidget {
   final String statusLabel;
   final bool verified;
   final bool isDark;
-  final String? actionLabel;
-  final VoidCallback? onAction;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: _surfaceCard(isDark),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _cardBorder(isDark)),
-          ),
-          child: Icon(icon, size: 18, color: _mutedText(isDark)),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: _mutedText(isDark),
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: _textPrimary(isDark),
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        if (actionLabel != null && onAction != null)
-          TextButton(
-            onPressed: onAction,
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.passengerPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: _surfaceCard(isDark),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _cardBorder(isDark)),
             ),
-            child: Text(
-              actionLabel!,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          )
-        else
-          _InlineStatusChip(
-            label: statusLabel,
-            verified: verified,
-            isDark: isDark,
+            child: Icon(icon, size: 20, color: _mutedText(isDark)),
           ),
-      ],
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: _mutedText(isDark),
+                        ),
+                      ),
+                    ),
+                    _InlineStatusChip(
+                      label: statusLabel,
+                      verified: verified,
+                      isDark: isDark,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _fieldFill(isDark),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _cardBorder(isDark)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          value,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _textPrimary(isDark),
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: _mutedText(isDark),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
+}
+
+class _ContactEditResult {
+  _ContactEditResult._({this.routeName, this.arguments});
+
+  _ContactEditResult.saved() : this._();
+
+  _ContactEditResult.verifyEmail(String email)
+    : this._(routeName: AuthRoutes.verifyEmail, arguments: {'email': email});
+
+  _ContactEditResult.verifyPhone({required String phone, required String email})
+    : this._(
+        routeName: AuthRoutes.verifyPhone,
+        arguments: {'phone': phone, 'email': email, 'autoSend': true},
+      );
+
+  final String? routeName;
+  final Map<String, dynamic>? arguments;
 }
 
 class _InlineStatusChip extends StatelessWidget {
@@ -2146,189 +2575,6 @@ class _LogoutCard extends StatelessWidget {
   }
 }
 
-class _ProfilePhotoUploadField extends StatefulWidget {
-  const _ProfilePhotoUploadField({
-    required this.controller,
-    required this.avatarCtrl,
-    required this.isDark,
-  });
-
-  final ProfileController controller;
-  final TextEditingController avatarCtrl;
-  final bool isDark;
-
-  @override
-  State<_ProfilePhotoUploadField> createState() =>
-      _ProfilePhotoUploadFieldState();
-}
-
-class _ProfilePhotoUploadFieldState extends State<_ProfilePhotoUploadField> {
-  bool _pickingFile = false;
-
-  Future<void> _pickAndUpload() async {
-    if (_pickingFile || widget.controller.avatarUploading.value) return;
-
-    setState(() => _pickingFile = true);
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowMultiple: false,
-        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
-        withData: false,
-      );
-      if (!mounted || result == null || result.files.isEmpty) return;
-
-      final file = result.files.single;
-      final path = file.path;
-      if (path == null || path.trim().isEmpty) {
-        _showSnack('Could not read the selected file.');
-        return;
-      }
-
-      final fileName = file.name.trim().isNotEmpty
-          ? file.name.trim()
-          : path.split('/').last;
-      final mimeType =
-          lookupMimeType(path, headerBytes: file.bytes) ??
-          _mimeTypeForExt(file.extension);
-
-      final uploadedValue = await widget.controller.uploadProfilePhoto(
-        filePath: path,
-        fileName: fileName,
-        mimeType: mimeType,
-      );
-      if (!mounted) return;
-      widget.avatarCtrl.text = uploadedValue;
-      widget.avatarCtrl.selection = TextSelection.collapsed(
-        offset: uploadedValue.length,
-      );
-      _showSnack('Profile photo uploaded.');
-    } catch (e) {
-      if (!mounted) return;
-      final fromController = widget.controller.avatarUploadError.value;
-      final message = (fromController ?? e.toString())
-          .replaceFirst('Exception: ', '')
-          .trim();
-      _showSnack(message.isEmpty ? 'Profile photo upload failed.' : message);
-    } finally {
-      if (mounted) {
-        setState(() => _pickingFile = false);
-      }
-    }
-  }
-
-  String _mimeTypeForExt(String? ext) {
-    switch ((ext ?? '').toLowerCase()) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'webp':
-        return 'image/webp';
-      default:
-        return 'application/octet-stream';
-    }
-  }
-
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.avatarCtrl,
-      builder: (_, __) {
-        final avatarValue = widget.avatarCtrl.text.trim();
-        final hasHttpUrl =
-            avatarValue.startsWith('https://') ||
-            avatarValue.startsWith('http://');
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _surfaceCard(widget.isDark),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _cardBorder(widget.isDark)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: _chipNeutralBg(widget.isDark),
-                    backgroundImage: hasHttpUrl
-                        ? NetworkImage(avatarValue)
-                        : null,
-                    child: hasHttpUrl
-                        ? null
-                        : Icon(
-                            Icons.person_outline,
-                            color: _mutedText(widget.isDark),
-                          ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Photo preview',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: _textPrimary(widget.isDark),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Obx(() {
-                final uploading =
-                    widget.controller.avatarUploading.value || _pickingFile;
-                return SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: uploading ? null : _pickAndUpload,
-                    icon: uploading
-                        ? SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: _textPrimary(widget.isDark),
-                            ),
-                          )
-                        : const Icon(Icons.photo_camera_outlined, size: 18),
-                    label: Text(
-                      uploading
-                          ? 'Uploading...'
-                          : avatarValue.isEmpty
-                          ? 'Upload profile photo'
-                          : 'Replace profile photo',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _textPrimary(widget.isDark),
-                      side: BorderSide(color: _cardBorder(widget.isDark)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _DriverDocumentUploadSection extends StatefulWidget {
   const _DriverDocumentUploadSection({
     required this.controller,
@@ -2755,7 +3001,7 @@ class _DriverDocumentTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(isDark ? 0.25 : 0.12),
+              color: statusColor.withValues(alpha: isDark ? 0.25 : 0.12),
               borderRadius: BorderRadius.circular(99),
             ),
             child: Text(
@@ -2773,51 +3019,6 @@ class _DriverDocumentTile extends StatelessWidget {
   }
 }
 
-class _ContactStatusSummary extends StatelessWidget {
-  const _ContactStatusSummary({
-    required this.emailVerified,
-    required this.phoneVerified,
-    required this.hasPhone,
-    required this.isDark,
-  });
-
-  final bool emailVerified;
-  final bool phoneVerified;
-  final bool hasPhone;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _surfaceCard(isDark),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _cardBorder(isDark)),
-      ),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          _InlineStatusChip(
-            label: emailVerified ? 'Email verified' : 'Email pending',
-            verified: emailVerified,
-            isDark: isDark,
-          ),
-          _InlineStatusChip(
-            label: hasPhone
-                ? (phoneVerified ? 'Mobile verified' : 'Mobile pending')
-                : 'Add a mobile number',
-            verified: hasPhone && phoneVerified,
-            isDark: isDark,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _EditField extends StatelessWidget {
   const _EditField({
     required this.controller,
@@ -2825,7 +3026,6 @@ class _EditField extends StatelessWidget {
     this.keyboardType,
     this.inputFormatters,
     this.validator,
-    this.readOnly = false,
     this.helperText,
   });
 
@@ -2834,7 +3034,6 @@ class _EditField extends StatelessWidget {
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final String? Function(String?)? validator;
-  final bool readOnly;
   final String? helperText;
 
   @override
@@ -2843,7 +3042,6 @@ class _EditField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
-      readOnly: readOnly,
       onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
       validator: validator,
       autovalidateMode: AutovalidateMode.onUserInteraction,

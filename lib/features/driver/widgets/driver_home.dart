@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../home/widgets/common/app_card.dart';
+import '../../profile/controllers/profile_controller.dart';
 import '../controllers/driver_home_controller.dart';
 import '../routes/driver_routes.dart';
 import '../services/driver_earnings_api.dart';
+import '../utils/driver_compliance.dart';
 
 class DriverHomeView extends GetView<DriverHomeController> {
   const DriverHomeView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final profileController = Get.isRegistered<ProfileController>()
+        ? Get.find<ProfileController>()
+        : Get.put(ProfileController(), permanent: false);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
     final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
@@ -26,9 +32,24 @@ class DriverHomeView extends GetView<DriverHomeController> {
       final earningsError = controller.earningsError.value;
       final loadingMore = controller.loadingMore.value;
       final bottomSafeArea = MediaQuery.of(context).padding.bottom;
+      final complianceLoading =
+          profileController.docsLoading.value ||
+          profileController.stripeStatusLoading.value;
+      final missingComplianceItems = missingDeferredDriverComplianceItems(
+        documents: profileController.driverDocuments,
+        stripeStatus: profileController.stripeConnectStatus.value,
+      );
+      final complianceRequired = requiresDeferredDriverCompliance(
+        completedRides: summary.ridesCompleted,
+        documents: profileController.driverDocuments,
+        stripeStatus: profileController.stripeConnectStatus.value,
+      );
 
       final openRidesRaw = summary.ridesTotal - summary.ridesCompleted;
       final openRides = openRidesRaw < 0 ? 0 : openRidesRaw;
+      void openComplianceSetup() {
+        Get.offAllNamed(AppRoutes.shell, arguments: const {'tab': 'profile'});
+      }
 
       return RefreshIndicator(
         onRefresh: controller.refreshAll,
@@ -145,6 +166,17 @@ class DriverHomeView extends GetView<DriverHomeController> {
                 },
               ),
             ],
+            if (!summaryLoading &&
+                summary.ridesCompleted >= deferredDriverComplianceRideLimit &&
+                (complianceLoading || missingComplianceItems.isNotEmpty)) ...[
+              const SizedBox(height: 16),
+              _DeferredComplianceCard(
+                loading: complianceLoading,
+                isDark: isDark,
+                missingItems: missingComplianceItems,
+                onOpenProfile: openComplianceSetup,
+              ),
+            ],
             const SizedBox(height: 16),
             LayoutBuilder(
               builder: (context, constraints) {
@@ -153,7 +185,19 @@ class DriverHomeView extends GetView<DriverHomeController> {
                 final createButton = SizedBox(
                   height: buttonHeight,
                   child: ElevatedButton.icon(
-                    onPressed: () => Get.toNamed(DriverRoutes.createRide),
+                    onPressed: summaryLoading
+                        ? null
+                        : () {
+                            if (complianceRequired) {
+                              openComplianceSetup();
+                              Get.snackbar(
+                                'Complete setup',
+                                'Finish Stripe payout setup and upload vehicle registration before creating another ride.',
+                              );
+                              return;
+                            }
+                            Get.toNamed(DriverRoutes.createRide);
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.driverPrimary,
                       foregroundColor: Colors.white,
@@ -880,6 +924,90 @@ Future<void> _showPaymentDetails(
       );
     },
   );
+}
+
+class _DeferredComplianceCard extends StatelessWidget {
+  const _DeferredComplianceCard({
+    required this.loading,
+    required this.isDark,
+    required this.missingItems,
+    required this.onOpenProfile,
+  });
+
+  final bool loading;
+  final bool isDark;
+  final List<String> missingItems;
+  final VoidCallback onOpenProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    final titleColor = isDark ? AppColors.darkText : AppColors.lightText;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final accentBg = isDark ? const Color(0xFF1B202B) : const Color(0xFFF6F8FC);
+
+    final body = loading
+        ? 'Checking whether Stripe payout setup and registration are complete.'
+        : missingItems.isEmpty
+        ? 'Stripe payout setup and vehicle registration are ready for rides after your first 5 completions.'
+        : 'Before ride ${deferredDriverComplianceRideLimit + 1}, complete ${missingItems.join(' and ')} from your profile.';
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: accentBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.verified_user_outlined,
+                  color: AppColors.driverPrimary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'After 5 rides',
+                  style: TextStyle(
+                    color: titleColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(body, style: TextStyle(color: muted, height: 1.4)),
+          if (!loading && missingItems.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: onOpenProfile,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.driverPrimary,
+                  side: const BorderSide(color: AppColors.driverPrimary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  'Open profile setup',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 String _compactAddress(String location) {

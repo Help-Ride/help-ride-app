@@ -42,6 +42,8 @@ class MyRidesController extends GetxController {
   final payingBookingIds = <String>{}.obs;
   final paymentIntentIds = <String, String>{}.obs;
   final paymentSessions = <String, PaymentIntentSession>{}.obs;
+  String? _focusedBookingId;
+  String? _focusedRideRequestId;
 
   @override
   Future<void> onInit() async {
@@ -50,6 +52,7 @@ class MyRidesController extends GetxController {
     _api = BookingsApi(client);
     _requestsApi = RideRequestsApi(client);
     _paymentsApi = PaymentsApi(client);
+    _applyInitialNavigationArgs((Get.arguments as Map?) ?? const {});
     await fetch();
   }
 
@@ -62,6 +65,7 @@ class MyRidesController extends GetxController {
       bookings.assignAll(list);
       _syncPaymentIntentIds(list);
       rideRequests.assignAll(requests);
+      await _ensureFocusedRideRequestLoaded();
     } catch (e) {
       error.value = e.toString();
     } finally {
@@ -80,8 +84,16 @@ class MyRidesController extends GetxController {
     final past = bookings.where((b) => !b.ride.startTime.isAfter(now)).toList()
       ..sort((a, b) => _bookingSortTime(b).compareTo(_bookingSortTime(a)));
 
-    if (tab.value == MyRidesTab.upcoming) return upcoming;
-    if (tab.value == MyRidesTab.past) return past;
+    if (tab.value == MyRidesTab.upcoming) {
+      return _prioritizeById(
+        upcoming,
+        _focusedBookingId,
+        (booking) => booking.id,
+      );
+    }
+    if (tab.value == MyRidesTab.past) {
+      return _prioritizeById(past, _focusedBookingId, (booking) => booking.id);
+    }
     return const [];
   }
 
@@ -92,12 +104,78 @@ class MyRidesController extends GetxController {
             .where((request) => !hiddenRequestIds.contains(request.id.trim()))
             .toList()
           ..sort((a, b) => _requestSortTime(b).compareTo(_requestSortTime(a)));
-    return list;
+    return _prioritizeById(
+      list,
+      _focusedRideRequestId,
+      (request) => request.id,
+    );
   }
 
   DateTime _bookingSortTime(Booking b) => b.updatedAt ?? b.createdAt;
 
   DateTime _requestSortTime(RideRequest r) => r.updatedAt ?? r.createdAt;
+
+  void _applyInitialNavigationArgs(Map<dynamic, dynamic> args) {
+    final requestedTab = _parseTab(args['tab']);
+    if (requestedTab != null) {
+      tab.value = requestedTab;
+    }
+
+    final bookingId = (args['bookingId'] ?? '').toString().trim();
+    _focusedBookingId = bookingId.isEmpty ? null : bookingId;
+
+    final rideRequestId = (args['rideRequestId'] ?? args['requestId'] ?? '')
+        .toString()
+        .trim();
+    _focusedRideRequestId = rideRequestId.isEmpty ? null : rideRequestId;
+  }
+
+  MyRidesTab? _parseTab(dynamic value) {
+    if (value == null) return null;
+    final normalized = value.toString().trim().toLowerCase();
+    switch (normalized) {
+      case 'upcoming':
+        return MyRidesTab.upcoming;
+      case 'past':
+        return MyRidesTab.past;
+      case 'requests':
+      case 'request':
+      case 'offers':
+        return MyRidesTab.requests;
+      default:
+        return null;
+    }
+  }
+
+  Future<void> _ensureFocusedRideRequestLoaded() async {
+    final rideRequestId = _focusedRideRequestId;
+    if (rideRequestId == null || rideRequestId.isEmpty) return;
+
+    final exists = rideRequests.any((request) => request.id == rideRequestId);
+    if (exists) return;
+
+    final request = await _requestsApi.getRideRequestById(rideRequestId);
+    if (request == null) return;
+    rideRequests.insert(0, request);
+    rideRequests.refresh();
+  }
+
+  List<T> _prioritizeById<T>(
+    List<T> list,
+    String? requestedId,
+    String Function(T item) selectId,
+  ) {
+    final targetId = requestedId?.trim() ?? '';
+    if (targetId.isEmpty || list.length < 2) return list;
+
+    final index = list.indexWhere((item) => selectId(item).trim() == targetId);
+    if (index <= 0) return list;
+
+    final prioritized = [...list];
+    final match = prioritized.removeAt(index);
+    prioritized.insert(0, match);
+    return prioritized;
+  }
 
   Set<String> _requestIdsAlreadyConvertedToBookings() {
     if (rideRequests.isEmpty || bookings.isEmpty) return const <String>{};

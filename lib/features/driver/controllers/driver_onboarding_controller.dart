@@ -88,11 +88,11 @@ class DriverOnboardingController extends GetxController {
     loading.value = true;
     try {
       await _api.createDriverProfile(
-        carMake: carMake,
-        carModel: carModel,
+        carMake: carMake.isEmpty ? null : carMake,
+        carModel: carModel.isEmpty ? null : carModel,
         carYear: carYear.isEmpty ? null : carYear,
         carColor: carColor.isEmpty ? null : carColor,
-        plateNumber: plateNumber,
+        plateNumber: plateNumber.isEmpty ? null : plateNumber,
         licenseNumber: licenseNumber,
         insuranceInfo: insuranceInfo.isEmpty ? null : insuranceInfo,
       );
@@ -128,17 +128,13 @@ class DriverOnboardingController extends GetxController {
 
   bool _validateFields({required bool showErrors}) {
     final errors = <String, String?>{
-      'carMake': InputValidators.requiredText(carMake, fieldLabel: 'Car make'),
-      'carModel': InputValidators.requiredText(
-        carModel,
-        fieldLabel: 'Car model',
-      ),
-      'carYear': InputValidators.optionalYear(carYear),
+      'carMake': null,
+      'carModel': null,
+      'carYear': carYear.trim().isEmpty
+          ? null
+          : InputValidators.optionalYear(carYear),
       'carColor': null,
-      'plateNumber': InputValidators.requiredText(
-        plateNumber,
-        fieldLabel: 'Plate number',
-      ),
+      'plateNumber': null,
       'licenseNumber': InputValidators.requiredText(
         licenseNumber,
         fieldLabel: 'License number',

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../controllers/email_verification_controller.dart';
 import '../widgets/auth_screen_frame.dart';
+import '../widgets/auth_text_field.dart';
 import '../widgets/auth_top_bar.dart';
 import '../widgets/otp_code_field.dart';
 
@@ -32,7 +33,7 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
               ),
               const SizedBox(height: 18),
               Text(
-                'Verify your email',
+                controller.hasEmail ? 'Verify your email' : 'Add your email',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
@@ -41,7 +42,9 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Enter the 6-digit code from your email.',
+                controller.hasEmail
+                    ? 'Enter the 6-digit code from your email.'
+                    : 'Add your email first. We will send a 6-digit code before you can continue.',
                 style: TextStyle(
                   color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
                   fontSize: 16,
@@ -49,14 +52,58 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                 ),
               ),
               const SizedBox(height: 24),
-              OtpCodeField(
-                controller: controller.otpTextController,
-                value: controller.otp.value,
-                onChanged: controller.setOtp,
-                errorText: controller.otp.value.trim().isEmpty
-                    ? null
-                    : controller.otpError,
-              ),
+              if (!controller.hasEmail) ...[
+                AuthTextField(
+                  key: const ValueKey('email-verification-email'),
+                  label: 'Email address',
+                  hint: 'name@example.com',
+                  controller: controller.emailTextController,
+                  keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.email],
+                  onChanged: controller.setEmail,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => controller.saveEmailAndSendOtp(),
+                  errorText: controller.emailInput.value.trim().isEmpty
+                      ? null
+                      : controller.emailError,
+                ),
+              ] else ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF101726)
+                        : const Color(0xFFF5F7FB),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF1C2331)
+                          : const Color(0xFFD9E2EF),
+                    ),
+                  ),
+                  child: Text(
+                    controller.email,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppColors.darkText : AppColors.lightText,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                OtpCodeField(
+                  controller: controller.otpTextController,
+                  value: controller.otp.value,
+                  onChanged: controller.setOtp,
+                  errorText: controller.otp.value.trim().isEmpty
+                      ? null
+                      : controller.otpError,
+                ),
+              ],
               const SizedBox(height: 12),
               Obx(() {
                 final msg = controller.message.value;
@@ -65,7 +112,10 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
                     msg,
-                    style: TextStyle(color: primary, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: primary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 );
               }),
@@ -81,14 +131,22 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                 );
               }),
               Obx(() {
-                final loading = controller.isVerifying.value;
-                final enabled = controller.canVerify && !loading;
+                final loading = controller.hasEmail
+                    ? controller.isVerifying.value
+                    : controller.isSavingEmail.value;
+                final enabled = controller.hasEmail
+                    ? (controller.canVerify && !loading)
+                    : controller.canSubmitEmail;
 
                 return SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: enabled ? controller.verifyOtp : null,
+                    onPressed: enabled
+                        ? (controller.hasEmail
+                              ? controller.verifyOtp
+                              : controller.saveEmailAndSendOtp)
+                        : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primary,
                       foregroundColor: Colors.white,
@@ -109,26 +167,29 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
                             width: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Verify email',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                        : Text(
+                            controller.hasEmail
+                                ? 'Verify email'
+                                : 'Email me a code',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                   ),
                 );
               }),
               const SizedBox(height: 10),
-              Center(
-                child: Obx(() {
-                  final sending = controller.isSending.value;
-                  return TextButton(
-                    onPressed: sending ? null : controller.sendOtp,
-                    style: TextButton.styleFrom(foregroundColor: primary),
-                    child: sending
-                        ? const Text('Sending...')
-                        : const Text('Resend code'),
-                  );
-                }),
-              ),
+              if (controller.hasEmail)
+                Center(
+                  child: Obx(() {
+                    final sending = controller.isSending.value;
+                    return TextButton(
+                      onPressed: sending ? null : controller.sendOtp,
+                      style: TextButton.styleFrom(foregroundColor: primary),
+                      child: sending
+                          ? const Text('Sending...')
+                          : const Text('Resend code'),
+                    );
+                  }),
+                ),
               if (controller.allowBackToLogin)
                 Center(
                   child: TextButton(

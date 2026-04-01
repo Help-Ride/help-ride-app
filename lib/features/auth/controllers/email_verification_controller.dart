@@ -3,38 +3,52 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:help_ride/core/routes/app_routes.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_exception.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/token_storage.dart';
-import '../../../shared/models/user.dart';
-import '../../../shared/services/location_sync_service.dart';
-import '../../../shared/services/push_notification_service.dart';
 import '../../../shared/utils/input_validators.dart';
+import '../../profile/services/profile_api.dart';
 import '../routes/auth_routes.dart';
 import '../services/auth_api.dart';
 
 class EmailVerificationController extends GetxController {
   final otp = ''.obs;
+  final emailInput = ''.obs;
+  final emailTextController = TextEditingController();
   final isSending = false.obs;
+  final isSavingEmail = false.obs;
   final isVerifying = false.obs;
   final error = RxnString();
   final message = RxnString();
   final otpTextController = TextEditingController();
 
   final _email = ''.obs;
+  final _provider = ''.obs;
   final _allowBackToLogin = true.obs;
   var _autoSent = false;
 
   late final TokenStorage _tokenStorage;
   late final AuthApi _authApi;
+  late final ProfileApi _profileApi;
   late final SessionController _session;
 
   String get email => _email.value;
+  String get provider => _provider.value;
+  bool get hasEmail => _email.value.trim().isNotEmpty;
   bool get allowBackToLogin => _allowBackToLogin.value;
   String? get otpError => InputValidators.otpCode(otp.value);
+  String? get emailError {
+    final trimmed = emailInput.value.trim();
+    if (trimmed.isEmpty) {
+      return 'Enter your email address.';
+    }
+    return InputValidators.email(trimmed);
+  }
+
   bool get canVerify => otpError == null && !isVerifying.value;
+  bool get canSubmitEmail =>
+      emailError == null && !isSavingEmail.value && !isSending.value;
 
   @override
   void onInit() {
@@ -46,6 +60,7 @@ class EmailVerificationController extends GetxController {
     _tokenStorage = TokenStorage();
     final apiClient = await ApiClient.create();
     _authApi = AuthApi(apiClient);
+    _profileApi = ProfileApi(apiClient);
     _session = Get.find<SessionController>();
 
     final args = Get.arguments is Map
@@ -53,14 +68,26 @@ class EmailVerificationController extends GetxController {
         : const <String, dynamic>{};
     final argEmail = args['email'];
     _allowBackToLogin.value = args['allowBackToLogin'] != false;
+    _provider.value = args['provider']?.toString().trim() ?? '';
     _email.value = (argEmail?.toString().trim().isNotEmpty ?? false)
         ? argEmail.toString().trim()
-        : (_session.user.value?.email ?? '');
+        : ((_session.user.value?.pendingEmail?.trim().isNotEmpty ?? false)
+              ? _session.user.value!.pendingEmail!.trim()
+              : (_session.user.value?.email ?? ''));
+    _setField(
+      emailInput,
+      emailTextController,
+      _email.value,
+      clearFeedback: false,
+    );
 
-    if (_email.value.isEmpty) {
-      error.value = 'Missing email for verification.';
-      return;
+    if (_provider.value.isEmpty) {
+      final storedProvider = await _tokenStorage.getAuthProvider();
+      _provider.value = storedProvider?.trim().isNotEmpty == true
+          ? storedProvider!.trim()
+          : _session.authProvider;
     }
+
     _autoSendIfReady();
   }
 
@@ -71,9 +98,13 @@ class EmailVerificationController extends GetxController {
   }
 
   void _autoSendIfReady() {
-    if (_autoSent || _email.value.isEmpty) return;
+    if (_autoSent || !hasEmail) return;
     _autoSent = true;
-    sendOtp();
+    unawaited(sendOtp());
+  }
+
+  void setEmail(String value) {
+    _setField(emailInput, emailTextController, value);
   }
 
   void setOtp(String value) {
@@ -93,7 +124,7 @@ class EmailVerificationController extends GetxController {
     final canPop = Get.key.currentState?.canPop() ?? false;
     final hasSession = _session.status.value == SessionStatus.authenticated;
 
-    if (canPop && hasSession) {
+    if (allowBackToLogin && canPop && hasSession) {
       Get.back<void>();
       return;
     }
@@ -111,8 +142,54 @@ class EmailVerificationController extends GetxController {
     await goBack();
   }
 
+  Future<void> saveEmailAndSendOtp() async {
+    final validation = emailError;
+    if (validation != null) {
+      error.value = validation;
+      return;
+    }
+
+    final userId = _session.user.value?.id ?? '';
+    if (userId.isEmpty) {
+      error.value = 'Please sign in again to continue.';
+      return;
+    }
+
+    isSavingEmail.value = true;
+    error.value = null;
+    message.value = null;
+
+    try {
+      final updatedUser = await _profileApi.updateUserProfile(
+        userId,
+        email: emailInput.value.trim(),
+      );
+      _email.value = updatedUser.pendingEmail?.trim().isNotEmpty ?? false
+          ? updatedUser.pendingEmail!.trim()
+          : updatedUser.email.trim();
+      _setField(
+        emailInput,
+        emailTextController,
+        _email.value,
+        clearFeedback: false,
+      );
+      _setField(otp, otpTextController, '', clearFeedback: false);
+      await _session.bootstrap();
+      await sendOtp();
+    } catch (e) {
+      error.value = _prettyError(e);
+    } finally {
+      isSavingEmail.value = false;
+    }
+  }
+
   Future<void> sendOtp() async {
-    if (isSending.value || _email.value.isEmpty) return;
+    if (isSending.value || !hasEmail) {
+      if (!hasEmail) {
+        error.value = 'Enter your email address first.';
+      }
+      return;
+    }
     isSending.value = true;
     error.value = null;
     message.value = null;
@@ -146,37 +223,17 @@ class EmailVerificationController extends GetxController {
       final tokens = result?.tokens;
       if (tokens != null) {
         await _tokenStorage.saveAccessToken(tokens.accessToken);
-        await _tokenStorage.saveAuthProvider('email');
+        await _tokenStorage.saveAuthProvider(
+          provider.trim().isNotEmpty ? provider.trim() : 'email',
+        );
         if (tokens.refreshToken != null) {
           await _tokenStorage.saveRefreshToken(tokens.refreshToken!);
         } else {
           await _tokenStorage.deleteRefreshToken();
         }
 
-        final session = Get.find<SessionController>();
-        final userJson = result?.user;
-        if (userJson != null) {
-          if (!userJson.containsKey('emailVerified')) {
-            userJson['emailVerified'] = true;
-          }
-          session.user.value = User.fromJson(userJson);
-          session.status.value = SessionStatus.authenticated;
-          try {
-            await PushNotificationService.instance
-                .registerDeviceTokenIfNeeded();
-          } catch (_) {
-            // Best-effort token registration.
-          }
-        } else {
-          await session.bootstrap();
-        }
-        unawaited(
-          LocationSyncService.instance.syncMyLocation(
-            requestPermission: false,
-            force: true,
-          ),
-        );
-        Get.offAllNamed(AppRoutes.shell);
+        await _session.bootstrap();
+        await _session.openVerifiedAppDestination();
       } else {
         message.value = 'Email verified. Please sign in.';
         Get.offAllNamed(AuthRoutes.login);
@@ -200,8 +257,28 @@ class EmailVerificationController extends GetxController {
     return 'Something went wrong. Please try again.';
   }
 
+  void _setField(
+    RxString target,
+    TextEditingController controller,
+    String value, {
+    bool clearFeedback = true,
+  }) {
+    target.value = value;
+    if (controller.text != value) {
+      controller.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+      );
+    }
+    if (clearFeedback) {
+      error.value = null;
+      message.value = null;
+    }
+  }
+
   @override
   void onClose() {
+    emailTextController.dispose();
     otpTextController.dispose();
     super.onClose();
   }

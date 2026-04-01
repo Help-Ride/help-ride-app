@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:help_ride/features/bookings/routes/booking_routes.dart';
+import 'package:help_ride/features/chat/views/messages_view.dart';
 import 'package:help_ride/features/driver/routes/driver_routes.dart';
 import 'package:help_ride/features/profile/routes/profile_routes.dart';
 import 'package:help_ride/features/rides/routes/rides_routes.dart';
@@ -14,6 +15,7 @@ class AppRoutes {
   static const gate = '/';
   static const shell = '/shell';
   static const login = '/login';
+  static const messages = '/messages';
 
   static final pages = [
     GetPage(name: gate, page: () => const SplashGate()),
@@ -24,6 +26,7 @@ class AppRoutes {
     ...DriverRoutes.pages, // /driver/*
     ...ProfileRoutes.pages, // /profile/*
     ...SupportRoutes.pages, // /support/*
+    GetPage(name: messages, page: () => const MessagesView()),
     GetPage(name: shell, page: () => const AppShell(), binding: ShellBinding()),
   ];
 }
