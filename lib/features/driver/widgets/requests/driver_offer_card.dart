@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../ride_requests/models/ride_request_offer.dart';
 import '../../../bookings/utils/booking_formatters.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/user_avatar.dart';
 
 class DriverOfferCard extends StatelessWidget {
   const DriverOfferCard({
@@ -17,7 +18,9 @@ class DriverOfferCard extends StatelessWidget {
 
   bool get _canCancel {
     final s = offer.status.toLowerCase();
-    return !(s.contains('cancel') || s.contains('accepted') || s.contains('rejected'));
+    return !(s.contains('cancel') ||
+        s.contains('accepted') ||
+        s.contains('rejected'));
   }
 
   @override
@@ -27,6 +30,10 @@ class DriverOfferCard extends StatelessWidget {
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
     final request = offer.request;
     final ride = offer.ride;
+    final passenger = request?.passenger;
+    final passengerName = (passenger?.name ?? '').trim().isNotEmpty
+        ? passenger!.name.trim()
+        : 'Passenger';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -60,6 +67,40 @@ class DriverOfferCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
+          if (request != null) ...[
+            Row(
+              children: [
+                UserAvatar(
+                  name: passengerName,
+                  avatarUrl: passenger?.avatarUrl,
+                  radius: 18,
+                  backgroundColor: isDark
+                      ? const Color(0xFF1C2331)
+                      : const Color(0xFFE9EEF6),
+                  foregroundColor: AppColors.driverPrimary,
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: AppColors.driverPrimary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    passengerName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
           if (request != null) ...[
             Row(
               children: [

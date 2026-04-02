@@ -24,11 +24,16 @@ class DriverOnboardingView extends StatefulWidget {
 }
 
 class _DriverOnboardingViewState extends State<DriverOnboardingView> {
-  static const _steps = <String>['Driver details', 'Documents'];
+  static const _steps = <String>['Vehicle details', 'Documents'];
 
   late final DriverOnboardingController _driverController;
   late final ProfileController _profileController;
   late final SessionController _session;
+  late final TextEditingController _carMakeCtrl;
+  late final TextEditingController _carModelCtrl;
+  late final TextEditingController _carYearCtrl;
+  late final TextEditingController _carColorCtrl;
+  late final TextEditingController _plateCtrl;
   int _stepIndex = 0;
   String? _uploadingType;
   final Map<String, String?> _typeErrors = <String, String?>{};
@@ -46,6 +51,11 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView> {
         : Get.put(ProfileController(), permanent: false);
 
     _session = Get.find<SessionController>();
+    _carMakeCtrl = TextEditingController();
+    _carModelCtrl = TextEditingController();
+    _carYearCtrl = TextEditingController();
+    _carColorCtrl = TextEditingController();
+    _plateCtrl = TextEditingController();
 
     _seedFormFromExistingProfile();
     unawaited(_hydrateInitialStepState());
@@ -53,6 +63,11 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView> {
 
   @override
   void dispose() {
+    _carMakeCtrl.dispose();
+    _carModelCtrl.dispose();
+    _carYearCtrl.dispose();
+    _carColorCtrl.dispose();
+    _plateCtrl.dispose();
     super.dispose();
   }
 
@@ -190,7 +205,7 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView> {
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         children: [
           Text(
-            'Step 1 of 2: Driver details',
+            'Step 1 of 2: Vehicle details',
             style: TextStyle(
               fontWeight: FontWeight.w800,
               color: isDark ? AppColors.darkText : AppColors.lightText,
@@ -198,22 +213,60 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Share your license details now so you can start quickly. Stripe setup and vehicle registration kick in after your first 5 completed rides.',
+            'Add the vehicle you will drive. Your uploaded license and insurance documents handle verification in the next step.',
             style: TextStyle(color: muted, height: 1.35),
           ),
           const SizedBox(height: 16),
           ExoField(
-            label: 'License Number',
-            hint: 'LIC-987654',
-            onChanged: _driverController.setLicenseNumber,
-            errorText: _driverController.fieldError('licenseNumber'),
+            controller: _carMakeCtrl,
+            label: 'Car make',
+            hint: 'Toyota',
+            onChanged: _driverController.setCarMake,
+            errorText: _driverController.fieldError('carMake'),
+          ),
+          const SizedBox(height: 14),
+          ExoField(
+            controller: _carModelCtrl,
+            label: 'Car model',
+            hint: 'Corolla',
+            onChanged: _driverController.setCarModel,
+            errorText: _driverController.fieldError('carModel'),
+          ),
+          const SizedBox(height: 14),
+          ExoField(
+            controller: _carYearCtrl,
+            label: 'Car year',
+            hint: '2020',
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(4),
+            ],
+            onChanged: _driverController.setCarYear,
+            errorText: _driverController.fieldError('carYear'),
+          ),
+          const SizedBox(height: 14),
+          ExoField(
+            controller: _carColorCtrl,
+            label: 'Car color',
+            hint: 'White',
+            onChanged: _driverController.setCarColor,
+            errorText: _driverController.fieldError('carColor'),
+          ),
+          const SizedBox(height: 14),
+          ExoField(
+            controller: _plateCtrl,
+            label: 'Plate number',
+            hint: 'ABC-123',
+            onChanged: _driverController.setPlateNumber,
+            errorText: _driverController.fieldError('plateNumber'),
           ),
           const SizedBox(height: 14),
           _OnboardingInfoCard(
             isDark: isDark,
-            title: 'What you can finish later',
+            title: 'What happens next',
             message:
-                'Vehicle details, payout setup, and registration can be completed from your profile before you create rides after ride #5.',
+                'Upload your license and insurance in step 2. Stripe payout setup and vehicle registration are only enforced after your first 5 completed rides.',
           ),
           if (err != null && err.trim().isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -454,6 +507,11 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView> {
     _driverController.setCarYear(profile.carYear ?? '');
     _driverController.setCarColor(profile.carColor ?? '');
     _driverController.setPlateNumber(profile.plateNumber ?? '');
+    _carMakeCtrl.text = profile.carMake ?? '';
+    _carModelCtrl.text = profile.carModel ?? '';
+    _carYearCtrl.text = profile.carYear ?? '';
+    _carColorCtrl.text = profile.carColor ?? '';
+    _plateCtrl.text = profile.plateNumber ?? '';
     _driverController.setLicenseNumber(profile.licenseNumber ?? '');
     _driverController.setInsuranceInfo(profile.insuranceInfo ?? '');
   }
@@ -553,6 +611,7 @@ class _StepHeader extends StatelessWidget {
 class ExoField extends StatelessWidget {
   const ExoField({
     super.key,
+    this.controller,
     required this.label,
     required this.hint,
     required this.onChanged,
@@ -561,6 +620,7 @@ class ExoField extends StatelessWidget {
     this.inputFormatters,
   });
 
+  final TextEditingController? controller;
   final String label;
   final String hint;
   final ValueChanged<String> onChanged;
@@ -583,6 +643,7 @@ class ExoField extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         TextField(
+          controller: controller,
           keyboardType: keyboardType,
           onChanged: onChanged,
           onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),

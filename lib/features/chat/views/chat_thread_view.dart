@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/controllers/session_controller.dart';
 import '../../../shared/widgets/app_input_decoration.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../controllers/chat_thread_controller.dart';
 import '../controllers/chat_conversations_controller.dart';
 import '../models/chat_conversation.dart';
@@ -383,14 +384,15 @@ class _ChatHeader extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: 0,
       title: Row(
         children: [
-          CircleAvatar(
+          UserAvatar(
+            name: conversation.participant.name,
+            avatarUrl: conversation.participant.avatarUrl,
             radius: 18,
             backgroundColor: accentColor.withValues(alpha: 0.15),
-            child: Text(
-              conversation.participant.name.isNotEmpty
-                  ? conversation.participant.name[0].toUpperCase()
-                  : 'U',
-              style: TextStyle(fontWeight: FontWeight.w700, color: accentColor),
+            foregroundColor: accentColor,
+            textStyle: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: accentColor,
             ),
           ),
           const SizedBox(width: 10),

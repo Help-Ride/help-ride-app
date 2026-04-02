@@ -28,7 +28,7 @@ class ProfileApi {
     String? carYear,
     String? carColor,
     required String plateNumber,
-    required String licenseNumber,
+    String? licenseNumber,
     String? insuranceInfo,
   }) async {
     await _client.post<Map<String, dynamic>>(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../models/chat_conversation.dart';
 import '../utils/chat_formatters.dart';
 
@@ -42,6 +43,7 @@ class ChatConversationTile extends StatelessWidget {
         : (conversation.blockedByOtherUser ? 'Unavailable' : '');
     final paymentLabel = conversation.paymentRequired ? 'Payment required' : '';
     final routeLabel = routeSummary.isNotEmpty ? routeSummary : rideReference;
+    final avatarUrl = (conversation.participant.avatarUrl ?? '').trim();
 
     final badgeColor = accentColor;
     final avatarBg = accentColor.withValues(alpha: isDark ? 0.22 : 0.14);
@@ -82,16 +84,16 @@ class ChatConversationTile extends StatelessWidget {
               children: [
                 Stack(
                   children: [
-                    CircleAvatar(
+                    UserAvatar(
+                      name: conversation.participant.name,
+                      avatarUrl: avatarUrl,
                       radius: 26,
                       backgroundColor: avatarBg,
-                      child: Text(
-                        chatInitials(conversation.participant.name),
-                        style: TextStyle(
-                          color: accentColor,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                        ),
+                      foregroundColor: accentColor,
+                      textStyle: TextStyle(
+                        color: accentColor,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
                       ),
                     ),
                     Positioned(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/user_avatar.dart';
 
 class AppCard extends StatelessWidget {
   const AppCard({super.key, required this.child});
@@ -32,26 +33,25 @@ class AppCard extends StatelessWidget {
 }
 
 class Avatar extends StatelessWidget {
-  const Avatar({super.key, required this.initials});
+  const Avatar({super.key, required this.initials, this.avatarUrl});
   final String initials;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      height: 44,
-      width: 44,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: TextStyle(
-          fontWeight: FontWeight.w900,
-          color: isDark ? AppColors.darkText : AppColors.lightText,
-        ),
+    return UserAvatar(
+      name: initials,
+      avatarUrl: avatarUrl,
+      fallbackText: initials,
+      radius: 22,
+      backgroundColor: isDark
+          ? const Color(0xFF1C2331)
+          : const Color(0xFFE9EEF6),
+      foregroundColor: isDark ? AppColors.darkText : AppColors.lightText,
+      textStyle: TextStyle(
+        fontWeight: FontWeight.w900,
+        color: isDark ? AppColors.darkText : AppColors.lightText,
       ),
     );
   }

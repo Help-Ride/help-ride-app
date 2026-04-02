@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../ride_requests/models/ride_request.dart';
 import '../../../bookings/utils/booking_formatters.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/user_avatar.dart';
 
 class DriverRideRequestCard extends StatelessWidget {
   const DriverRideRequestCard({
@@ -18,6 +19,10 @@ class DriverRideRequestCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
+    final passenger = request.passenger;
+    final passengerName = (passenger?.name ?? '').trim().isNotEmpty
+        ? passenger!.name.trim()
+        : 'Passenger';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -47,6 +52,38 @@ class DriverRideRequestCard extends StatelessWidget {
               Text(
                 formatDateTime(request.preferredDate),
                 style: TextStyle(color: muted, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              UserAvatar(
+                name: passengerName,
+                avatarUrl: passenger?.avatarUrl,
+                radius: 18,
+                backgroundColor: isDark
+                    ? const Color(0xFF1C2331)
+                    : const Color(0xFFE9EEF6),
+                foregroundColor: AppColors.driverPrimary,
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  color: AppColors.driverPrimary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  passengerName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: textPrimary,
+                  ),
+                ),
               ),
             ],
           ),

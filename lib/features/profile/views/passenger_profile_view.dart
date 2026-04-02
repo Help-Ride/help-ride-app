@@ -498,11 +498,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
           const SizedBox(height: 12),
           _EditField(
             controller: licenseCtrl,
-            label: 'License number',
-            validator: (value) => InputValidators.requiredText(
-              value ?? '',
-              fieldLabel: 'License number',
-            ),
+            label: 'License number (optional)',
           ),
           const SizedBox(height: 18),
           _SheetSectionTitle(

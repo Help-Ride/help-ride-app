@@ -1,5 +1,33 @@
 enum RideRequestMode { offer, jit }
 
+class RideRequestPassenger {
+  final String id;
+  final String name;
+  final String? email;
+  final String? avatarUrl;
+
+  const RideRequestPassenger({
+    required this.id,
+    required this.name,
+    this.email,
+    this.avatarUrl,
+  });
+
+  factory RideRequestPassenger.fromJson(Map<String, dynamic> json) {
+    return RideRequestPassenger(
+      id: (json['id'] ?? json['userId'] ?? json['user_id'] ?? '').toString(),
+      name: (json['name'] ?? json['fullName'] ?? 'Passenger').toString(),
+      email: json['email']?.toString(),
+      avatarUrl:
+          (json['providerAvatarUrl'] ??
+                  json['avatarUrl'] ??
+                  json['photoUrl'] ??
+                  json['profileImage'])
+              ?.toString(),
+    );
+  }
+}
+
 RideRequestMode rideRequestModeFromRaw(dynamic value) {
   final normalized = value?.toString().trim().toUpperCase() ?? '';
   if (normalized == 'JIT') return RideRequestMode.jit;
@@ -36,6 +64,7 @@ class RideRequest {
   final double? quotedPricePerSeat;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final RideRequestPassenger? passenger;
 
   RideRequest({
     required this.id,
@@ -63,6 +92,7 @@ class RideRequest {
     this.quotedPricePerSeat,
     required this.createdAt,
     this.updatedAt,
+    this.passenger,
   });
 
   factory RideRequest.fromJson(Map<String, dynamic> json) {
@@ -93,6 +123,8 @@ class RideRequest {
     DateTime toDate(dynamic v) {
       return toDateNullable(v) ?? DateTime.now();
     }
+
+    final passengerMap = json['passenger'];
 
     return RideRequest(
       id: (json['id'] ?? '').toString(),
@@ -131,6 +163,9 @@ class RideRequest {
       updatedAt: json['updatedAt'] == null && json['updated_at'] == null
           ? null
           : toDate(json['updatedAt'] ?? json['updated_at']),
+      passenger: passengerMap is Map<String, dynamic>
+          ? RideRequestPassenger.fromJson(passengerMap)
+          : null,
     );
   }
 }

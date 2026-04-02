@@ -7,6 +7,7 @@ import 'package:help_ride/features/chat/views/chat_thread_view.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_client.dart';
 import 'package:help_ride/shared/services/api_exception.dart';
+import 'package:help_ride/shared/widgets/user_avatar.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'request_formatters.dart';
 
@@ -110,7 +111,11 @@ class DriverRequestCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              _Avatar(initials: initials(name), isDark: isDark),
+              _Avatar(
+                initials: initials(name),
+                avatarUrl: passenger?.avatarUrl,
+                isDark: isDark,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -314,10 +319,7 @@ class DriverRequestCard extends StatelessWidget {
                               final message = e is ApiException
                                   ? e.message
                                   : 'Unable to start chat right now.';
-                              Get.snackbar(
-                                'Chat unavailable',
-                                message,
-                              );
+                              Get.snackbar('Chat unavailable', message);
                             }
                           },
                     icon: const Icon(Icons.chat_bubble_outline, size: 18),
@@ -423,26 +425,25 @@ class _StatusPill extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initials, required this.isDark});
+  const _Avatar({required this.initials, required this.isDark, this.avatarUrl});
   final String initials;
   final bool isDark;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 44,
-      width: 44,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C2331) : const Color(0xFFE9EEF6),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: TextStyle(
-          fontWeight: FontWeight.w900,
-          color: isDark ? AppColors.darkText : AppColors.lightText,
-        ),
+    return UserAvatar(
+      name: initials,
+      avatarUrl: avatarUrl,
+      fallbackText: initials,
+      radius: 22,
+      backgroundColor: isDark
+          ? const Color(0xFF1C2331)
+          : const Color(0xFFE9EEF6),
+      foregroundColor: isDark ? AppColors.darkText : AppColors.lightText,
+      textStyle: TextStyle(
+        fontWeight: FontWeight.w900,
+        color: isDark ? AppColors.darkText : AppColors.lightText,
       ),
     );
   }

@@ -289,7 +289,7 @@ class ProfileController extends GetxController {
     String? carYear,
     String? carColor,
     required String plateNumber,
-    required String licenseNumber,
+    String? licenseNumber,
     String? insuranceInfo,
   }) async {
     final userId = _session.user.value?.id ?? '';
@@ -304,7 +304,9 @@ class ProfileController extends GetxController {
           carYear: carYear?.trim(),
           carColor: carColor?.trim(),
           plateNumber: plateNumber.trim(),
-          licenseNumber: licenseNumber.trim(),
+          licenseNumber: licenseNumber?.trim().isEmpty ?? true
+              ? null
+              : licenseNumber!.trim(),
           insuranceInfo: insuranceInfo?.trim(),
         );
       } else {
@@ -315,7 +317,9 @@ class ProfileController extends GetxController {
           carYear: carYear?.trim(),
           carColor: carColor?.trim(),
           plateNumber: plateNumber.trim(),
-          licenseNumber: licenseNumber.trim(),
+          licenseNumber: licenseNumber?.trim().isEmpty ?? true
+              ? null
+              : licenseNumber!.trim(),
           insuranceInfo: insuranceInfo?.trim(),
         );
       }

@@ -93,7 +93,7 @@ class DriverOnboardingController extends GetxController {
         carYear: carYear.isEmpty ? null : carYear,
         carColor: carColor.isEmpty ? null : carColor,
         plateNumber: plateNumber.isEmpty ? null : plateNumber,
-        licenseNumber: licenseNumber,
+        licenseNumber: licenseNumber.isEmpty ? null : licenseNumber,
         insuranceInfo: insuranceInfo.isEmpty ? null : insuranceInfo,
       );
 
@@ -128,17 +128,20 @@ class DriverOnboardingController extends GetxController {
 
   bool _validateFields({required bool showErrors}) {
     final errors = <String, String?>{
-      'carMake': null,
-      'carModel': null,
+      'carMake': InputValidators.requiredText(carMake, fieldLabel: 'Car make'),
+      'carModel': InputValidators.requiredText(
+        carModel,
+        fieldLabel: 'Car model',
+      ),
       'carYear': carYear.trim().isEmpty
           ? null
           : InputValidators.optionalYear(carYear),
       'carColor': null,
-      'plateNumber': null,
-      'licenseNumber': InputValidators.requiredText(
-        licenseNumber,
-        fieldLabel: 'License number',
+      'plateNumber': InputValidators.requiredText(
+        plateNumber,
+        fieldLabel: 'Plate number',
       ),
+      'licenseNumber': null,
       'insuranceInfo': null,
     };
 
