@@ -119,17 +119,29 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
         backgroundColor: _surfaceBg(isDark),
         body: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
             children: [
-              Text(
-                'Profile',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: _textPrimary(isDark),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Profile',
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.6,
+                        color: _textPrimary(isDark),
+                      ),
+                    ),
+                  ),
+                  _HeaderActionButton(
+                    icon: Icons.tune_rounded,
+                    isDark: isDark,
+                    onTap: () => _openQuickActionsSheet(context, session),
+                  ),
+                ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 18),
               _UserCard(
                 user: user,
                 roleLabel: roleLabel,
@@ -147,10 +159,30 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                     ? () => _openVerificationDrawer(context, user)
                     : null,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 24),
+              _SectionLabel(
+                label: 'Account',
+                subtitle: 'Personal details and ride contact preferences.',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
+              _ActionGroup(
+                items: [
+                  _ActionItem(
+                    icon: Icons.person_outline_rounded,
+                    label: 'Personal info',
+                    subtitle: user.name.trim().isEmpty
+                        ? 'Add the name shown on rides and messages'
+                        : user.name,
+                    onTap: () => _openPersonalInfoSheet(context, user),
+                  ),
+                ],
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
               _ContactMethodsCard(
                 key: ValueKey(
-                  '${user.email}|${user.phone}|${user.emailVerified}|${user.phoneVerified}',
+                  '${user.name}|${user.email}|${user.phone}|${user.emailVerified}|${user.phoneVerified}|${user.pendingEmail}|${user.pendingPhone}',
                 ),
                 controller: _controller,
                 user: user,
@@ -177,25 +209,15 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                     ? () => _openVerificationDrawer(context, user)
                     : null,
               ),
-              const SizedBox(height: 16),
-              _SectionLabel(label: 'PAYMENTS', isDark: isDark),
-              const SizedBox(height: 8),
-              _ActionGroup(
-                items: [
-                  _ActionItem(
-                    icon: Icons.credit_card_outlined,
-                    label: _controller.paymentMethodsLoading.value
-                        ? 'Opening Payment Methods...'
-                        : 'Payment Methods',
-                    onTap: _controller.paymentMethodsLoading.value
-                        ? null
-                        : () => unawaited(_openPaymentMethods()),
-                  ),
-                ],
-                isDark: isDark,
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 22),
               if (isDriver || _controller.driverProfile.value != null) ...[
+                _SectionLabel(
+                  label: 'Driver profile',
+                  subtitle:
+                      'Vehicle details, verification, and driving documents.',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 10),
                 _DriverProfileCard(
                   controller: _controller,
                   profile: _controller.driverProfile.value,
@@ -205,37 +227,110 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                     context,
                     _controller.driverProfile.value,
                   ),
+                  onOpenDocuments: () => _openDriverDocumentsSheet(context),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 22),
               ],
-              _SectionLabel(label: 'SUPPORT', isDark: isDark),
-              const SizedBox(height: 8),
+              _SectionLabel(
+                label: 'Payments',
+                subtitle: 'Manage cards for bookings and payouts.',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
               _ActionGroup(
                 items: [
                   _ActionItem(
-                    icon: Icons.help_outline,
-                    label: 'Help Center',
+                    icon: Icons.credit_card_outlined,
+                    label: 'Payment methods',
+                    subtitle: _controller.paymentMethodsLoading.value
+                        ? 'Opening card manager...'
+                        : 'Manage cards and saved checkout methods',
+                    trailing: _controller.paymentMethodsLoading.value
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _textPrimary(isDark),
+                            ),
+                          )
+                        : null,
+                    onTap: _controller.paymentMethodsLoading.value
+                        ? null
+                        : () => unawaited(_openPaymentMethods()),
+                  ),
+                ],
+                isDark: isDark,
+              ),
+              if (isDriver ||
+                  _controller.stripeConnectStatus.value.hasStripeAccount) ...[
+                const SizedBox(height: 10),
+                _StripeConnectSection(controller: _controller, isDark: isDark),
+              ],
+              const SizedBox(height: 22),
+              _SectionLabel(
+                label: 'Safety & support',
+                subtitle: 'Get help, policy details, and safety guidance.',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
+              _ActionGroup(
+                items: [
+                  _ActionItem(
+                    icon: Icons.shield_outlined,
+                    label: 'Emergency & safety',
+                    subtitle: 'Safety guidance and support during active trips',
+                    onTap: () => Get.toNamed(SupportRoutes.tickets),
+                  ),
+                  _ActionItem(
+                    icon: Icons.support_agent_outlined,
+                    label: 'Help & support',
+                    subtitle: 'Open support tickets and contact HelpRide',
                     onTap: () => Get.toNamed(SupportRoutes.tickets),
                   ),
                   _ActionItem(
                     icon: Icons.policy_outlined,
-                    label: 'Terms & Privacy',
+                    label: 'Terms & privacy',
+                    subtitle: 'Policies, privacy, and legal information',
                     onTap: () => Get.toNamed(ProfileRoutes.termsPrivacy),
                   ),
                 ],
                 isDark: isDark,
               ),
-              const SizedBox(height: 16),
-              _SectionLabel(label: 'ACCOUNT', isDark: isDark),
-              const SizedBox(height: 8),
+              const SizedBox(height: 22),
+              _SectionLabel(
+                label: 'Account actions',
+                subtitle: 'Manage your session and account access.',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
               _ActionGroup(
                 items: [
                   _ActionItem(
+                    icon: Icons.logout_rounded,
+                    label: 'Log out',
+                    subtitle: 'Sign out from this device',
+                    destructive: true,
+                    onTap: () async {
+                      await session.logout();
+                      Get.offAllNamed(AppRoutes.login);
+                    },
+                  ),
+                  _ActionItem(
                     icon: Icons.delete_forever_outlined,
                     label: _controller.deleteAccountLoading.value
-                        ? 'Deleting Account...'
-                        : 'Delete Account',
+                        ? 'Deleting account...'
+                        : 'Delete account',
+                    subtitle:
+                        'Permanently remove your HelpRide account and profile',
                     destructive: true,
+                    trailing: _controller.deleteAccountLoading.value
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
                     onTap: _controller.deleteAccountLoading.value
                         ? null
                         : () => _confirmDeleteAccount(context),
@@ -243,15 +338,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                 ],
                 isDark: isDark,
               ),
-              const SizedBox(height: 16),
-              _LogoutCard(
-                onLogout: () async {
-                  await session.logout();
-                  Get.offAllNamed(AppRoutes.login);
-                },
-                isDark: isDark,
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               Center(
                 child: Text(
                   'Version 1.0.0',
@@ -290,6 +377,167 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
         message.isEmpty ? 'Could not open payment methods.' : message,
       );
     }
+  }
+
+  Future<void> _openPersonalInfoSheet(BuildContext context, User user) async {
+    final nameCtrl = TextEditingController(text: user.name);
+    final formKey = GlobalKey<FormState>();
+
+    await _showEditSheet(
+      context,
+      title: 'Personal info',
+      saveLabel: 'Save changes',
+      formKey: formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SheetSectionTitle(
+            title: 'Display name',
+            subtitle: 'This name appears on rides, bookings, and messages.',
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
+          const SizedBox(height: 12),
+          _EditField(
+            controller: nameCtrl,
+            label: 'Full name',
+            validator: (value) => InputValidators.requiredText(
+              value ?? '',
+              fieldLabel: 'Full name',
+            ),
+            helperText: 'Keep this aligned with the name riders should see.',
+          ),
+        ],
+      ),
+      onSave: () async {
+        final nextName = nameCtrl.text.trim();
+        if (nextName == user.name.trim()) {
+          return true;
+        }
+        try {
+          await _controller.updateUserProfile(
+            name: nextName,
+            email: user.email,
+            phone: PhoneNumberUtils.formatForDisplay(user.phone),
+            avatarUrl: user.avatarUrl ?? '',
+          );
+          return true;
+        } catch (e) {
+          if (context.mounted) {
+            _showError(context, e);
+          }
+          return false;
+        }
+      },
+      isSaving: _controller.loading,
+    );
+
+    nameCtrl.dispose();
+  }
+
+  Future<void> _openDriverDocumentsSheet(BuildContext context) async {
+    await _controller.refreshDriverDocuments();
+    if (!context.mounted) return;
+    await _showEditSheet(
+      context,
+      title: 'Driver documents',
+      saveLabel: 'Done',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SheetSectionTitle(
+            title: 'Verification uploads',
+            subtitle:
+                'Manage the license, insurance, and supporting documents used for driver review.',
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
+          const SizedBox(height: 12),
+          _DriverDocumentUploadSection(
+            controller: _controller,
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
+        ],
+      ),
+      onSave: () async => true,
+      isSaving: false.obs,
+    );
+  }
+
+  void _openQuickActionsSheet(BuildContext context, SessionController session) {
+    final isDark = Get.find<ThemeController>().isDark.value;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _surfaceCard(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE6EAF2),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Quick actions',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary(isDark),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _ActionGroup(
+                  isDark: isDark,
+                  items: [
+                    _ActionItem(
+                      icon: Icons.support_agent_outlined,
+                      label: 'Help & support',
+                      subtitle: 'Open support tickets and contact HelpRide',
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        Get.toNamed(SupportRoutes.tickets);
+                      },
+                    ),
+                    _ActionItem(
+                      icon: Icons.policy_outlined,
+                      label: 'Terms & privacy',
+                      subtitle: 'Review policies, privacy, and legal info',
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        Get.toNamed(ProfileRoutes.termsPrivacy);
+                      },
+                    ),
+                    _ActionItem(
+                      icon: Icons.logout_rounded,
+                      label: 'Log out',
+                      subtitle: 'Sign out from this device',
+                      destructive: true,
+                      onTap: () async {
+                        Navigator.of(sheetContext).pop();
+                        await session.logout();
+                        Get.offAllNamed(AppRoutes.login);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _confirmDeleteAccount(BuildContext context) async {
@@ -450,6 +698,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
     await _showEditSheet(
       context,
       title: profile == null ? 'Create Driver Profile' : 'Edit Driver Profile',
+      saveLabel: 'Save changes',
       formKey: formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,6 +793,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
     required Widget child,
     required Future<bool> Function() onSave,
     required RxBool isSaving,
+    String saveLabel = 'Save',
     GlobalKey<FormState>? formKey,
   }) {
     final isDark = Get.find<ThemeController>().isDark.value;
@@ -649,9 +899,11 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text(
-                                'Save',
-                                style: TextStyle(fontWeight: FontWeight.w700),
+                            : Text(
+                                saveLabel,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                       ),
                     );
@@ -798,25 +1050,38 @@ class _UserCard extends StatelessWidget {
     final initials = _initialsFor(user.name);
     final formattedPhone = PhoneNumberUtils.formatForDisplay(user.phone);
     final hasPhone = formattedPhone.trim().isNotEmpty;
+    final verificationLabel = isVerified
+        ? 'Contact verified'
+        : 'Verification needed';
+    final verificationColor = isVerified
+        ? AppColors.passengerPrimary
+        : const Color(0xFF9C6A09);
+    final verificationBg = isVerified
+        ? (isDark ? const Color(0xFF14382B) : const Color(0xFFE8FAF3))
+        : (isDark ? const Color(0xFF3A2C10) : const Color(0xFFFFF4D6));
+    final verificationBorder = isVerified
+        ? (isDark ? const Color(0xFF1E5B45) : const Color(0xFFD8F2E5))
+        : (isDark ? const Color(0xFF5A4414) : const Color(0xFFF3D98B));
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _surfaceCard(isDark),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _cardBorder(isDark)),
+        boxShadow: _cardShadow(isDark),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Stack(
                 clipBehavior: Clip.none,
                 children: [
                   CircleAvatar(
-                    radius: 26,
+                    radius: 28,
                     backgroundColor: isDark
                         ? const Color(0xFF1C2331)
                         : const Color(0xFFE9EEF6),
@@ -834,24 +1099,27 @@ class _UserCard extends StatelessWidget {
                         : null,
                   ),
                   Positioned(
-                    right: -4,
-                    bottom: -4,
+                    right: -2,
+                    bottom: -2,
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
                         onTap: avatarUploading ? null : onUploadPhoto,
                         borderRadius: BorderRadius.circular(99),
                         child: Container(
-                          width: 30,
-                          height: 30,
+                          width: 28,
+                          height: 28,
                           decoration: BoxDecoration(
-                            color: _surfaceCard(isDark),
+                            color: AppColors.passengerPrimary,
                             shape: BoxShape.circle,
-                            border: Border.all(color: _cardBorder(isDark)),
+                            border: Border.all(
+                              color: _surfaceCard(isDark),
+                              width: 2,
+                            ),
                             boxShadow: const [
                               BoxShadow(
                                 color: Color(0x14000000),
-                                blurRadius: 12,
+                                blurRadius: 10,
                                 offset: Offset(0, 4),
                               ),
                             ],
@@ -868,8 +1136,8 @@ class _UserCard extends StatelessWidget {
                                   )
                                 : Icon(
                                     Icons.photo_camera_outlined,
-                                    size: 16,
-                                    color: AppColors.passengerPrimary,
+                                    size: 14,
+                                    color: Colors.white,
                                   ),
                           ),
                         ),
@@ -883,46 +1151,40 @@ class _UserCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Text(
+                      user.name.isNotEmpty ? user.name : 'User',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                        color: _textPrimary(isDark),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        Expanded(
-                          child: Text(
-                            user.name.isNotEmpty ? user.name : 'User',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: _textPrimary(isDark),
-                            ),
+                        _TagChip(
+                          label: roleLabel,
+                          textColor: roleColor,
+                          background: roleColor.withValues(
+                            alpha: isDark ? 0.2 : 0.12,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: isVerified ? null : onOpenVerificationDrawer,
+                          child: _OutlinedTagChip(
+                            label: verificationLabel,
+                            textColor: verificationColor,
+                            background: verificationBg,
+                            borderColor: verificationBorder,
+                            icon: isVerified
+                                ? Icons.verified_rounded
+                                : Icons.pending_outlined,
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 8),
-                    _HeaderMetaLine(
-                      icon: Icons.mail_outline,
-                      value: user.email,
-                      isDark: isDark,
-                    ),
-                    if (hasPhone)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: _HeaderMetaLine(
-                          icon: Icons.phone_iphone_outlined,
-                          value: formattedPhone,
-                          isDark: isDark,
-                        ),
-                      ),
-                    const SizedBox(height: 10),
-                    Text(
-                      avatarUploading
-                          ? 'Updating profile photo...'
-                          : 'Tap the camera to take a new profile photo.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _mutedText(isDark),
-                        height: 1.35,
-                      ),
                     ),
                   ],
                 ),
@@ -930,44 +1192,48 @@ class _UserCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _TagChip(
-                label: roleLabel,
-                textColor: roleColor,
-                background: roleColor.withValues(alpha: isDark ? 0.22 : 0.12),
-              ),
-              GestureDetector(
-                onTap: isVerified ? null : onOpenVerificationDrawer,
-                child: _OutlinedTagChip(
-                  label: isVerified
-                      ? 'Contact verified'
-                      : 'Verification needed',
-                  textColor: isVerified
-                      ? AppColors.passengerPrimary
-                      : const Color(0xFF8A5A00),
-                  background: isVerified
-                      ? (isDark
-                            ? const Color(0xFF14382B)
-                            : const Color(0xFFE8FAF3))
-                      : (isDark
-                            ? const Color(0xFF3C2E07)
-                            : const Color(0xFFFFF4D6)),
-                  borderColor: isVerified
-                      ? (isDark
-                            ? const Color(0xFF1E5B45)
-                            : const Color(0xFFD7F1E4))
-                      : (isDark
-                            ? const Color(0xFF5C4411)
-                            : const Color(0xFFF1D98C)),
-                  icon: isVerified
-                      ? Icons.verified_outlined
-                      : Icons.pending_outlined,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: _fieldFill(isDark),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _cardBorder(isDark)),
+            ),
+            child: Column(
+              children: [
+                _HeaderMetaLine(
+                  icon: Icons.mail_outline,
+                  value: user.email.trim().isEmpty
+                      ? 'Add your email address'
+                      : user.email,
+                  isDark: isDark,
                 ),
-              ),
-            ],
+                if (hasPhone) ...[
+                  const SizedBox(height: 10),
+                  Divider(height: 1, color: _cardDivider(isDark)),
+                  const SizedBox(height: 10),
+                ],
+                _HeaderMetaLine(
+                  icon: Icons.phone_iphone_outlined,
+                  value: hasPhone ? formattedPhone : 'Add your mobile number',
+                  isDark: isDark,
+                ),
+                if (avatarUploading) ...[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Updating profile photo...',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _mutedText(isDark),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -1421,105 +1687,197 @@ class _ContactMethodsCardState extends State<_ContactMethodsCard> {
   Widget build(BuildContext context) {
     final formattedPhone = PhoneNumberUtils.formatForDisplay(widget.user.phone);
     final hasPhone = formattedPhone.trim().isNotEmpty;
+    final currentEmail = widget.user.email.trim();
+    final pendingEmail = widget.user.pendingEmail?.trim() ?? '';
+    final pendingPhone = widget.user.pendingPhone?.trim() ?? '';
     final needsEmailVerification =
-        widget.user.email.trim().isNotEmpty && !widget.user.emailVerified;
+        currentEmail.isNotEmpty && !widget.user.emailVerified;
     final needsPhoneVerification = hasPhone && !widget.user.phoneVerified;
+    final hasPendingEmailChange =
+        pendingEmail.isNotEmpty &&
+        pendingEmail.toLowerCase() != currentEmail.toLowerCase();
+    final normalizedCurrentPhone = PhoneNumberUtils.normalizeToE164(
+      widget.user.phone ?? '',
+    );
+    final normalizedPendingPhone = PhoneNumberUtils.normalizeToE164(
+      pendingPhone,
+    );
+    final hasPendingPhoneChange =
+        normalizedPendingPhone != null &&
+        normalizedPendingPhone != normalizedCurrentPhone;
     final needsAnyVerification =
         needsEmailVerification || needsPhoneVerification;
+    final pendingBannerText = hasPendingEmailChange
+        ? 'Pending email verification for $pendingEmail'
+        : hasPendingPhoneChange
+        ? 'Pending mobile verification for ${PhoneNumberUtils.formatForDisplay(pendingPhone)}'
+        : needsPhoneVerification
+        ? 'Verify your mobile number before changing it.'
+        : needsEmailVerification
+        ? 'Verify your email before changing it.'
+        : null;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
         color: _surfaceCard(widget.isDark),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _cardBorder(widget.isDark)),
+        boxShadow: _cardShadow(widget.isDark),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Contact methods',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary(widget.isDark),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              if (needsAnyVerification ||
+                  hasPendingEmailChange ||
+                  hasPendingPhoneChange)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: widget.isDark
+                        ? const Color(0xFF3A2C10)
+                        : const Color(0xFFFFF4D6),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'Needs attention',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF9C6A09),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
           Text(
-            'Contact methods',
+            'Update the contact details used for alerts, booking updates, and account recovery.',
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: _textPrimary(widget.isDark),
-              letterSpacing: 0.2,
+              fontSize: 12,
+              height: 1.45,
+              color: _mutedText(widget.isDark),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           _ContactMethodDisplayRow(
             icon: Icons.mail_outline,
             title: 'Email',
-            value: widget.user.email.trim().isNotEmpty
+            value: currentEmail.isNotEmpty
                 ? widget.user.email
                 : 'Add your email address',
-            statusLabel: widget.user.email.trim().isNotEmpty
-                ? (widget.user.emailVerified ? 'Verified' : 'Pending')
-                : 'Missing',
-            verified:
-                widget.user.email.trim().isNotEmpty &&
-                widget.user.emailVerified,
+            supportingText: hasPendingEmailChange
+                ? 'Pending verification: $pendingEmail'
+                : currentEmail.isEmpty
+                ? 'Required for receipts and recovery'
+                : null,
+            statusLabel: currentEmail.isEmpty
+                ? 'Add'
+                : widget.user.emailVerified
+                ? 'Verified'
+                : 'Pending',
+            verified: currentEmail.isNotEmpty && widget.user.emailVerified,
             isDark: widget.isDark,
             onTap: _openEmailSheet,
           ),
-          const SizedBox(height: 14),
-          Divider(height: 1, color: _cardBorder(widget.isDark)),
-          const SizedBox(height: 14),
+          Divider(height: 24, color: _cardDivider(widget.isDark)),
           _ContactMethodDisplayRow(
             icon: Icons.phone_iphone_outlined,
             title: 'Mobile',
             value: hasPhone ? formattedPhone : 'Add your mobile number',
+            supportingText: hasPendingPhoneChange
+                ? 'Pending verification: ${PhoneNumberUtils.formatForDisplay(pendingPhone)}'
+                : !hasPhone
+                ? 'Required for SMS ride alerts'
+                : null,
             statusLabel: hasPhone
                 ? (widget.user.phoneVerified ? 'Verified' : 'Pending')
-                : 'Missing',
+                : 'Add',
             verified: hasPhone && widget.user.phoneVerified,
             isDark: widget.isDark,
             onTap: _openPhoneSheet,
           ),
-          if (needsAnyVerification || !hasPhone) ...[
-            const SizedBox(height: 14),
-            Divider(height: 1, color: _cardBorder(widget.isDark)),
-            const SizedBox(height: 14),
-            Text(
-              !hasPhone
-                  ? 'Tap a field to manage it. Verified contact methods are required for ride alerts, OTP sign-in, and booking updates.'
-                  : needsPhoneVerification
-                  ? 'Verify your current mobile number before changing it or using it for ride alerts and SMS sign-in.'
-                  : 'Verify your current email before changing it or using it for account recovery and important updates.',
-              style: TextStyle(
-                color: _mutedText(widget.isDark),
-                fontSize: 12,
-                height: 1.45,
+          if (pendingBannerText != null || !hasPhone) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: widget.isDark
+                    ? const Color(0xFF171C27)
+                    : const Color(0xFFF8FAFD),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _cardBorder(widget.isDark)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: widget.isDark
+                          ? const Color(0xFF3A2C10)
+                          : const Color(0xFFFFF4D6),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.verified_user_outlined,
+                      size: 16,
+                      color: Color(0xFF9C6A09),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          pendingBannerText ??
+                              'Verified contact details are required for ride alerts and sign-in.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.45,
+                            color: _textPrimary(widget.isDark),
+                          ),
+                        ),
+                        if (widget.onOpenVerificationDrawer != null) ...[
+                          const SizedBox(height: 10),
+                          GestureDetector(
+                            onTap: widget.onOpenVerificationDrawer,
+                            child: Text(
+                              'Review verification',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.passengerPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (needsAnyVerification &&
-                widget.onOpenVerificationDrawer != null) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: widget.onOpenVerificationDrawer,
-                  icon: const Icon(Icons.verified_user_outlined, size: 18),
-                  label: const Text(
-                    'Review verification',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.passengerPrimary,
-                    side: BorderSide(
-                      color: widget.isDark
-                          ? const Color(0xFF1E5B45)
-                          : const Color(0xFFD7F1E4),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ],
         ],
       ),
@@ -1534,6 +1892,7 @@ class _DriverProfileCard extends StatelessWidget {
     required this.loading,
     required this.isDark,
     required this.onEdit,
+    required this.onOpenDocuments,
   });
 
   final ProfileController controller;
@@ -1541,6 +1900,7 @@ class _DriverProfileCard extends StatelessWidget {
   final bool loading;
   final bool isDark;
   final VoidCallback onEdit;
+  final VoidCallback onOpenDocuments;
 
   @override
   Widget build(BuildContext context) {
@@ -1555,130 +1915,121 @@ class _DriverProfileCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _driverCardBg(isDark),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _driverCardBorder(isDark)),
+        boxShadow: _cardShadow(isDark),
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.directions_car, color: AppColors.driverPrimary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Driver Profile',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                    color: _textPrimary(isDark),
+      child: Obx(() {
+        final docs = controller.driverDocuments;
+        final docCount = docs.length;
+        final approvedCount = docs
+            .where(
+              (doc) => (doc.status ?? '').trim().toLowerCase() == 'approved',
+            )
+            .length;
+
+        return Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.driverPrimary.withValues(
+                      alpha: isDark ? 0.18 : 0.1,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.directions_car_outlined,
+                    color: AppColors.driverPrimary,
                   ),
                 ),
-              ),
-              IconButton(
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined),
-                color: AppColors.driverPrimary,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _DriverInfoRow(
-            label: 'Vehicle',
-            value: _joinParts(profile?.carMake, profile?.carModel),
-            isDark: isDark,
-          ),
-          _DriverInfoRow(
-            label: 'Year',
-            value: profile?.carYear,
-            isDark: isDark,
-          ),
-          _DriverInfoRow(
-            label: 'Color',
-            value: profile?.carColor,
-            isDark: isDark,
-          ),
-          _DriverInfoRow(
-            label: 'License Plate',
-            value: profile?.plateNumber,
-            isDark: isDark,
-          ),
-          _DriverInfoRow(
-            label: 'License No.',
-            value: profile?.licenseNumber,
-            isDark: isDark,
-          ),
-          _DriverInfoRow(
-            label: 'Insurance',
-            value: profile?.insuranceInfo,
-            isDark: isDark,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Status',
-                style: TextStyle(color: _mutedText(isDark), fontSize: 13),
-              ),
-              _StatusPill(
-                isActive: profile?.isVerified == true,
-                isDark: isDark,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _StripeConnectSection(controller: controller, isDark: isDark),
-        ],
-      ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Driver profile',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: _textPrimary(isDark),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Manage your vehicle details and verification documents.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: _mutedText(isDark),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _StatusPill(
+                  isActive: profile?.isVerified == true,
+                  isDark: isDark,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _ActionGroup(
+              isDark: isDark,
+              items: [
+                _ActionItem(
+                  icon: Icons.local_taxi_outlined,
+                  label: 'Vehicle details',
+                  subtitle: _vehicleSummary(profile),
+                  onTap: onEdit,
+                ),
+                _ActionItem(
+                  icon: Icons.verified_user_outlined,
+                  label: 'Driver verification',
+                  subtitle: profile?.isVerified == true
+                      ? 'Verified to drive on HelpRide'
+                      : approvedCount > 0
+                      ? '$approvedCount document${approvedCount == 1 ? '' : 's'} approved'
+                      : 'License and insurance still need review',
+                  trailing: profile?.isVerified == true
+                      ? Icon(
+                          Icons.check_circle_rounded,
+                          size: 18,
+                          color: AppColors.passengerPrimary,
+                        )
+                      : null,
+                  onTap: onOpenDocuments,
+                ),
+                _ActionItem(
+                  icon: Icons.description_outlined,
+                  label: 'Documents',
+                  subtitle: docCount == 0
+                      ? 'Upload license and insurance files'
+                      : '$docCount file${docCount == 1 ? '' : 's'} uploaded',
+                  onTap: onOpenDocuments,
+                ),
+              ],
+            ),
+          ],
+        );
+      }),
     );
   }
 
-  String _joinParts(String? a, String? b) {
+  String _vehicleSummary(DriverProfile? profile) {
     final parts = [
-      a,
-      b,
+      profile?.carMake,
+      profile?.carModel,
+      profile?.carYear,
+      profile?.plateNumber,
     ].where((p) => p != null && p.trim().isNotEmpty).toList();
-    return parts.isEmpty ? '—' : parts.join(' ');
-  }
-}
-
-class _DriverInfoRow extends StatelessWidget {
-  const _DriverInfoRow({
-    required this.label,
-    required this.value,
-    required this.isDark,
-  });
-
-  final String label;
-  final String? value;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: _mutedText(isDark), fontSize: 13),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              (value == null || value!.trim().isEmpty) ? '—' : value!,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: _textPrimary(isDark),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return parts.isEmpty
+        ? 'Add your vehicle and plate details'
+        : parts.join(' • ');
   }
 }
 
@@ -1696,19 +2047,23 @@ class _HeaderMetaLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 15, color: _mutedText(isDark)),
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(icon, size: 15, color: _mutedText(isDark)),
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             value,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13.5,
               fontWeight: FontWeight.w600,
               color: _mutedText(isDark),
-              height: 1.2,
+              height: 1.3,
             ),
           ),
         ),
@@ -1729,7 +2084,7 @@ class _StatusPill extends StatelessWidget {
         ? (isDark ? const Color(0xFF14382B) : const Color(0xFFE8FAF3))
         : _chipNeutralBg(isDark);
     final color = isActive ? AppColors.passengerPrimary : _mutedText(isDark);
-    final label = isActive ? 'Active' : 'Pending';
+    final label = isActive ? 'Verified' : 'Reviewing';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1754,6 +2109,7 @@ class _ContactMethodDisplayRow extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.value,
+    this.supportingText,
     required this.statusLabel,
     required this.verified,
     required this.isDark,
@@ -1763,6 +2119,7 @@ class _ContactMethodDisplayRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
+  final String? supportingText;
   final String statusLabel;
   final bool verified;
   final bool isDark;
@@ -1774,80 +2131,91 @@ class _ContactMethodDisplayRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: _surfaceCard(isDark),
+              color: _fieldFill(isDark),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: _cardBorder(isDark)),
             ),
             child: Icon(icon, size: 20, color: _mutedText(isDark)),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: _mutedText(isDark),
-                        ),
-                      ),
-                    ),
-                    _InlineStatusChip(
-                      label: statusLabel,
-                      verified: verified,
-                      isDark: isDark,
-                    ),
-                  ],
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _mutedText(isDark),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 14,
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary(isDark),
+                    height: 1.25,
                   ),
-                  decoration: BoxDecoration(
-                    color: _fieldFill(isDark),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _cardBorder(isDark)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          value,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: _textPrimary(isDark),
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Icon(
-                        Icons.chevron_right_rounded,
+                ),
+                if (supportingText != null && supportingText!.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      supportingText!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
                         color: _mutedText(isDark),
                       ),
-                    ],
+                    ),
                   ),
-                ),
               ],
             ),
+          ),
+          const SizedBox(width: 10),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (verified)
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 18,
+                  color: AppColors.passengerPrimary,
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _chipNeutralBg(isDark),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _mutedText(isDark),
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right_rounded, color: _mutedText(isDark)),
+            ],
           ),
         ],
       ),
@@ -1875,56 +2243,6 @@ class _ContactEditResult {
   final String? routeName;
   final Map<String, dynamic>? arguments;
   final String? snackBarMessage;
-}
-
-class _InlineStatusChip extends StatelessWidget {
-  const _InlineStatusChip({
-    required this.label,
-    required this.verified,
-    required this.isDark,
-  });
-
-  final String label;
-  final bool verified;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = verified
-        ? (isDark ? const Color(0xFF14382B) : const Color(0xFFF0FBF6))
-        : _chipNeutralBg(isDark);
-    final color = verified ? AppColors.passengerPrimary : _mutedText(isDark);
-    final border = verified
-        ? (isDark ? const Color(0xFF1E5B45) : const Color(0xFFD7F1E4))
-        : _cardBorder(isDark);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _CompactBadge extends StatelessWidget {
@@ -2104,11 +2422,12 @@ class _StripeConnectSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _surfaceCard(isDark),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _cardBorder(isDark)),
+        boxShadow: _cardShadow(isDark),
       ),
       child: Obx(() {
         final status = controller.stripeConnectStatus.value;
@@ -2127,21 +2446,47 @@ class _StripeConnectSection extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.account_balance_wallet_outlined,
-                  size: 18,
-                  color: _textPrimary(isDark),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Stripe Connect',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: _textPrimary(isDark),
-                    ),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF172133)
+                        : const Color(0xFFF3F7FE),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 20,
+                    color: AppColors.driverPrimary,
                   ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Payouts',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: _textPrimary(isDark),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Manage your Stripe payout setup and banking details.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: _mutedText(isDark),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
                 _StripeStatusChip(
                   label: uiState.label,
                   isReady: uiState.ready,
@@ -2149,37 +2494,55 @@ class _StripeConnectSection extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              uiState.message,
-              style: TextStyle(color: _mutedText(isDark), fontSize: 13),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _fieldFill(isDark),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _cardBorder(isDark)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    uiState.message,
+                    style: TextStyle(
+                      color: _textPrimary(isDark),
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (uiState.requiresInformation &&
+                      status.requirementsCurrentlyDue.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    ..._buildRequirementRows(
+                      status.requirementsCurrentlyDue,
+                      isDark: isDark,
+                    ),
+                  ],
+                  if (status.requirementsPendingVerification.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Pending verification',
+                      style: TextStyle(
+                        color: _textPrimary(isDark),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ..._buildRequirementRows(
+                      status.requirementsPendingVerification,
+                      isDark: isDark,
+                    ),
+                  ],
+                ],
+              ),
             ),
-            if (uiState.requiresInformation &&
-                status.requirementsCurrentlyDue.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ..._buildRequirementRows(
-                status.requirementsCurrentlyDue,
-                isDark: isDark,
-              ),
-            ],
-            if (status.requirementsPendingVerification.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Pending verification',
-                style: TextStyle(
-                  color: _textPrimary(isDark),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              ..._buildRequirementRows(
-                status.requirementsPendingVerification,
-                isDark: isDark,
-              ),
-            ],
             if (error != null && error.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text(
                 error,
                 style: const TextStyle(
@@ -2189,7 +2552,7 @@ class _StripeConnectSection extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -2204,11 +2567,11 @@ class _StripeConnectSection extends StatelessWidget {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                        horizontal: 14,
+                        vertical: 11,
                       ),
                     ),
                     child: onboardingLoading
@@ -2231,11 +2594,11 @@ class _StripeConnectSection extends StatelessWidget {
                       foregroundColor: _textPrimary(isDark),
                       side: BorderSide(color: _cardBorder(isDark)),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                        horizontal: 14,
+                        vertical: 11,
                       ),
                     ),
                     child: dashboardLoading
@@ -2248,7 +2611,7 @@ class _StripeConnectSection extends StatelessWidget {
                             ),
                           )
                         : const Text(
-                            'View Pay Details',
+                            'View payout details',
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                   ),
@@ -2493,19 +2856,75 @@ class _StripeStatusChip extends StatelessWidget {
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label, required this.isDark});
+  const _SectionLabel({
+    required this.label,
+    required this.isDark,
+    this.subtitle,
+  });
 
   final String label;
   final bool isDark;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: TextStyle(
-        color: _mutedText(isDark),
-        fontWeight: FontWeight.w800,
-        letterSpacing: 1,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: _textPrimary(isDark),
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            letterSpacing: -0.2,
+          ),
+        ),
+        if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle!,
+            style: TextStyle(
+              color: _mutedText(isDark),
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _HeaderActionButton extends StatelessWidget {
+  const _HeaderActionButton({
+    required this.icon,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: _surfaceCard(isDark),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _cardBorder(isDark)),
+            boxShadow: _cardShadow(isDark),
+          ),
+          child: Icon(icon, color: _textPrimary(isDark), size: 20),
+        ),
       ),
     );
   }
@@ -2522,8 +2941,9 @@ class _ActionGroup extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: _surfaceCard(isDark),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _cardBorder(isDark)),
+        boxShadow: _cardShadow(isDark),
       ),
       child: Column(
         children: [
@@ -2541,13 +2961,17 @@ class _ActionGroup extends StatelessWidget {
 class _ActionItem {
   final IconData icon;
   final String label;
+  final String? subtitle;
   final bool destructive;
+  final Widget? trailing;
   final VoidCallback? onTap;
 
   const _ActionItem({
     required this.icon,
     required this.label,
+    this.subtitle,
     this.destructive = false,
+    this.trailing,
     this.onTap,
   });
 }
@@ -2560,46 +2984,76 @@ class _ProfileActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accentColor = item.destructive ? Colors.red : _mutedText(isDark);
-    final textColor = item.destructive ? Colors.red : _textPrimary(isDark);
+    final accentColor = item.destructive
+        ? const Color(0xFFDA3C3C)
+        : AppColors.driverPrimary;
+    final textColor = item.destructive
+        ? const Color(0xFFB3261E)
+        : _textPrimary(isDark);
+    final iconTint = item.onTap == null ? _mutedText(isDark) : accentColor;
 
-    return ListTile(
+    return InkWell(
       onTap: item.onTap,
-      leading: Icon(item.icon, color: accentColor),
-      title: Text(
-        item.label,
-        style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
-      ),
-      trailing: Icon(Icons.chevron_right, color: accentColor),
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-    );
-  }
-}
-
-class _LogoutCard extends StatelessWidget {
-  const _LogoutCard({required this.onLogout, required this.isDark});
-
-  final VoidCallback onLogout;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surfaceCard(isDark),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _cardBorder(isDark)),
-      ),
-      child: ListTile(
-        onTap: onLogout,
-        leading: const Icon(Icons.logout, color: Colors.red),
-        title: const Text(
-          'Log out',
-          style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: item.destructive
+                    ? (isDark
+                          ? const Color(0xFF2A1515)
+                          : const Color(0xFFFFF1F1))
+                    : (isDark
+                          ? const Color(0xFF172133)
+                          : const Color(0xFFF3F7FE)),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(item.icon, color: iconTint, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.label,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: textColor,
+                    ),
+                  ),
+                  if (item.subtitle != null &&
+                      item.subtitle!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      item.subtitle!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: _mutedText(isDark),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (item.trailing != null) ...[
+              item.trailing!,
+              const SizedBox(width: 8),
+            ],
+            Icon(
+              Icons.chevron_right_rounded,
+              color: item.onTap == null
+                  ? _cardBorder(isDark)
+                  : _mutedText(isDark),
+            ),
+          ],
         ),
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14),
       ),
     );
   }
@@ -3156,6 +3610,14 @@ Color _surfaceBg(bool isDark) => isDark ? AppColors.darkBg : AppColors.lightBg;
 
 Color _surfaceCard(bool isDark) =>
     isDark ? AppColors.darkSurface : Colors.white;
+
+List<BoxShadow> _cardShadow(bool isDark) => [
+  BoxShadow(
+    color: isDark ? const Color(0x33000000) : const Color(0x0F101828),
+    blurRadius: 22,
+    offset: const Offset(0, 10),
+  ),
+];
 
 Color _cardBorder(bool isDark) =>
     isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2);
