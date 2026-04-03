@@ -1,12 +1,11 @@
 import 'dart:async';
 
-import 'package:app_links/app_links.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
@@ -15,7 +14,6 @@ import '../../../shared/widgets/app_input_decoration.dart';
 import '../../home/controllers/home_controller.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../../profile/models/driver_document.dart';
-import '../../profile/services/stripe_connect_api.dart';
 import '../controllers/driver_onboarding_controller.dart';
 import '../routes/driver_routes.dart';
 
@@ -26,29 +24,24 @@ class DriverOnboardingView extends StatefulWidget {
   State<DriverOnboardingView> createState() => _DriverOnboardingViewState();
 }
 
-class _DriverOnboardingViewState extends State<DriverOnboardingView>
-    with WidgetsBindingObserver {
-  static const _steps = <String>[
-    'Car details',
-    'Documents',
-    'Stripe onboarding',
-  ];
+class _DriverOnboardingViewState extends State<DriverOnboardingView> {
+  static const _steps = <String>['Vehicle details', 'Documents'];
 
   late final DriverOnboardingController _driverController;
   late final ProfileController _profileController;
   late final SessionController _session;
-  late final AppLinks _appLinks;
-
-  StreamSubscription<Uri>? _stripeLinkSub;
+  late final TextEditingController _carMakeCtrl;
+  late final TextEditingController _carModelCtrl;
+  late final TextEditingController _carYearCtrl;
+  late final TextEditingController _carColorCtrl;
+  late final TextEditingController _plateCtrl;
   int _stepIndex = 0;
   String? _uploadingType;
   final Map<String, String?> _typeErrors = <String, String?>{};
-  bool _closingBrowserView = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
 
     _driverController = Get.isRegistered<DriverOnboardingController>()
         ? Get.find<DriverOnboardingController>()
@@ -59,29 +52,24 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
         : Get.put(ProfileController(), permanent: false);
 
     _session = Get.find<SessionController>();
-    _appLinks = AppLinks();
+    _carMakeCtrl = TextEditingController();
+    _carModelCtrl = TextEditingController();
+    _carYearCtrl = TextEditingController();
+    _carColorCtrl = TextEditingController();
+    _plateCtrl = TextEditingController();
 
     _seedFormFromExistingProfile();
-    unawaited(_listenForStripeReturnLinks());
     unawaited(_hydrateInitialStepState());
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    final sub = _stripeLinkSub;
-    if (sub != null) {
-      unawaited(sub.cancel());
-    }
+    _carMakeCtrl.dispose();
+    _carModelCtrl.dispose();
+    _carYearCtrl.dispose();
+    _carColorCtrl.dispose();
+    _plateCtrl.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(_closeInAppBrowserViewIfOpen());
-      unawaited(_profileController.refreshStripeConnectStatus(silent: true));
-    }
   }
 
   @override
@@ -92,7 +80,6 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
       final docs = _profileController.driverDocuments;
       final canContinueDocs = _areRequiredDocumentsUploaded(docs);
       final driverLoading = _driverController.loading.value;
-      final canFinalize = _canFinalizeStripeStep;
 
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -160,11 +147,7 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
                             ? (driverLoading
                                   ? null
                                   : _saveCarDetailsAndContinue)
-                            : _stepIndex == 1
-                            ? (canContinueDocs ? _continueToStripeStep : null)
-                            : () => _completeOnboarding(
-                                needsConfirmation: !canFinalize,
-                              ),
+                            : (canContinueDocs ? _completeOnboarding : null),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.driverPrimary,
                           foregroundColor: Colors.white,
@@ -185,11 +168,7 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
                             : Text(
                                 _stepIndex == 0
                                     ? 'Save & Continue'
-                                    : _stepIndex == 1
-                                    ? 'Continue'
-                                    : canFinalize
-                                    ? 'Finish onboarding'
-                                    : 'Finish later',
+                                    : 'Finish onboarding',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -212,8 +191,6 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
         return _buildCarDetailsStep(isDark);
       case 1:
         return _buildDocumentsStep(isDark);
-      case 2:
-        return _buildStripeStep(isDark);
       default:
         return const SizedBox.shrink();
     }
@@ -229,7 +206,7 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         children: [
           Text(
-            'Step 1 of 3: Vehicle details',
+            'Step 1 of 2: Vehicle details',
             style: TextStyle(
               fontWeight: FontWeight.w800,
               color: isDark ? AppColors.darkText : AppColors.lightText,
@@ -237,62 +214,60 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
           ),
           const SizedBox(height: 6),
           Text(
-            'Add your car and license details to create your driver profile.',
+            'Add the vehicle you will drive. Your selfie, license, and insurance uploads handle onboarding verification in the next step.',
             style: TextStyle(color: muted, height: 1.35),
           ),
           const SizedBox(height: 16),
           ExoField(
-            label: 'Car Make',
+            controller: _carMakeCtrl,
+            label: 'Car make',
             hint: 'Toyota',
             onChanged: _driverController.setCarMake,
             errorText: _driverController.fieldError('carMake'),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           ExoField(
-            label: 'Car Model',
-            hint: 'Camry',
+            controller: _carModelCtrl,
+            label: 'Car model',
+            hint: 'Corolla',
             onChanged: _driverController.setCarModel,
             errorText: _driverController.fieldError('carModel'),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           ExoField(
-            label: 'Car Year',
-            hint: '2022',
+            controller: _carYearCtrl,
+            label: 'Car year',
+            hint: '2020',
             keyboardType: TextInputType.number,
-            onChanged: _driverController.setCarYear,
-            errorText: _driverController.fieldError('carYear'),
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(4),
             ],
+            onChanged: _driverController.setCarYear,
+            errorText: _driverController.fieldError('carYear'),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           ExoField(
-            label: 'Car Color',
-            hint: 'Silver',
+            controller: _carColorCtrl,
+            label: 'Car color',
+            hint: 'White',
             onChanged: _driverController.setCarColor,
             errorText: _driverController.fieldError('carColor'),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           ExoField(
-            label: 'Plate Number',
-            hint: 'ABC-1234',
+            controller: _plateCtrl,
+            label: 'Plate number',
+            hint: 'ABC-123',
             onChanged: _driverController.setPlateNumber,
             errorText: _driverController.fieldError('plateNumber'),
           ),
-          const SizedBox(height: 12),
-          ExoField(
-            label: 'License Number',
-            hint: 'LIC-987654',
-            onChanged: _driverController.setLicenseNumber,
-            errorText: _driverController.fieldError('licenseNumber'),
-          ),
-          const SizedBox(height: 12),
-          ExoField(
-            label: 'Insurance Info (optional)',
-            hint: 'Provider / policy',
-            onChanged: _driverController.setInsuranceInfo,
-            errorText: _driverController.fieldError('insuranceInfo'),
+          const SizedBox(height: 14),
+          _OnboardingInfoCard(
+            isDark: isDark,
+            title: 'What happens next',
+            message:
+                'Upload your selfie, license, and insurance in step 2. Stripe payout setup and vehicle registration are only enforced after your first 5 completed rides.',
           ),
           if (err != null && err.trim().isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -324,7 +299,7 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         children: [
           Text(
-            'Step 2 of 3: Required documents',
+            'Step 2 of 2: Required documents',
             style: TextStyle(
               fontWeight: FontWeight.w800,
               color: isDark ? AppColors.darkText : AppColors.lightText,
@@ -332,7 +307,7 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
           ),
           const SizedBox(height: 6),
           Text(
-            'Upload the required documents so we can review your driver account.',
+            'Upload your selfie, license, and insurance to finish onboarding. Vehicle registration is deferred until after 5 completed rides.',
             style: TextStyle(color: muted, height: 1.35),
           ),
           if (docsLoading) ...[
@@ -340,239 +315,50 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
             const LinearProgressIndicator(minHeight: 2),
           ],
           const SizedBox(height: 14),
-          for (int i = 0; i < _onboardingDocRequirements.length; i++) ...[
+          for (final requirement in _onboardingDocRequirements.where(
+            (item) => item.required,
+          )) ...[
             _DocumentUploadCard(
-              requirement: _onboardingDocRequirements[i],
-              documents: _documentsForRequirement(
-                docs,
-                _onboardingDocRequirements[i],
-              ),
+              requirement: requirement,
+              documents: _documentsForRequirement(docs, requirement),
               isDark: isDark,
               busy: docsUploading || _uploadingType != null,
-              isUploading:
-                  docsUploading &&
-                  _uploadingType == _onboardingDocRequirements[i].type,
-              errorText: _typeErrors[_onboardingDocRequirements[i].type],
-              onUpload: () => _pickAndUpload(_onboardingDocRequirements[i]),
+              isUploading: docsUploading && _uploadingType == requirement.type,
+              errorText: _typeErrors[requirement.type],
+              onUpload: () => _pickAndUpload(requirement),
             ),
-            if (i != _onboardingDocRequirements.length - 1)
-              const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ],
+          _OnboardingInfoCard(
+            isDark: isDark,
+            title: 'Required later after 5 completed rides',
+            message:
+                'Upload your vehicle registration and finish Stripe payout setup from Profile before publishing ride number 6.',
+          ),
+          const SizedBox(height: 12),
+          for (final requirement in _onboardingDocRequirements.where(
+            (item) => !item.required,
+          )) ...[
+            _DocumentUploadCard(
+              requirement: requirement,
+              documents: _documentsForRequirement(docs, requirement),
+              isDark: isDark,
+              busy: docsUploading || _uploadingType != null,
+              isUploading: docsUploading && _uploadingType == requirement.type,
+              errorText: _typeErrors[requirement.type],
+              onUpload: () => _pickAndUpload(requirement),
+            ),
+            const SizedBox(height: 12),
           ],
           const SizedBox(height: 12),
           Text(
             canContinue
-                ? 'All required documents uploaded. Continue to Stripe onboarding.'
-                : 'Upload all required documents (license, insurance, ownership) to continue.',
+                ? 'Selfie, license, and insurance received. You can finish onboarding now.'
+                : 'Upload your selfie, license, and insurance to finish onboarding.',
             style: TextStyle(
               color: canContinue ? AppColors.passengerPrimary : muted,
               fontWeight: FontWeight.w600,
               fontSize: 12,
-            ),
-          ),
-        ],
-      );
-    });
-  }
-
-  Widget _buildStripeStep(bool isDark) {
-    return Obx(() {
-      final status = _profileController.stripeConnectStatus.value;
-      final loading = _profileController.stripeStatusLoading.value;
-      final onboardingLoading =
-          _profileController.stripeOnboardingLoading.value;
-      final dashboardLoading = _profileController.stripeDashboardLoading.value;
-      final error = _profileController.stripeConnectError.value;
-
-      final uiState = _stripeStepUiState(status, loading: loading);
-      final isReady = uiState.ready;
-      final requiresInformation = uiState.requiresInformation;
-      final setupLabel = status.hasStripeAccount
-          ? 'Continue Stripe setup'
-          : 'Set up payouts';
-
-      return ListView(
-        key: const ValueKey('stripe-step'),
-        children: [
-          Text(
-            'Step 3 of 3: Stripe payout setup',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: isDark ? AppColors.darkText : AppColors.lightText,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Connect Stripe so we can send your payouts securely.',
-            style: TextStyle(
-              color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkSurface : Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isDark
-                    ? const Color(0xFF232836)
-                    : const Color(0xFFE6EAF2),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.account_balance_wallet_outlined,
-                      color: isDark ? AppColors.darkText : AppColors.lightText,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Stripe Connect',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: isDark
-                              ? AppColors.darkText
-                              : AppColors.lightText,
-                        ),
-                      ),
-                    ),
-                    _StripeStatusPill(
-                      label: uiState.label,
-                      ready: isReady,
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  uiState.message,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                  ),
-                ),
-                if (status.requirementsCurrentlyDue.isNotEmpty &&
-                    requiresInformation) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    'Required information',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? AppColors.darkText : AppColors.lightText,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  ..._buildRequirementItems(
-                    status.requirementsCurrentlyDue,
-                    isDark: isDark,
-                  ),
-                ],
-                if (status.requirementsPendingVerification.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    'Pending verification',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? AppColors.darkText : AppColors.lightText,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  ..._buildRequirementItems(
-                    status.requirementsPendingVerification,
-                    isDark: isDark,
-                  ),
-                ],
-                if ((status.disabledReason ?? '').trim().isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    'Status reason: ${_formatRequirement(status.disabledReason!)}',
-                    style: TextStyle(
-                      color: isDark
-                          ? AppColors.darkMuted
-                          : AppColors.lightMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-                if (error != null && error.trim().isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    error,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (uiState.showOnboardingButton)
-                      ElevatedButton(
-                        onPressed: onboardingLoading
-                            ? null
-                            : () => _openStripeOnboarding(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.driverPrimary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: onboardingLoading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                setupLabel,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                      ),
-                    if (status.hasStripeAccount) ...[
-                      if (uiState.showOnboardingButton)
-                        const SizedBox(height: 8),
-                      OutlinedButton(
-                        onPressed: dashboardLoading
-                            ? null
-                            : () => _openStripeDashboard(context),
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: dashboardLoading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text(
-                                'Open payout dashboard',
-                                style: TextStyle(fontWeight: FontWeight.w700),
-                              ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
             ),
           ),
         ],
@@ -591,14 +377,6 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
     setState(() => _stepIndex = 1);
     await _profileController.refreshDriverProfile();
     await _profileController.refreshDriverDocuments();
-    await _profileController.refreshStripeConnectStatus(silent: true);
-  }
-
-  Future<void> _continueToStripeStep() async {
-    final ready = await _ensureDriverProfileReadyForStripe();
-    if (!ready || !mounted) return;
-    setState(() => _stepIndex = 2);
-    await _profileController.refreshStripeConnectStatus();
   }
 
   void _goBackStep() {
@@ -606,32 +384,7 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
     setState(() => _stepIndex -= 1);
   }
 
-  Future<void> _completeOnboarding({required bool needsConfirmation}) async {
-    if (needsConfirmation) {
-      final proceed = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) {
-          return AlertDialog(
-            title: const Text('Finish for now?'),
-            content: const Text(
-              'Stripe setup still needs action. You can finish now and complete Stripe later from your profile.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Finish now'),
-              ),
-            ],
-          );
-        },
-      );
-      if (proceed != true || !mounted) return;
-    }
-
+  Future<void> _completeOnboarding() async {
     await _session.bootstrap();
 
     if (!mounted) return;
@@ -658,38 +411,27 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
     });
 
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowMultiple: false,
-        allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
-      );
-      if (!mounted || result == null || result.files.isEmpty) return;
-
-      final file = result.files.single;
-      final path = file.path;
-      if (path == null || path.trim().isEmpty) {
-        _setTypeError(requirement.type, 'Could not read selected file.');
-        return;
-      }
-
-      final fileName = file.name.trim().isNotEmpty
-          ? file.name.trim()
-          : path.split('/').last;
-      final mimeType =
-          lookupMimeType(path, headerBytes: file.bytes) ??
-          _mimeTypeForExt(file.extension);
+      final pickedFile = await _pickUploadFile(requirement);
+      if (!mounted || pickedFile == null) return;
+      final messenger = ScaffoldMessenger.of(context);
 
       await _profileController.uploadDriverDocument(
         type: requirement.type,
-        filePath: path,
-        fileName: fileName,
-        mimeType: mimeType,
+        filePath: pickedFile.path,
+        fileName: pickedFile.fileName,
+        mimeType: pickedFile.mimeType,
       );
 
       _setTypeError(requirement.type, null);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${requirement.title} uploaded successfully.')),
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            requirement.type == 'selfie'
+                ? '${requirement.title} uploaded and set as your profile photo.'
+                : '${requirement.title} uploaded successfully.',
+          ),
+        ),
       );
     } catch (e) {
       _setTypeError(requirement.type, _cleanError(e));
@@ -709,9 +451,111 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
     setState(() => _typeErrors[type] = message);
   }
 
-  bool get _canFinalizeStripeStep {
-    final status = _profileController.stripeConnectStatus.value;
-    return status.payoutsReady || status.pendingVerification;
+  Future<_PickedDriverDocumentFile?> _pickUploadFile(
+    _OnboardingDocumentRequirement requirement,
+  ) async {
+    if (requirement.photoOnly) {
+      return _pickSelfiePhoto();
+    }
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowMultiple: false,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
+    );
+    if (!mounted || result == null || result.files.isEmpty) return null;
+
+    final file = result.files.single;
+    final path = file.path;
+    if (path == null || path.trim().isEmpty) {
+      _setTypeError(requirement.type, 'Could not read selected file.');
+      return null;
+    }
+
+    final fileName = file.name.trim().isNotEmpty
+        ? file.name.trim()
+        : path.split('/').last;
+    final mimeType =
+        lookupMimeType(path, headerBytes: file.bytes) ??
+        _mimeTypeForExt(file.extension);
+
+    return _PickedDriverDocumentFile(
+      path: path,
+      fileName: fileName,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<_PickedDriverDocumentFile?> _pickSelfiePhoto() async {
+    final source = await _promptSelfieSource();
+    if (!mounted || source == null) return null;
+
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: source,
+      preferredCameraDevice: CameraDevice.front,
+      imageQuality: 86,
+      maxWidth: 1600,
+    );
+    if (!mounted || image == null) return null;
+
+    final fileName = image.name.trim().isNotEmpty
+        ? image.name.trim()
+        : image.path.split('/').last;
+    return _PickedDriverDocumentFile(
+      path: image.path,
+      fileName: fileName,
+      mimeType: lookupMimeType(image.path) ?? 'image/jpeg',
+    );
+  }
+
+  Future<ImageSource?> _promptSelfieSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final textColor = isDark ? AppColors.darkText : AppColors.lightText;
+        final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add selfie photo',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Use a clear front-facing photo that matches your driver documents. This selfie will also become your profile photo.',
+                  style: TextStyle(color: muted, height: 1.35),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.camera_alt_outlined),
+                  title: const Text('Take selfie'),
+                  onTap: () => Navigator.of(context).pop(ImageSource.camera),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('Choose existing photo'),
+                  onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   bool _areRequiredDocumentsUploaded(List<DriverDocument> docs) {
@@ -719,7 +563,11 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
       (r) => r.required,
     )) {
       final uploaded = _documentsForRequirement(docs, requirement);
-      if (uploaded.isEmpty) return false;
+      final hasAcceptedUpload = uploaded.any((document) {
+        final status = (document.status ?? '').trim().toLowerCase();
+        return status != 'rejected';
+      });
+      if (!hasAcceptedUpload) return false;
     }
     return true;
   }
@@ -739,145 +587,16 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
     return raw.trim().toLowerCase().replaceAll(RegExp(r'[\s\-]'), '_');
   }
 
-  Future<void> _openStripeOnboarding(BuildContext context) async {
-    try {
-      final ready = await _ensureDriverProfileReadyForStripe();
-      if (!ready) return;
-      final uri = await _profileController.createStripeOnboardingUri();
-      await _launchStripeInBrowser(
-        uri,
-        failureMessage: 'Could not open Stripe onboarding.',
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_cleanError(e))));
-    }
-  }
-
-  Future<void> _openStripeDashboard(BuildContext context) async {
-    try {
-      final uri = await _profileController.createStripeDashboardUri();
-      await _launchStripeInBrowser(
-        uri,
-        failureMessage: 'Could not open Stripe dashboard.',
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_cleanError(e))));
-    }
-  }
-
-  Future<void> _launchStripeInBrowser(
-    Uri uri, {
-    required String failureMessage,
-  }) async {
-    final openedInExternalBrowser = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
-    if (openedInExternalBrowser) return;
-
-    final openedInBrowserView = await launchUrl(
-      uri,
-      mode: LaunchMode.inAppBrowserView,
-    );
-    if (!openedInBrowserView) {
-      throw Exception(failureMessage);
-    }
-  }
-
   Future<void> _hydrateInitialStepState() async {
     await _profileController.refreshDriverProfile();
     await _profileController.refreshDriverDocuments(silent: true);
-    await _profileController.refreshStripeConnectStatus(silent: true);
     if (!mounted) return;
 
     final hasDriverProfile =
         _session.user.value?.driverProfile != null ||
         _profileController.driverProfile.value != null;
     if (!hasDriverProfile) return;
-    final docsReady = _areRequiredDocumentsUploaded(
-      _profileController.driverDocuments,
-    );
-    setState(() => _stepIndex = docsReady ? 2 : 1);
-  }
-
-  Future<bool> _ensureDriverProfileReadyForStripe() async {
-    await _profileController.refreshDriverProfile();
-
-    final hasDriverProfile =
-        _session.user.value?.driverProfile != null ||
-        _profileController.driverProfile.value != null;
-    if (hasDriverProfile) {
-      return true;
-    }
-
-    final saved = await _driverController.submit(
-      refreshSession: false,
-      closeOnRoute: false,
-    );
-    if (!saved) return false;
-
-    await _profileController.refreshDriverProfile();
-    return _session.user.value?.driverProfile != null ||
-        _profileController.driverProfile.value != null;
-  }
-
-  Future<void> _listenForStripeReturnLinks() async {
-    try {
-      final initial = await _appLinks.getInitialLink();
-      if (initial != null) {
-        _handleIncomingAppLink(initial);
-      }
-    } catch (_) {
-      // Ignore initial app-link read failures.
-    }
-
-    _stripeLinkSub = _appLinks.uriLinkStream.listen(
-      _handleIncomingAppLink,
-      onError: (_) {
-        // Ignore stream failures.
-      },
-    );
-  }
-
-  void _handleIncomingAppLink(Uri uri) {
-    if (!_isStripeReturnUri(uri)) return;
-    unawaited(_closeInAppBrowserViewIfOpen());
-    unawaited(_profileController.refreshStripeConnectStatus(silent: true));
-  }
-
-  bool _isStripeReturnUri(Uri uri) {
-    final normalizedPath = uri.path.trim().toLowerCase().replaceFirst(
-      RegExp(r'/+$'),
-      '',
-    );
-    if (normalizedPath == '/stripe/return') {
-      return true;
-    }
-
-    final normalizedHost = uri.host.trim().toLowerCase();
-    return normalizedHost == 'stripe' && normalizedPath == '/return';
-  }
-
-  Future<void> _closeInAppBrowserViewIfOpen() async {
-    if (_closingBrowserView) return;
-    _closingBrowserView = true;
-    try {
-      final supportsClose = await supportsCloseForLaunchMode(
-        LaunchMode.inAppBrowserView,
-      );
-      if (!supportsClose) return;
-      await closeInAppWebView();
-    } catch (_) {
-      // Ignore close failures when no browser view is active.
-    } finally {
-      _closingBrowserView = false;
-    }
+    setState(() => _stepIndex = 1);
   }
 
   void _seedFormFromExistingProfile() {
@@ -889,6 +608,11 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
     _driverController.setCarYear(profile.carYear ?? '');
     _driverController.setCarColor(profile.carColor ?? '');
     _driverController.setPlateNumber(profile.plateNumber ?? '');
+    _carMakeCtrl.text = profile.carMake ?? '';
+    _carModelCtrl.text = profile.carModel ?? '';
+    _carYearCtrl.text = profile.carYear ?? '';
+    _carColorCtrl.text = profile.carColor ?? '';
+    _plateCtrl.text = profile.plateNumber ?? '';
     _driverController.setLicenseNumber(profile.licenseNumber ?? '');
     _driverController.setInsuranceInfo(profile.insuranceInfo ?? '');
   }
@@ -897,135 +621,6 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView>
     if (!Get.isRegistered<HomeController>()) return;
     Get.find<HomeController>().setRole(HomeRole.passenger);
     Get.offAllNamed(AppRoutes.shell);
-  }
-
-  String _formatRequirement(String value) {
-    final normalized = value
-        .replaceAll('.', ' ')
-        .replaceAll('_', ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-    if (normalized.isEmpty) return value;
-    return '${normalized[0].toUpperCase()}${normalized.substring(1)}';
-  }
-
-  List<Widget> _buildRequirementItems(
-    List<String> rawItems, {
-    required bool isDark,
-    int maxVisible = 3,
-  }) {
-    final items = rawItems.map(_formatRequirement).toList(growable: false);
-    if (items.isEmpty) return const <Widget>[];
-
-    final visible = items.take(maxVisible).toList(growable: false);
-    final hasMore = items.length > visible.length;
-    final widgets = <Widget>[
-      for (final item in visible)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Icon(
-                  Icons.circle,
-                  size: 6,
-                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  item,
-                  style: TextStyle(
-                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-    ];
-
-    if (hasMore) {
-      widgets.add(
-        Text(
-          '+${items.length - visible.length} more',
-          style: TextStyle(
-            color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
-    }
-
-    return widgets;
-  }
-
-  _StripeStepUiState _stripeStepUiState(
-    StripeConnectStatus status, {
-    required bool loading,
-  }) {
-    if (loading) {
-      return const _StripeStepUiState(
-        label: 'Checking',
-        message: 'Checking Stripe status...',
-        ready: false,
-        requiresInformation: false,
-        showOnboardingButton: false,
-      );
-    }
-
-    if (!status.hasStripeAccount) {
-      return const _StripeStepUiState(
-        label: 'Not started',
-        message: 'Start Stripe onboarding to receive payouts.',
-        ready: false,
-        requiresInformation: false,
-        showOnboardingButton: true,
-      );
-    }
-
-    switch (status.statusSummary) {
-      case StripeConnectStatusSummary.ready:
-        return const _StripeStepUiState(
-          label: 'Payouts ready',
-          message: 'Your payout setup is complete.',
-          ready: true,
-          requiresInformation: false,
-          showOnboardingButton: false,
-        );
-      case StripeConnectStatusSummary.pendingVerification:
-        return const _StripeStepUiState(
-          label: 'Pending review',
-          message: 'Stripe is reviewing, no action needed yet.',
-          ready: false,
-          requiresInformation: false,
-          showOnboardingButton: false,
-        );
-      case StripeConnectStatusSummary.requiresInformation:
-        return const _StripeStepUiState(
-          label: 'Action required',
-          message: 'Continue onboarding',
-          ready: false,
-          requiresInformation: true,
-          showOnboardingButton: true,
-        );
-      case StripeConnectStatusSummary.unknown:
-        return _StripeStepUiState(
-          label: status.payoutsReady ? 'Payouts ready' : 'Not started',
-          message: status.payoutsReady
-              ? 'Your payout setup is complete.'
-              : 'Start Stripe onboarding to receive payouts.',
-          ready: status.payoutsReady,
-          requiresInformation: status.requiresInformation,
-          showOnboardingButton:
-              status.requiresInformation || !status.hasStripeAccount,
-        );
-    }
   }
 
   String _cleanError(Object error) {
@@ -1117,6 +712,7 @@ class _StepHeader extends StatelessWidget {
 class ExoField extends StatelessWidget {
   const ExoField({
     super.key,
+    this.controller,
     required this.label,
     required this.hint,
     required this.onChanged,
@@ -1125,6 +721,7 @@ class ExoField extends StatelessWidget {
     this.inputFormatters,
   });
 
+  final TextEditingController? controller;
   final String label;
   final String hint;
   final ValueChanged<String> onChanged;
@@ -1147,6 +744,7 @@ class ExoField extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         TextField(
+          controller: controller,
           keyboardType: keyboardType,
           onChanged: onChanged,
           onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
@@ -1171,6 +769,7 @@ class _OnboardingDocumentRequirement {
     required this.buttonLabel,
     required this.required,
     this.aliases = const [],
+    this.photoOnly = false,
   });
 
   final String type;
@@ -1179,9 +778,20 @@ class _OnboardingDocumentRequirement {
   final String buttonLabel;
   final bool required;
   final List<String> aliases;
+  final bool photoOnly;
 }
 
 const _onboardingDocRequirements = <_OnboardingDocumentRequirement>[
+  _OnboardingDocumentRequirement(
+    type: 'selfie',
+    title: 'Selfie Photo',
+    description:
+        'Take or upload a clear selfie photo so HelpRide can match your account to your driver documents and use it as your profile photo.',
+    buttonLabel: 'selfie photo',
+    required: true,
+    aliases: ['driver_selfie', 'photo_selfie'],
+    photoOnly: true,
+  ),
   _OnboardingDocumentRequirement(
     type: 'license',
     title: 'Driver License',
@@ -1202,9 +812,9 @@ const _onboardingDocRequirements = <_OnboardingDocumentRequirement>[
     type: 'ownership',
     title: 'Ownership / Registration',
     description:
-        'Upload ownership proof (vehicle title/ownership or registration).',
-    buttonLabel: 'ownership document',
-    required: true,
+        'Upload ownership proof or vehicle registration before you publish ride number 6.',
+    buttonLabel: 'registration document',
+    required: false,
     aliases: [
       'registration',
       'vehicle_registration',
@@ -1214,6 +824,18 @@ const _onboardingDocRequirements = <_OnboardingDocumentRequirement>[
     ],
   ),
 ];
+
+class _PickedDriverDocumentFile {
+  const _PickedDriverDocumentFile({
+    required this.path,
+    required this.fileName,
+    required this.mimeType,
+  });
+
+  final String path;
+  final String fileName;
+  final String mimeType;
+}
 
 class _DocumentUploadCard extends StatelessWidget {
   const _DocumentUploadCard({
@@ -1263,27 +885,29 @@ class _DocumentUploadCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (requirement.required)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.driverPrimary.withValues(
-                      alpha: isDark ? 0.30 : 0.14,
-                    ),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Text(
-                    'Required',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 11,
-                      color: AppColors.driverPrimary,
-                    ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: requirement.required
+                      ? AppColors.driverPrimary.withValues(
+                          alpha: isDark ? 0.30 : 0.14,
+                        )
+                      : (isDark
+                            ? const Color(0xFF1B202B)
+                            : const Color(0xFFF0F3F8)),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  requirement.required ? 'Required' : 'Later',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    color: requirement.required
+                        ? AppColors.driverPrimary
+                        : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
                   ),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -1342,55 +966,49 @@ class _DocumentUploadCard extends StatelessWidget {
   }
 }
 
-class _StripeStepUiState {
-  const _StripeStepUiState({
-    required this.label,
-    required this.message,
-    required this.ready,
-    required this.requiresInformation,
-    required this.showOnboardingButton,
-  });
-
-  final String label;
-  final String message;
-  final bool ready;
-  final bool requiresInformation;
-  final bool showOnboardingButton;
-}
-
-class _StripeStatusPill extends StatelessWidget {
-  const _StripeStatusPill({
-    required this.label,
-    required this.ready,
+class _OnboardingInfoCard extends StatelessWidget {
+  const _OnboardingInfoCard({
     required this.isDark,
+    required this.title,
+    required this.message,
   });
 
-  final String label;
-  final bool ready;
   final bool isDark;
+  final String title;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    final bg = ready
-        ? (isDark ? const Color(0xFF14382B) : const Color(0xFFE8FAF3))
-        : (isDark ? const Color(0xFF1B202B) : const Color(0xFFF0F3F8));
-    final color = ready
-        ? AppColors.passengerPrimary
-        : (isDark ? AppColors.darkMuted : AppColors.lightMuted);
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w700,
-          fontSize: 11,
+        color: isDark ? const Color(0xFF111827) : const Color(0xFFF7F9FD),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF232836) : const Color(0xFFE1E7F0),
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: isDark ? AppColors.darkText : AppColors.lightText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            style: TextStyle(
+              color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }

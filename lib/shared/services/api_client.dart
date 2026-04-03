@@ -545,17 +545,23 @@ class ApiClient {
     }
 
     _isRedirectingToVerifyEmail = true;
+    final session = Get.isRegistered<SessionController>()
+        ? Get.find<SessionController>()
+        : null;
+    final hasAuthenticatedSession =
+        session?.status.value == SessionStatus.authenticated;
     final email =
         _extractEmail(error.response?.data) ??
         _extractEmail(error.requestOptions.data);
     Future.microtask(() {
       try {
         if (Get.currentRoute == _verifyEmailRoute) return;
-        if (email != null) {
-          Get.offAllNamed(_verifyEmailRoute, arguments: {'email': email});
-        } else {
-          Get.offAllNamed(_verifyEmailRoute);
-        }
+        final arguments = <String, dynamic>{
+          'allowBackToLogin': !hasAuthenticatedSession,
+          if (hasAuthenticatedSession) 'provider': session?.authProvider,
+          if (email != null) 'email': email,
+        };
+        Get.offAllNamed(_verifyEmailRoute, arguments: arguments);
       } finally {
         _isRedirectingToVerifyEmail = false;
       }

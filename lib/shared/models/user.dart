@@ -3,6 +3,8 @@ class User {
   final String name;
   final String email;
   final String? phone;
+  final String? pendingEmail;
+  final String? pendingPhone;
   final bool phoneVerified;
   final bool emailVerified;
   final String? authProvider;
@@ -19,6 +21,8 @@ class User {
     required this.name,
     required this.email,
     this.phone,
+    this.pendingEmail,
+    this.pendingPhone,
     required this.phoneVerified,
     required this.emailVerified,
     this.authProvider,
@@ -40,6 +44,8 @@ class User {
       name: json['name']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       phone: json['phone']?.toString(),
+      pendingEmail: json['pendingEmail']?.toString(),
+      pendingPhone: json['pendingPhone']?.toString(),
       phoneVerified: _parseBool(
         json['phoneVerified'] ??
             json['isPhoneVerified'] ??

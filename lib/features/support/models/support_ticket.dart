@@ -4,6 +4,7 @@ class SupportTicket {
     required this.userId,
     required this.subject,
     required this.description,
+    required this.attachmentUrl,
     required this.status,
     required this.adminResponse,
     required this.createdAt,
@@ -14,6 +15,7 @@ class SupportTicket {
   final String userId;
   final String subject;
   final String description;
+  final String? attachmentUrl;
   final SupportTicketStatus status;
   final String? adminResponse;
   final DateTime createdAt;
@@ -25,6 +27,7 @@ class SupportTicket {
       userId: (json['userId'] ?? '').toString(),
       subject: (json['subject'] ?? '').toString(),
       description: (json['description'] ?? '').toString(),
+      attachmentUrl: json['attachmentUrl']?.toString(),
       status: SupportTicketStatusX.fromValue(json['status']),
       adminResponse: json['adminResponse']?.toString(),
       createdAt: _parseDate(json['createdAt']),
@@ -37,6 +40,7 @@ class SupportTicket {
     String? userId,
     String? subject,
     String? description,
+    String? attachmentUrl,
     SupportTicketStatus? status,
     String? adminResponse,
     DateTime? createdAt,
@@ -47,6 +51,7 @@ class SupportTicket {
       userId: userId ?? this.userId,
       subject: subject ?? this.subject,
       description: description ?? this.description,
+      attachmentUrl: attachmentUrl ?? this.attachmentUrl,
       status: status ?? this.status,
       adminResponse: adminResponse ?? this.adminResponse,
       createdAt: createdAt ?? this.createdAt,
@@ -84,7 +89,6 @@ extension SupportTicketStatusX on SupportTicketStatus {
       case SupportTicketStatus.closed:
         return 'closed';
       case SupportTicketStatus.open:
-      default:
         return 'open';
     }
   }
@@ -98,7 +102,6 @@ extension SupportTicketStatusX on SupportTicketStatus {
       case SupportTicketStatus.closed:
         return 'Closed';
       case SupportTicketStatus.open:
-      default:
         return 'Open';
     }
   }

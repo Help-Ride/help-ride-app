@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:help_ride/core/routes/app_routes.dart';
 import 'package:help_ride/features/auth/services/auth_analytics.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_exception.dart';
@@ -159,7 +158,7 @@ class AuthCodeController extends GetxController {
 
         final session = Get.find<SessionController>();
         await session.bootstrap();
-        Get.offAllNamed(AppRoutes.shell);
+        await session.openVerifiedAppDestination();
         return;
       }
 

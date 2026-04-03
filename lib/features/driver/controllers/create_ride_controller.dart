@@ -1,9 +1,12 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../core/routes/app_routes.dart';
 import '../models/ride_pricing_preview.dart';
 import '../../rides/utils/ride_recurrence.dart';
+import '../../../shared/services/api_exception.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/utils/input_validators.dart';
 import '../../../shared/widgets/place_picker_field.dart';
@@ -207,9 +210,11 @@ class CreateRideController extends GetxController {
     _refreshComputedState();
   }
 
-  List<DateTime> get recurringOccurrenceStarts => _buildRecurringOccurrenceStarts();
+  List<DateTime> get recurringOccurrenceStarts =>
+      _buildRecurringOccurrenceStarts();
 
-  String get recurrenceDaysLabel => formatRideRecurrenceDays(selectedRecurrenceDays);
+  String get recurrenceDaysLabel =>
+      formatRideRecurrenceDays(selectedRecurrenceDays);
 
   bool _computeCanPublish() {
     final recurringValid =
@@ -273,9 +278,9 @@ class CreateRideController extends GetxController {
 
     final end = recurrenceEndDate.value;
     if (end == null || _dateOnly(end).isBefore(_dateOnly(selectedDate))) {
-      recurrenceEndDate.value = _dateOnly(selectedDate).add(
-        const Duration(days: 28),
-      );
+      recurrenceEndDate.value = _dateOnly(
+        selectedDate,
+      ).add(const Duration(days: 28));
     }
   }
 
@@ -305,7 +310,9 @@ class CreateRideController extends GetxController {
     final from = fromPick.value?.latLng;
     final to = toPick.value?.latLng;
     final departure = isRecurring
-        ? (recurringOccurrenceStarts.isEmpty ? null : recurringOccurrenceStarts.first)
+        ? (recurringOccurrenceStarts.isEmpty
+              ? null
+              : recurringOccurrenceStarts.first)
         : startDateTimeLocal;
     final seats = int.tryParse(seatsCtrl.text.trim());
     final basePrice = double.tryParse(priceCtrl.text.trim());
@@ -390,7 +397,9 @@ class CreateRideController extends GetxController {
     required double finalPrice,
     required int createdCount,
   }) {
-    final rideLabel = createdCount > 1 ? '$createdCount rides created' : 'Ride created';
+    final rideLabel = createdCount > 1
+        ? '$createdCount rides created'
+        : 'Ride created';
     if ((finalPrice - inputPrice).abs() >= 0.01) {
       Get.snackbar(
         'Published',
@@ -481,8 +490,7 @@ class CreateRideController extends GetxController {
             createdRide['pricePerSeat'] ?? createdRide['price_per_seat'],
           ) ??
           basePrice;
-      final createdCount =
-          (createdRide['createdCount'] as num?)?.toInt() ?? 1;
+      final createdCount = (createdRide['createdCount'] as num?)?.toInt() ?? 1;
       final createdRideType =
           (createdRide['rideType'] ?? createdRide['ride_type'] ?? 'one-time')
               .toString()
@@ -524,11 +532,36 @@ class CreateRideController extends GetxController {
         createdCount: createdCount,
       );
     } catch (e) {
-      error.value = e.toString();
+      error.value = _normalizePublishError(e);
+      if (_isDeferredComplianceError(e)) {
+        Get.offAllNamed(AppRoutes.shell, arguments: const {'tab': 'profile'});
+      }
       Get.snackbar('Failed', error.value ?? 'Failed');
     } finally {
       loading.value = false;
     }
+  }
+
+  bool _isDeferredComplianceError(Object error) {
+    if (error is! DioException || error.error is! ApiException) {
+      return false;
+    }
+
+    final details = (error.error as ApiException).details;
+    if (details is! Map) return false;
+    final code = details['code']?.toString().trim().toUpperCase();
+    return code == 'DRIVER_COMPLIANCE_REQUIRED';
+  }
+
+  String _normalizePublishError(Object error) {
+    if (error is DioException && error.error is ApiException) {
+      final apiError = error.error as ApiException;
+      if (_isDeferredComplianceError(error)) {
+        return 'Finish Stripe payout setup and upload vehicle registration from your profile before creating another ride.';
+      }
+      return apiError.message;
+    }
+    return error.toString().replaceFirst('Exception: ', '').trim();
   }
 }
 

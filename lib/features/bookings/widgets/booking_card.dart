@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/user_avatar.dart';
 import '../models/booking.dart';
 import '../utils/booking_formatters.dart';
 
@@ -37,7 +38,9 @@ class BookingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = b.status.toLowerCase();
     final driverName = (b.ride.driver?.name ?? '').trim();
+    final driverAvatarUrl = (b.ride.driver?.avatarUrl ?? '').trim();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -112,21 +115,32 @@ class BookingCard extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 formatDateTime(b.ride.startTime),
-                style: TextStyle(
-                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                style: TextStyle(color: muted),
+              ),
+              const Spacer(),
+              UserAvatar(
+                name: driverName.isNotEmpty ? driverName : 'Driver',
+                avatarUrl: driverAvatarUrl,
+                radius: 11,
+                backgroundColor: isDark
+                    ? const Color(0xFF1C2331)
+                    : const Color(0xFFE9EEF6),
+                foregroundColor: isDark
+                    ? AppColors.darkText
+                    : AppColors.lightText,
+                textStyle: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                  color: isDark ? AppColors.darkText : AppColors.lightText,
                 ),
               ),
-              const SizedBox(width: 14),
-              Icon(
-                Icons.person_outline,
-                size: 18,
-                color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                driverName.isNotEmpty ? driverName : shortId(b.ride.driverId),
-                style: TextStyle(
-                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  driverName.isNotEmpty ? driverName : shortId(b.ride.driverId),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: muted),
                 ),
               ),
             ],

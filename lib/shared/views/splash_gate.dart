@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/session_controller.dart';
-import '../services/push_notification_service.dart';
-import '../../core/routes/app_routes.dart';
 import '../../features/auth/routes/auth_routes.dart';
 
 class SplashGate extends StatelessWidget {
@@ -17,8 +15,9 @@ class SplashGate extends StatelessWidget {
 
       if (s == SessionStatus.authenticated) {
         Future.microtask(() async {
-          await Get.offAllNamed(AppRoutes.shell);
-          await PushNotificationService.instance.flushPendingNavigation();
+          await session.openVerifiedAppDestination(
+            flushPendingNavigation: true,
+          );
         });
       } else if (s == SessionStatus.unauthenticated) {
         Future.microtask(() => Get.offAllNamed(AuthRoutes.login));

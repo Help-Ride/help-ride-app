@@ -81,20 +81,22 @@ class DriverRideSeriesController extends GetxController {
     if (currentSeries == null) return const <DriverRideItem>[];
 
     final now = DateTime.now();
-    final filtered = currentSeries.occurrences.where((ride) {
-      switch (occurrenceFilter.value) {
-        case DriverRideOccurrenceFilter.all:
-          return true;
-        case DriverRideOccurrenceFilter.upcoming:
-          return ride.startTime.isAfter(now);
-        case DriverRideOccurrenceFilter.modified:
-          return currentSeries.isModifiedOccurrence(ride);
-        case DriverRideOccurrenceFilter.cancelled:
-          return ride.isCancelled;
-        case DriverRideOccurrenceFilter.completed:
-          return ride.isCompleted;
-      }
-    }).toList(growable: false);
+    final filtered = currentSeries.occurrences
+        .where((ride) {
+          switch (occurrenceFilter.value) {
+            case DriverRideOccurrenceFilter.all:
+              return currentSeries.shouldSurfaceInOverview(ride);
+            case DriverRideOccurrenceFilter.upcoming:
+              return ride.startTime.isAfter(now) && !ride.isCancelled;
+            case DriverRideOccurrenceFilter.modified:
+              return currentSeries.isModifiedOccurrence(ride);
+            case DriverRideOccurrenceFilter.cancelled:
+              return ride.isCancelled;
+            case DriverRideOccurrenceFilter.completed:
+              return ride.isEffectivelyCompleted;
+          }
+        })
+        .toList(growable: false);
 
     filtered.sort((left, right) => left.startTime.compareTo(right.startTime));
     return filtered;

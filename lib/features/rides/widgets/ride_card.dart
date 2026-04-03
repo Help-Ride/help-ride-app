@@ -44,7 +44,10 @@ class RideCard extends GetView<SearchRidesController> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Avatar(initials: initials(driverName)),
+              Avatar(
+                initials: initials(driverName),
+                avatarUrl: driver?.avatarUrl,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -104,10 +107,7 @@ class RideCard extends GetView<SearchRidesController> {
                   ),
                   Text(
                     'per seat',
-                    style: TextStyle(
-                      color: muted,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(color: muted, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -123,7 +123,9 @@ class RideCard extends GetView<SearchRidesController> {
               color: cardTint,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: isDark ? const Color(0xFF232836) : const Color(0xFFE9EEF6),
+                color: isDark
+                    ? const Color(0xFF232836)
+                    : const Color(0xFFE9EEF6),
               ),
             ),
             child: Column(
@@ -181,9 +183,14 @@ class RideCard extends GetView<SearchRidesController> {
                           ? 'Direct ride'
                           : '${stops.length} stop${stops.length == 1 ? '' : 's'}'),
               ),
-              ...amenities.take(2).map(
-                (item) => _InfoChip(icon: Icons.check_circle_outline, label: item),
-              ),
+              ...amenities
+                  .take(2)
+                  .map(
+                    (item) => _InfoChip(
+                      icon: Icons.check_circle_outline,
+                      label: item,
+                    ),
+                  ),
               if (amenities.length > 2)
                 _InfoChip(
                   icon: Icons.add_circle_outline,
@@ -192,13 +199,17 @@ class RideCard extends GetView<SearchRidesController> {
             ],
           ),
 
-          if (pickupInstructions != null || notes != null || stops.isNotEmpty) ...[
+          if (pickupInstructions != null ||
+              notes != null ||
+              stops.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF151B25) : const Color(0xFFF9FBFE),
+                color: isDark
+                    ? const Color(0xFF151B25)
+                    : const Color(0xFFF9FBFE),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: isDark
@@ -321,10 +332,7 @@ class RideCard extends GetView<SearchRidesController> {
                       const SizedBox(height: 2),
                       Text(
                         '\$${ride.pricePerSeat.toStringAsFixed(0)} x $selected ${selected == 1 ? 'seat' : 'seats'}',
-                        style: TextStyle(
-                          color: muted,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: muted, fontSize: 12),
                       ),
                     ],
                   );
@@ -335,7 +343,9 @@ class RideCard extends GetView<SearchRidesController> {
                 height: 44,
                 child: OutlinedButton(
                   onPressed: () {
-                    final max = ride.seatsAvailable <= 0 ? 1 : ride.seatsAvailable;
+                    final max = ride.seatsAvailable <= 0
+                        ? 1
+                        : ride.seatsAvailable;
                     final seats = controller.getSelectedSeats(ride.id, max);
 
                     Get.toNamed(
@@ -348,7 +358,9 @@ class RideCard extends GetView<SearchRidesController> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     side: BorderSide(
-                      color: isDark ? const Color(0xFF232836) : const Color(0xFFE2E6EF),
+                      color: isDark
+                          ? const Color(0xFF232836)
+                          : const Color(0xFFE2E6EF),
                     ),
                   ),
                   child: const Text('Details'),
@@ -364,7 +376,10 @@ class RideCard extends GetView<SearchRidesController> {
                           final max = ride.seatsAvailable <= 0
                               ? 1
                               : ride.seatsAvailable;
-                          final seats = controller.getSelectedSeats(ride.id, max);
+                          final seats = controller.getSelectedSeats(
+                            ride.id,
+                            max,
+                          );
                           Get.toNamed(
                             '/rides/${ride.id}',
                             arguments: {
@@ -529,19 +544,13 @@ class _RoutePointRow extends StatelessWidget {
             title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: textPrimary,
-              fontWeight: FontWeight.w800,
-            ),
+            style: TextStyle(color: textPrimary, fontWeight: FontWeight.w800),
           ),
         ),
         const SizedBox(width: 12),
         Text(
           trailing,
-          style: TextStyle(
-            color: muted,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: muted, fontWeight: FontWeight.w700),
         ),
       ],
     );
@@ -549,10 +558,7 @@ class _RoutePointRow extends StatelessWidget {
 }
 
 class _InfoChip extends StatelessWidget {
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-  });
+  const _InfoChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;

@@ -33,6 +33,7 @@ class RideRequestFormController extends GetxController {
   final arrivalTime = Rxn<TimeOfDay>();
   final rideType = 'one-time'.obs;
   final tripType = 'one-way'.obs;
+  final savePaymentMethodForJit = false.obs;
 
   final canSubmitFlag = false.obs;
   final submitAttempted = false.obs;
@@ -373,6 +374,8 @@ class RideRequestFormController extends GetxController {
     required String? arrival,
     required int seats,
   }) async {
+    final savePaymentMethod = savePaymentMethodForJit.value;
+
     final intent = await _api.createJitIntent(
       fromCity: pickup.name,
       fromLat: pickup.lat,
@@ -386,11 +389,14 @@ class RideRequestFormController extends GetxController {
       seatsNeeded: seats,
       rideType: rideType.value,
       tripType: tripType.value,
+      savePaymentMethod: savePaymentMethod,
     );
 
     await Stripe.instance.initPaymentSheet(
       paymentSheetParameters: SetupPaymentSheetParameters(
         paymentIntentClientSecret: intent.clientSecret,
+        customerId: intent.customerId,
+        customerEphemeralKeySecret: intent.customerEphemeralKeySecret,
         merchantDisplayName: 'HelpRide',
         applePay: const PaymentSheetApplePay(merchantCountryCode: 'CA'),
         style: ThemeMode.system,

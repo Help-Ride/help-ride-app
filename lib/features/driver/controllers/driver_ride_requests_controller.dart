@@ -97,6 +97,10 @@ class DriverRideRequestsController extends GetxController {
     _api = RideRequestsApi(_client);
     _ridesApi = DriverRidesApi(_client);
     final args = (Get.arguments as Map?) ?? {};
+    final requestedTab = _parseInitialTab(args['tab']);
+    if (requestedTab != null) {
+      tab.value = requestedTab;
+    }
     final requestedId = (args['rideRequestId'] ?? '').toString().trim();
     final autoOpenRaw = args['autoOpenOfferSheet'];
     _requestedRideRequestId = requestedId.isEmpty ? null : requestedId;
@@ -123,6 +127,23 @@ class DriverRideRequestsController extends GetxController {
   }
 
   void setTab(DriverRideRequestsTab t) => tab.value = t;
+
+  DriverRideRequestsTab? _parseInitialTab(dynamic value) {
+    if (value == null) return null;
+    final normalized = value.toString().trim().toLowerCase();
+    switch (normalized) {
+      case 'requests':
+      case 'request':
+        return DriverRideRequestsTab.requests;
+      case 'offers':
+      case 'offer':
+      case 'my_offers':
+      case 'my-offers':
+        return DriverRideRequestsTab.offers;
+      default:
+        return null;
+    }
+  }
 
   bool get hasLocationPermission =>
       locationPermission.value == LocationPermission.always ||

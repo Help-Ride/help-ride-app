@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/save_payment_method_preference_card.dart';
 import '../controllers/my_rides_controller.dart';
 import '../models/booking.dart';
 import '../utils/booking_formatters.dart';
@@ -35,27 +36,57 @@ class BookingPayNowView extends GetView<MyRidesController> {
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
           child: Column(
             children: [
-              _SummaryCard(booking: booking, isDark: isDark),
-              const SizedBox(height: 12),
               Obx(() {
                 final session = controller.paymentSessionForBooking(booking.id);
                 final intentId =
                     controller.paymentIntentIdForBooking(booking.id) ??
                     booking.paymentIntentId;
-                if (intentId == null || intentId.trim().isEmpty) {
-                  return const SizedBox.shrink();
-                }
-                return _IntentCard(
-                  intentId: intentId,
-                  amount: session?.amount,
-                  currency: session?.currency,
-                  isDark: isDark,
+                final hasIntent =
+                    intentId != null && intentId.trim().isNotEmpty;
+                return Column(
+                  children: [
+                    _SummaryCard(
+                      booking: booking,
+                      isDark: isDark,
+                      payableAmountCents: session?.amount,
+                      currency: session?.currency,
+                    ),
+                    if (hasIntent) ...[
+                      const SizedBox(height: 12),
+                      _IntentCard(
+                        intentId: intentId,
+                        amount: session?.amount,
+                        currency: session?.currency,
+                        isDark: isDark,
+                      ),
+                    ],
+                  ],
+                );
+              }),
+              const SizedBox(height: 14),
+              Obx(() {
+                final savePaymentMethod =
+                    controller.savePaymentMethodForCheckout.value;
+                return Column(
+                  children: [
+                    SavePaymentMethodPreferenceCard(
+                      value: savePaymentMethod,
+                      onChanged: controller.setSavePaymentMethodForCheckout,
+                      title: 'Save payment method for future rides',
+                      description:
+                          'When enabled, HelpRide asks Stripe to save this card so checkout is faster next time.',
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                 );
               }),
               const Spacer(),
               Obx(() {
                 final paying = controller.isPaying(booking.id);
                 final payLabel = controller.payButtonLabel(booking);
+                final savePaymentMethod =
+                    controller.savePaymentMethodForCheckout.value;
                 return SizedBox(
                   height: 52,
                   width: double.infinity,
@@ -65,6 +96,7 @@ class BookingPayNowView extends GetView<MyRidesController> {
                         : () async {
                             final result = await controller.payToConfirm(
                               booking,
+                              savePaymentMethod: savePaymentMethod,
                             );
                             if (result == PaymentAttemptResult.processing) {
                               if (Get.key.currentState?.canPop() ?? false) {
@@ -117,15 +149,29 @@ class BookingPayNowView extends GetView<MyRidesController> {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.booking, required this.isDark});
+  const _SummaryCard({
+    required this.booking,
+    required this.isDark,
+    this.payableAmountCents,
+    this.currency,
+  });
 
   final Booking booking;
   final bool isDark;
+  final int? payableAmountCents;
+  final String? currency;
 
   @override
   Widget build(BuildContext context) {
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
     final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final quotedAmount = booking.totalPrice;
+    final payableAmount = payableAmountCents == null
+        ? quotedAmount
+        : payableAmountCents! / 100;
+    final showsAdjustedAmount =
+        payableAmountCents != null &&
+        (payableAmount - quotedAmount).abs() >= 0.01;
 
     return Container(
       width: double.infinity,
@@ -170,16 +216,47 @@ class _SummaryCard extends StatelessWidget {
                 style: TextStyle(color: muted, fontWeight: FontWeight.w700),
               ),
               const Spacer(),
-              Text(
-                '\$${booking.totalPrice.toStringAsFixed(0)}',
-                style: TextStyle(
-                  color: textPrimary,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 20,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (showsAdjustedAmount)
+                    Text(
+                      'Payable now',
+                      style: TextStyle(
+                        color: muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  Text(
+                    _formatCurrencyAmount(payableAmount, currency: currency),
+                    style: TextStyle(
+                      color: textPrimary,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 20,
+                    ),
+                  ),
+                  if (showsAdjustedAmount)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Ride fare ${_formatCurrencyAmount(quotedAmount)}',
+                        style: TextStyle(
+                          color: muted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
+          if (showsAdjustedAmount) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Includes any payment fees or tax applied at checkout.',
+              style: TextStyle(color: muted, fontWeight: FontWeight.w600),
+            ),
+          ],
         ],
       ),
     );
@@ -215,7 +292,7 @@ class _IntentCard extends StatelessWidget {
         [
           'PaymentIntent: $intentId',
           if (amount != null)
-            'Amount: ${amount!} ${currency == null ? '' : currency!.toUpperCase()}',
+            'Amount: ${_formatCurrencyAmount(amount! / 100, currency: currency)}',
         ].join('\n'),
         style: TextStyle(
           fontSize: 12,
@@ -225,4 +302,16 @@ class _IntentCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatCurrencyAmount(double amount, {String? currency}) {
+  final fixed = amount.toStringAsFixed(2);
+  final normalized = fixed.endsWith('.00')
+      ? amount.toStringAsFixed(0)
+      : (fixed.endsWith('0') ? fixed.substring(0, fixed.length - 1) : fixed);
+  final suffix = (currency ?? '').trim().toUpperCase();
+  if (suffix.isEmpty || suffix == 'CAD') {
+    return '\$$normalized';
+  }
+  return '\$$normalized $suffix';
 }

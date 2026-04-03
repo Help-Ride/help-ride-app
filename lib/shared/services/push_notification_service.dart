@@ -8,8 +8,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 
 import '../../core/routes/app_routes.dart';
+import '../../features/bookings/controllers/my_rides_controller.dart';
 import '../../features/driver/routes/driver_routes.dart';
 import '../../features/rides/routes/rides_routes.dart';
 import 'api_client.dart';
@@ -28,8 +30,11 @@ class PushNotificationService {
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
   final TokenStorage _tokenStorage = TokenStorage();
+  final GetStorage _box = GetStorage();
   final StreamController<String> _rideOfferController =
       StreamController<String>.broadcast();
+  final StreamController<void> _notificationEventsController =
+      StreamController<void>.broadcast();
 
   NotificationsApi? _api;
   StreamSubscription<String>? _tokenRefreshSub;
@@ -42,24 +47,65 @@ class PushNotificationService {
   int _retryAttempts = 0;
   static const int _maxRetryAttempts = 5;
   static const Duration _tokenRefreshInterval = Duration(days: 1);
+  static const String _notificationTargetsCacheKey =
+      'push_notification_targets_v1';
+  static const int _maxCachedNotificationTargets = 120;
 
-  static const AndroidNotificationChannel _offersChannel =
+  static const AndroidNotificationChannel _defaultChannel =
       AndroidNotificationChannel(
-        'driver_ride_offers',
-        'Driver Ride Offers',
-        description: 'Ride offer alerts for drivers',
+        'helpride_alerts',
+        'HelpRide Alerts',
+        description: 'Ride, booking, payment, and support alerts',
         importance: Importance.max,
       );
-  static const Set<String> _rideRequestKinds = {
+  static const Set<String> _driverRideRequestKinds = {
     'ride_request_created',
     'ride_request_created_nearby',
+    'ride_request_created_jit',
+    'ride_request_updated',
+    'ride_request_cancelled_by_passenger',
   };
-  static const Set<String> _rideCreatedKinds = {'ride_created'};
+  static const Set<String> _driverOfferKinds = {
+    'ride_request_offer_rejected',
+    'ride_request_offer_not_selected',
+  };
+  static const Set<String> _driverRideDetailKinds = {
+    'booking_request',
+    'booking_cancelled_by_passenger',
+    'booking_payment_pending',
+    'driver_booking_paid',
+    'driver_booking_payment_failed',
+    'driver_booking_refunded',
+    'driver_payout_initiated',
+    'ride_request_offer_accepted',
+    'ride_request_assigned_driver',
+  };
+  static const Set<String> _passengerRideDetailKinds = {
+    'booking_confirmed',
+    'booking_rejected',
+    'booking_cancelled_by_driver',
+    'booking_payment_succeeded',
+    'booking_refunded',
+    'ride_updated',
+    'ride_started',
+    'ride_completed',
+    'ride_cancelled_by_driver',
+    'ride_request_accepted',
+  };
+  static const Set<String> _passengerBookingListKinds = {
+    'booking_payment_failed',
+  };
+  static const Set<String> _passengerRequestKinds = {
+    'ride_request_offer_created',
+    'ride_request_offer_cancelled',
+    'ride_request_cancelled_by_driver',
+  };
 
   Map<String, String>? _pendingNavigationTarget;
   bool _navigationInFlight = false;
 
   Stream<String> get rideOfferStream => _rideOfferController.stream;
+  Stream<void> get notificationEvents => _notificationEventsController.stream;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -97,6 +143,40 @@ class PushNotificationService {
     await _messageOpenedSub?.cancel();
     _retryTimer?.cancel();
     await _rideOfferController.close();
+    await _notificationEventsController.close();
+  }
+
+  Map<String, String>? lookupCachedNotificationTarget(String notificationId) {
+    final id = notificationId.trim();
+    if (id.isEmpty) return null;
+    final cache = _readNotificationTargetCache();
+    final target = cache[id];
+    if (target == null || target.isEmpty) return null;
+    return Map<String, String>.from(target);
+  }
+
+  Future<void> navigateToNotificationTarget(Map<String, String> target) async {
+    if (target.isEmpty) return;
+    await _queueNotificationNavigation(Map<String, String>.from(target));
+  }
+
+  Future<void> openShellTab(
+    String tab, {
+    Map<String, dynamic> arguments = const {},
+    bool resetPassengerRidesController = false,
+  }) async {
+    final payload = <String, dynamic>{'tab': tab, ...arguments};
+    if (resetPassengerRidesController &&
+        Get.isRegistered<MyRidesController>()) {
+      Get.delete<MyRidesController>(force: true);
+    }
+
+    if (Get.currentRoute == AppRoutes.shell) {
+      await Get.offNamed(AppRoutes.shell, arguments: payload);
+      return;
+    }
+
+    await Get.offAllNamed(AppRoutes.shell, arguments: payload);
   }
 
   Future<void> registerDeviceTokenIfNeeded() async {
@@ -192,7 +272,7 @@ class PushNotificationService {
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
           >();
-      await androidImpl?.createNotificationChannel(_offersChannel);
+      await androidImpl?.createNotificationChannel(_defaultChannel);
       _localNotificationReady = true;
     } on MissingPluginException {
       // App can continue without foreground local notifications.
@@ -210,10 +290,7 @@ class PushNotificationService {
     final payload = response.payload?.trim();
     if (payload == null || payload.isEmpty) return;
     final target = _decodeNavigationPayload(payload);
-    final rideRequestId = target?['rideRequestId'];
-    if (rideRequestId != null && rideRequestId.isNotEmpty) {
-      _rideOfferController.add(rideRequestId);
-    }
+    _recordNotificationEvent(target);
     if (target != null) {
       unawaited(_queueNotificationNavigation(target));
       return;
@@ -226,20 +303,14 @@ class PushNotificationService {
       debugPrint('FCM foreground message: ${message.messageId}');
     }
     final target = _extractNavigationTarget(message.data);
-    final rideRequestId = target?['rideRequestId'];
-    if (rideRequestId != null && rideRequestId.isNotEmpty) {
-      _rideOfferController.add(rideRequestId);
-    }
+    _recordNotificationEvent(target);
     await _showForegroundNotification(message, navigationTarget: target);
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {
     final target = _extractNavigationTarget(message.data);
     if (target == null) return;
-    final rideRequestId = target['rideRequestId'];
-    if (rideRequestId != null && rideRequestId.isNotEmpty) {
-      _rideOfferController.add(rideRequestId);
-    }
+    _recordNotificationEvent(target);
     unawaited(_queueNotificationNavigation(target));
   }
 
@@ -260,9 +331,9 @@ class PushNotificationService {
     }
 
     final androidDetails = AndroidNotificationDetails(
-      _offersChannel.id,
-      _offersChannel.name,
-      channelDescription: _offersChannel.description,
+      _defaultChannel.id,
+      _defaultChannel.name,
+      channelDescription: _defaultChannel.description,
       importance: Importance.max,
       priority: Priority.high,
       ticker: 'ride_offer',
@@ -313,24 +384,82 @@ class PushNotificationService {
     final normalizedKind = kind?.trim().toLowerCase() ?? '';
     if (normalizedKind.isEmpty) return null;
 
-    if (_rideRequestKinds.contains(normalizedKind)) {
-      final rideRequestId = _firstNonEmpty(data, const [
-        'rideRequestId',
-        'ride_request_id',
-        'requestId',
-        'request_id',
-      ]);
-      if (rideRequestId == null || rideRequestId.isEmpty) return null;
-      return {'kind': normalizedKind, 'rideRequestId': rideRequestId};
+    final target = <String, String>{'kind': normalizedKind};
+
+    void addField(String targetKey, List<String> keys) {
+      final value = _firstNonEmpty(data, keys);
+      if (value != null && value.isNotEmpty) {
+        target[targetKey] = value;
+      }
     }
 
-    if (_rideCreatedKinds.contains(normalizedKind)) {
-      final rideId = _firstNonEmpty(data, const ['rideId', 'ride_id']);
-      if (rideId == null || rideId.isEmpty) return null;
-      return {'kind': normalizedKind, 'rideId': rideId};
+    addField('rideId', const ['rideId', 'ride_id']);
+    addField('bookingId', const ['bookingId', 'booking_id']);
+    addField('notificationId', const ['notificationId', 'notification_id']);
+    addField('rideRequestId', const [
+      'rideRequestId',
+      'ride_request_id',
+      'requestId',
+      'request_id',
+    ]);
+    addField('conversationId', const ['conversationId', 'conversation_id']);
+    addField('messageId', const ['messageId', 'message_id']);
+    addField('offerId', const ['offerId', 'offer_id']);
+    addField('paymentId', const ['paymentId', 'payment_id']);
+    addField('transferId', const ['transferId', 'transfer_id']);
+
+    return target;
+  }
+
+  void _recordNotificationEvent(Map<String, String>? target) {
+    if (target == null || target.isEmpty) return;
+    final rideRequestId = (target['rideRequestId'] ?? '').trim();
+    if (rideRequestId.isNotEmpty) {
+      _rideOfferController.add(rideRequestId);
+    }
+    _cacheNotificationTarget(target);
+    _notificationEventsController.add(null);
+  }
+
+  void _cacheNotificationTarget(Map<String, String> target) {
+    final notificationId = (target['notificationId'] ?? '').trim();
+    if (notificationId.isEmpty) return;
+
+    final cache = _readNotificationTargetCache();
+    cache.remove(notificationId);
+    cache[notificationId] = Map<String, String>.from(target);
+
+    final overflow = cache.length - _maxCachedNotificationTargets;
+    if (overflow > 0) {
+      final keysToRemove = cache.keys.take(overflow).toList();
+      for (final key in keysToRemove) {
+        cache.remove(key);
+      }
     }
 
-    return null;
+    _box.write(_notificationTargetsCacheKey, cache);
+  }
+
+  Map<String, Map<String, String>> _readNotificationTargetCache() {
+    final raw = _box.read(_notificationTargetsCacheKey);
+    if (raw is! Map) return <String, Map<String, String>>{};
+
+    final cache = <String, Map<String, String>>{};
+    for (final entry in raw.entries) {
+      final key = entry.key.toString().trim();
+      if (key.isEmpty || entry.value is! Map) continue;
+      final mapped = <String, String>{};
+      for (final payloadEntry in (entry.value as Map).entries) {
+        final payloadKey = payloadEntry.key.toString().trim();
+        final payloadValue = payloadEntry.value?.toString().trim() ?? '';
+        if (payloadKey.isEmpty || payloadValue.isEmpty) continue;
+        mapped[payloadKey] = payloadValue;
+      }
+      if (mapped.isNotEmpty) {
+        cache[key] = mapped;
+      }
+    }
+    return cache;
   }
 
   Map<String, String>? _decodeNavigationPayload(String payload) {
@@ -388,21 +517,27 @@ class PushNotificationService {
 
   Future<void> _navigateToTarget(Map<String, String> target) async {
     final kind = (target['kind'] ?? '').trim().toLowerCase();
+    final rideId = (target['rideId'] ?? '').trim();
+    final bookingId = (target['bookingId'] ?? '').trim();
+    final rideRequestId = (target['rideRequestId'] ?? '').trim();
+    final conversationId = (target['conversationId'] ?? '').trim();
+
     switch (kind) {
-      case 'ride_request_created':
-      case 'ride_request_created_nearby':
-        final rideRequestId = (target['rideRequestId'] ?? '').trim();
-        if (rideRequestId.isEmpty) return;
-        await Get.toNamed(
-          DriverRoutes.rideRequests,
+      case 'chat_message':
+        if (conversationId.isEmpty) return;
+        await openShellTab(
+          'messages',
           arguments: {
-            'rideRequestId': rideRequestId,
-            'autoOpenOfferSheet': true,
+            'conversationId': conversationId,
+            if ((target['messageId'] ?? '').trim().isNotEmpty)
+              'messageId': target['messageId'],
           },
         );
         return;
+      case 'connect_onboarding':
+        await Get.toNamed(DriverRoutes.onboarding);
+        return;
       case 'ride_created':
-        final rideId = (target['rideId'] ?? '').trim();
         if (rideId.isEmpty) return;
         await Get.toNamed(
           RidesRoutes.search,
@@ -410,6 +545,117 @@ class PushNotificationService {
         );
         return;
     }
+
+    if (_driverRideRequestKinds.contains(kind)) {
+      await _openDriverRideRequests(
+        tab: 'requests',
+        rideRequestId: rideRequestId,
+        autoOpenOfferSheet:
+            rideRequestId.isNotEmpty && _shouldAutoOpenRequest(kind),
+      );
+      return;
+    }
+
+    if (_driverOfferKinds.contains(kind)) {
+      await _openDriverRideRequests(
+        tab: 'offers',
+        rideRequestId: rideRequestId,
+      );
+      return;
+    }
+
+    if (_driverRideDetailKinds.contains(kind)) {
+      if (rideId.isNotEmpty) {
+        await Get.toNamed(
+          '/driver/rides/$rideId',
+          arguments: {
+            'rideId': rideId,
+            if (bookingId.isNotEmpty) 'bookingId': bookingId,
+            if (rideRequestId.isNotEmpty) 'rideRequestId': rideRequestId,
+          },
+        );
+        return;
+      }
+      if (kind == 'ride_request_offer_accepted') {
+        await _openDriverRideRequests(
+          tab: 'offers',
+          rideRequestId: rideRequestId,
+        );
+        return;
+      }
+      await _openDriverRideRequests(
+        tab: 'requests',
+        rideRequestId: rideRequestId,
+      );
+      return;
+    }
+
+    if (_passengerBookingListKinds.contains(kind)) {
+      await openShellTab(
+        'rides',
+        resetPassengerRidesController: true,
+        arguments: {'bookingId': bookingId},
+      );
+      return;
+    }
+
+    if (_passengerRequestKinds.contains(kind)) {
+      await openShellTab(
+        'rides',
+        resetPassengerRidesController: true,
+        arguments: {
+          'tab': 'requests',
+          if (rideRequestId.isNotEmpty) 'rideRequestId': rideRequestId,
+          if ((target['offerId'] ?? '').trim().isNotEmpty)
+            'offerId': target['offerId'],
+        },
+      );
+      return;
+    }
+
+    if (_passengerRideDetailKinds.contains(kind)) {
+      if (rideId.isNotEmpty) {
+        await Get.toNamed(
+          '/rides/$rideId',
+          arguments: {
+            'rideId': rideId,
+            if (bookingId.isNotEmpty) 'bookingId': bookingId,
+          },
+        );
+        return;
+      }
+      if (rideRequestId.isNotEmpty) {
+        await openShellTab(
+          'rides',
+          resetPassengerRidesController: true,
+          arguments: {'tab': 'requests', 'rideRequestId': rideRequestId},
+        );
+        return;
+      }
+    }
+  }
+
+  bool _shouldAutoOpenRequest(String kind) {
+    return kind == 'ride_request_created' ||
+        kind == 'ride_request_created_nearby' ||
+        kind == 'ride_request_created_jit';
+  }
+
+  Future<void> _openDriverRideRequests({
+    required String tab,
+    String? rideRequestId,
+    bool autoOpenOfferSheet = false,
+  }) async {
+    final requestId = rideRequestId?.trim() ?? '';
+    await Get.toNamed(
+      DriverRoutes.rideRequests,
+      arguments: {
+        'tab': tab,
+        if (requestId.isNotEmpty) 'rideRequestId': requestId,
+        if (autoOpenOfferSheet && requestId.isNotEmpty)
+          'autoOpenOfferSheet': true,
+      },
+    );
   }
 
   Future<void> _handleTokenRefresh(String token) async {

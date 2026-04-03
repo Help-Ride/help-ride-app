@@ -1,11 +1,15 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:get/get.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/models/user.dart';
+import '../../bookings/services/payments_api.dart';
 import '../../../shared/services/api_exception.dart';
 import '../../../shared/services/api_client.dart';
+import '../../../shared/utils/input_validators.dart';
 import '../../../shared/utils/phone_number_utils.dart';
 import '../models/driver_document.dart';
 import '../services/profile_api.dart';
@@ -14,6 +18,7 @@ import '../services/stripe_connect_api.dart';
 class ProfileController extends GetxController {
   late final ProfileApi _api;
   late final StripeConnectApi _stripeConnectApi;
+  late final PaymentsApi _paymentsApi;
   late final SessionController _session;
   bool _servicesReady = false;
 
@@ -27,6 +32,7 @@ class ProfileController extends GetxController {
   final avatarUploading = false.obs;
   final avatarUploadError = RxnString();
   final deleteAccountLoading = false.obs;
+  final paymentMethodsLoading = false.obs;
   final stripeConnectStatus = const StripeConnectStatus.empty().obs;
   final stripeStatusLoading = false.obs;
   final stripeOnboardingLoading = false.obs;
@@ -41,6 +47,7 @@ class ProfileController extends GetxController {
     final client = await ApiClient.create();
     _api = ProfileApi(client);
     _stripeConnectApi = StripeConnectApi(client);
+    _paymentsApi = PaymentsApi(client);
     _servicesReady = true;
     driverProfile.value = _session.user.value?.driverProfile;
     await refreshDriverProfile();
@@ -129,6 +136,9 @@ class ProfileController extends GetxController {
         mimeType: mimeType,
       );
       await refreshDriverDocuments(silent: true);
+      if (docType == 'selfie') {
+        await _session.bootstrap();
+      }
     } catch (e) {
       docsError.value = e.toString();
       rethrow;
@@ -185,6 +195,7 @@ class ProfileController extends GetxController {
 
   Future<User> updateUserProfile({
     required String name,
+    String? email,
     required String phone,
     required String avatarUrl,
   }) async {
@@ -194,6 +205,14 @@ class ProfileController extends GetxController {
     }
     loading.value = true;
     try {
+      final trimmedEmail = email?.trim().toLowerCase() ?? '';
+      if (trimmedEmail.isNotEmpty) {
+        final emailError = InputValidators.email(trimmedEmail);
+        if (emailError != null) {
+          throw Exception(emailError);
+        }
+      }
+
       final normalizedPhone = phone.trim().isEmpty
           ? null
           : PhoneNumberUtils.normalizeToE164(phone.trim());
@@ -204,11 +223,14 @@ class ProfileController extends GetxController {
       final updatedUser = await _api.updateUserProfile(
         userId,
         name: name.trim().isEmpty ? null : name.trim(),
+        email: trimmedEmail.isEmpty ? null : trimmedEmail,
         phone: normalizedPhone,
         providerAvatarUrl: avatarUrl.trim().isEmpty ? null : avatarUrl.trim(),
       );
       await _session.bootstrap();
       return updatedUser;
+    } catch (error) {
+      throw Exception(_normalizeError(error));
     } finally {
       loading.value = false;
     }
@@ -226,13 +248,57 @@ class ProfileController extends GetxController {
     }
   }
 
+  Future<bool> openPaymentMethodsSheet() async {
+    if (!_servicesReady) {
+      throw Exception('Profile service is still initializing.');
+    }
+
+    paymentMethodsLoading.value = true;
+    try {
+      final session = await _paymentsApi.createCustomerSheetSession();
+      await Stripe.instance.initCustomerSheet(
+        customerSheetInitParams: CustomerSheetInitParams.adapter(
+          setupIntentClientSecret: session.setupIntentClientSecret,
+          customerId: session.customerId,
+          customerEphemeralKeySecret: session.customerEphemeralKeySecret,
+          merchantDisplayName: 'HelpRide',
+          style: ThemeMode.system,
+          headerTextForSelectionScreen: 'Payment methods',
+          applePayEnabled: false,
+          googlePayEnabled: false,
+        ),
+      );
+      await Stripe.instance.presentCustomerSheet();
+      return true;
+    } on StripeException catch (error) {
+      if (_isCustomerSheetCancellation(error)) {
+        return false;
+      }
+
+      final message = error.error.message?.trim();
+      if (message != null && message.isNotEmpty) {
+        throw Exception(message);
+      }
+      throw Exception('Could not open payment methods.');
+    } catch (error) {
+      // flutter_stripe 12.4.0 can misparse the iOS CustomerSheet cancel payload
+      // when a saved card is already selected, surfacing a type-cast error.
+      if (_isCustomerSheetDismissCastError(error)) {
+        return false;
+      }
+      rethrow;
+    } finally {
+      paymentMethodsLoading.value = false;
+    }
+  }
+
   Future<void> upsertDriverProfile({
     required String carMake,
     required String carModel,
     String? carYear,
     String? carColor,
     required String plateNumber,
-    required String licenseNumber,
+    String? licenseNumber,
     String? insuranceInfo,
   }) async {
     final userId = _session.user.value?.id ?? '';
@@ -247,7 +313,9 @@ class ProfileController extends GetxController {
           carYear: carYear?.trim(),
           carColor: carColor?.trim(),
           plateNumber: plateNumber.trim(),
-          licenseNumber: licenseNumber.trim(),
+          licenseNumber: licenseNumber?.trim().isEmpty ?? true
+              ? null
+              : licenseNumber!.trim(),
           insuranceInfo: insuranceInfo?.trim(),
         );
       } else {
@@ -258,7 +326,9 @@ class ProfileController extends GetxController {
           carYear: carYear?.trim(),
           carColor: carColor?.trim(),
           plateNumber: plateNumber.trim(),
-          licenseNumber: licenseNumber.trim(),
+          licenseNumber: licenseNumber?.trim().isEmpty ?? true
+              ? null
+              : licenseNumber!.trim(),
           insuranceInfo: insuranceInfo?.trim(),
         );
       }
@@ -395,5 +465,16 @@ class ProfileController extends GetxController {
       return (error.error as ApiException).message;
     }
     return error.toString().replaceFirst('Exception: ', '').trim();
+  }
+
+  bool _isCustomerSheetCancellation(StripeException error) {
+    final code = error.error.code.toString().toLowerCase();
+    return code.contains('cancel');
+  }
+
+  bool _isCustomerSheetDismissCastError(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains("type 'string' is not a subtype of type") &&
+        message.contains("map<string, dynamic>");
   }
 }

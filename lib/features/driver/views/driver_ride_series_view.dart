@@ -82,7 +82,7 @@ class DriverRideSeriesView extends GetView<DriverRideSeriesController> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Track upcoming occurrences here. Modified and cancelled rides are highlighted.',
+                  'Track upcoming occurrences here. Past routine rides are moved into history so this list stays focused.',
                   style: TextStyle(color: muted),
                 ),
                 const SizedBox(height: 12),
@@ -122,9 +122,8 @@ class DriverRideSeriesView extends GetView<DriverRideSeriesController> {
                           rideId: ride.id,
                           ride: ride,
                         ),
-                        onEdit: () => Get.toNamed(
-                          '/driver/rides/${ride.id}/edit',
-                        ),
+                        onEdit: () =>
+                            Get.toNamed('/driver/rides/${ride.id}/edit'),
                       ),
                     ),
                   ),
@@ -153,10 +152,7 @@ class DriverRideSeriesView extends GetView<DriverRideSeriesController> {
 
     await Get.toNamed(
       '/driver/rides/${anchorRide.id}/edit',
-      arguments: {
-        'editScope': scope,
-        'seriesId': series.id,
-      },
+      arguments: {'editScope': scope, 'seriesId': series.id},
     );
     await controller.fetch();
   }
@@ -255,10 +251,7 @@ class _SeriesHeaderCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${series.seatCapacity} seats',
-                    style: TextStyle(
-                      color: muted,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(color: muted, fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
@@ -279,7 +272,8 @@ class _SeriesHeaderCard extends StatelessWidget {
             children: [
               _InfoChip(
                 icon: Icons.repeat_rounded,
-                label: 'Every ${formatRideRecurrenceDays(series.recurrenceDays)}',
+                label:
+                    'Every ${formatRideRecurrenceDays(series.recurrenceDays)}',
                 muted: muted,
                 isDark: isDark,
               ),
@@ -360,10 +354,7 @@ class _SeriesHeaderCard extends StatelessWidget {
 }
 
 class _OccurrenceFilters extends StatelessWidget {
-  const _OccurrenceFilters({
-    required this.active,
-    required this.onChange,
-  });
+  const _OccurrenceFilters({required this.active, required this.onChange});
 
   final DriverRideOccurrenceFilter active;
   final ValueChanged<DriverRideOccurrenceFilter> onChange;
@@ -375,45 +366,50 @@ class _OccurrenceFilters extends StatelessWidget {
       (DriverRideOccurrenceFilter.upcoming, 'Upcoming'),
       (DriverRideOccurrenceFilter.modified, 'Modified'),
       (DriverRideOccurrenceFilter.cancelled, 'Cancelled'),
-      (DriverRideOccurrenceFilter.completed, 'Completed'),
+      (DriverRideOccurrenceFilter.completed, 'Past'),
     ];
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: options.map((option) {
-        final selected = active == option.$1;
-        return InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: () => onChange(option.$1),
-          child: Ink(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              color: selected
-                  ? AppColors.driverPrimary.withValues(alpha: 0.12)
-                  : (isDark ? const Color(0xFF111827) : Colors.white),
+      children: options
+          .map((option) {
+            final selected = active == option.$1;
+            return InkWell(
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: selected
-                    ? AppColors.driverPrimary
-                    : (isDark
-                          ? const Color(0xFF232836)
-                          : const Color(0xFFE1E7F0)),
+              onTap: () => onChange(option.$1),
+              child: Ink(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppColors.driverPrimary.withValues(alpha: 0.12)
+                      : (isDark ? const Color(0xFF111827) : Colors.white),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: selected
+                        ? AppColors.driverPrimary
+                        : (isDark
+                              ? const Color(0xFF232836)
+                              : const Color(0xFFE1E7F0)),
+                  ),
+                ),
+                child: Text(
+                  option.$2,
+                  style: TextStyle(
+                    color: selected
+                        ? AppColors.driverPrimary
+                        : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              option.$2,
-              style: TextStyle(
-                color: selected
-                    ? AppColors.driverPrimary
-                    : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        );
-      }).toList(growable: false),
+            );
+          })
+          .toList(growable: false),
     );
   }
 }
@@ -436,7 +432,7 @@ class _OccurrenceCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
-    final canEdit = !ride.isCancelled && !ride.isCompleted;
+    final canEdit = ride.canEditOccurrence;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -471,10 +467,12 @@ class _OccurrenceCard extends StatelessWidget {
                   if (isModified)
                     _OccurrenceFlag(
                       label: 'Modified',
-                      background: AppColors.driverPrimary.withValues(alpha: 0.12),
+                      background: AppColors.driverPrimary.withValues(
+                        alpha: 0.12,
+                      ),
                       foreground: AppColors.driverPrimary,
                     ),
-                  _OccurrenceStatusPill(status: ride.status),
+                  _OccurrenceStatusPill(ride: ride),
                 ],
               ),
             ],
@@ -606,35 +604,31 @@ class _OccurrenceFlag extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: foreground,
-          fontWeight: FontWeight.w800,
-        ),
+        style: TextStyle(color: foreground, fontWeight: FontWeight.w800),
       ),
     );
   }
 }
 
 class _OccurrenceStatusPill extends StatelessWidget {
-  const _OccurrenceStatusPill({required this.status});
+  const _OccurrenceStatusPill({required this.ride});
 
-  final String status;
+  final DriverRideItem ride;
 
   @override
   Widget build(BuildContext context) {
-    final normalized = status.toLowerCase();
-    final background = normalized.contains('cancel')
+    final background = ride.isCancelled
         ? const Color(0xFFFDECEC)
-        : normalized.contains('complete')
+        : ride.isEffectivelyCompleted
         ? const Color(0xFFEFF2F6)
-        : normalized.contains('ongoing')
+        : ride.isOngoing
         ? const Color(0xFFEAF3FF)
         : const Color(0xFFE7F8EF);
-    final foreground = normalized.contains('cancel')
+    final foreground = ride.isCancelled
         ? const Color(0xFFC5394D)
-        : normalized.contains('complete')
+        : ride.isEffectivelyCompleted
         ? const Color(0xFF64748B)
-        : normalized.contains('ongoing')
+        : ride.isOngoing
         ? const Color(0xFF2563EB)
         : const Color(0xFF179C5E);
 
@@ -645,11 +639,13 @@ class _OccurrenceStatusPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        normalized.contains('cancel')
+        ride.isCancelled
             ? 'Cancelled'
-            : normalized.contains('complete')
+            : ride.isCompleted
             ? 'Completed'
-            : normalized.contains('ongoing')
+            : ride.isPastUnmanaged
+            ? 'Past'
+            : ride.isOngoing
             ? 'Ongoing'
             : 'Scheduled',
         style: TextStyle(color: foreground, fontWeight: FontWeight.w800),
@@ -686,7 +682,7 @@ class _SummaryGrid extends StatelessWidget {
         value: '${series.cancelledCount}',
         highlight: series.cancelledCount > 0,
       ),
-      (label: 'Completed', value: '${series.completedCount}', highlight: false),
+      (label: 'Past', value: '${series.completedCount}', highlight: false),
     ];
 
     return LayoutBuilder(
@@ -893,10 +889,7 @@ class _RouteStopRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: TextStyle(
-                  color: muted,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(color: muted, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 3),
               Text(
@@ -910,13 +903,7 @@ class _RouteStopRow extends StatelessWidget {
               ),
               if (secondary.isNotEmpty) ...[
                 const SizedBox(height: 2),
-                Text(
-                  secondary,
-                  style: TextStyle(
-                    color: muted,
-                    fontSize: 13,
-                  ),
-                ),
+                Text(secondary, style: TextStyle(color: muted, fontSize: 13)),
               ],
             ],
           ),

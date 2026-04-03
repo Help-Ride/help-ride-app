@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/save_payment_method_preference_card.dart';
 import '../../../shared/widgets/place_picker_field.dart';
 import '../../driver/widgets/create_ride/chip.dart';
 import '../../driver/widgets/create_ride/picker_tile.dart';
@@ -219,6 +220,20 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
               ],
 
               const SizedBox(height: 18),
+              if (!controller.isEditing) ...[
+                const SectionTitle('PAYMENT'),
+                SavePaymentMethodPreferenceCard(
+                  value: controller.savePaymentMethodForJit.value,
+                  onChanged: (value) =>
+                      controller.savePaymentMethodForJit.value = value,
+                  title: 'Save payment method for future rides',
+                  description:
+                      'If this request needs payment before matching, HelpRide can ask Stripe to save this method for faster checkout next time.',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 18),
+              ],
+
               if (controller.error.value != null)
                 Text(
                   controller.error.value!,
@@ -246,7 +261,7 @@ class RideRequestFormView extends GetView<RideRequestFormController> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: radius),
                       side: BorderSide(
-                        color: primary.withOpacity(0.35),
+                        color: primary.withValues(alpha: 0.35),
                         width: 1.4,
                       ),
                       foregroundColor: primary,

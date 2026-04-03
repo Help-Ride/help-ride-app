@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
-import 'package:help_ride/core/routes/app_routes.dart';
 import 'package:help_ride/shared/controllers/session_controller.dart';
 import 'package:help_ride/shared/services/api_exception.dart';
 import 'package:help_ride/shared/services/api_client.dart';
@@ -64,7 +63,12 @@ class PhoneVerificationController extends GetxController {
     final args = Get.arguments is Map
         ? Map<String, dynamic>.from(Get.arguments)
         : const <String, dynamic>{};
-    _phone.value = (args['phone']?.toString().trim() ?? '');
+    final argPhone = args['phone']?.toString().trim() ?? '';
+    _phone.value = argPhone.isNotEmpty
+        ? argPhone
+        : ((_session.user.value?.pendingPhone?.trim().isNotEmpty ?? false)
+              ? _session.user.value!.pendingPhone!.trim()
+              : (_session.user.value?.phone?.trim() ?? ''));
     _setField(
       phoneInput,
       phoneTextController,
@@ -173,7 +177,9 @@ class PhoneVerificationController extends GetxController {
         userId,
         phone: normalizedPhone,
       );
-      _phone.value = updatedUser.phone?.trim() ?? normalizedPhone;
+      _phone.value = updatedUser.pendingPhone?.trim().isNotEmpty ?? false
+          ? updatedUser.pendingPhone!.trim()
+          : (updatedUser.phone?.trim() ?? normalizedPhone);
       _setField(
         phoneInput,
         phoneTextController,
@@ -248,8 +254,7 @@ class PhoneVerificationController extends GetxController {
 
       final session = Get.find<SessionController>();
       await session.bootstrap();
-
-      Get.offAllNamed(AppRoutes.shell);
+      await session.openVerifiedAppDestination();
     } catch (e) {
       error.value = _prettyError(e);
     } finally {

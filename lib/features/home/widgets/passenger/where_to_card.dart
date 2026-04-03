@@ -3,10 +3,12 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/services/location_sync_service.dart';
 import '../../../../shared/widgets/app_input_decoration.dart';
 import '../../controllers/recent_searches_controller.dart';
 import '../common/app_card.dart';
@@ -25,6 +27,7 @@ class _WhereToCardState extends State<WhereToCard> {
   final _destCtrl = TextEditingController();
   _LatLng? _pickupLatLng;
   _LatLng? _destLatLng;
+  bool _resolvingCurrentPickup = false;
   static const double _defaultRadiusKm = 10.0;
 
   @override
@@ -90,6 +93,89 @@ class _WhereToCardState extends State<WhereToCard> {
     debugPrint('Picked: ${picked.fullText} | ${picked.latLng}');
   }
 
+  Future<void> _useCurrentLocationForPickup() async {
+    if (_resolvingCurrentPickup) return;
+
+    setState(() => _resolvingCurrentPickup = true);
+    try {
+      final sample = await LocationSyncService.instance.captureCurrentLocation(
+        requestPermission: true,
+        allowLastKnown: true,
+      );
+
+      if (!mounted) return;
+      if (sample == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to get your current location. Check location permissions and try again.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final pickupLabel = await _resolveCurrentLocationAddress(
+        sample.lat,
+        sample.lng,
+      );
+      if (!mounted) return;
+      if (pickupLabel == null || pickupLabel.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to resolve your current address. Please try again.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      _pickupCtrl.text = pickupLabel;
+      _pickupLatLng = _LatLng(sample.lat, sample.lng);
+      setState(() {});
+    } finally {
+      if (mounted) {
+        setState(() => _resolvingCurrentPickup = false);
+      }
+    }
+  }
+
+  void _swapRouteEndpoints() {
+    final pickupText = _pickupCtrl.text;
+    final destinationText = _destCtrl.text;
+    final pickupLatLng = _pickupLatLng;
+    final destinationLatLng = _destLatLng;
+
+    _pickupCtrl.text = destinationText;
+    _destCtrl.text = pickupText;
+    _pickupLatLng = destinationLatLng;
+    _destLatLng = pickupLatLng;
+    setState(() {});
+  }
+
+  Future<String?> _resolveCurrentLocationAddress(double lat, double lng) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isNotEmpty) {
+        final formatted = _formatPlacemark(placemarks.first);
+        if (formatted.isNotEmpty) return formatted;
+      }
+    } catch (_) {
+      // Fall through to Google reverse geocoding.
+    }
+
+    try {
+      final details = await _places.reverseGeocode(lat: lat, lng: lng);
+      final formatted = (details.formattedAddress ?? '').trim();
+      if (formatted.isNotEmpty) return formatted;
+    } catch (_) {
+      // Ignore and return null below.
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -97,32 +183,67 @@ class _WhereToCardState extends State<WhereToCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Where to?",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Expanded(
+                child: Text(
+                  "Where to?",
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                ),
+              ),
+              _QuickLocationButton(
+                isDark: isDark,
+                busy: _resolvingCurrentPickup,
+                onTap: _useCurrentLocationForPickup,
+              ),
+            ],
           ),
           const SizedBox(height: 14),
 
-          _TextFieldTile(
-            controller: _pickupCtrl,
-            icon: Icons.my_location,
-            hintText: "Pickup location",
-            isDark: isDark,
-            onTap: () => _openAutocomplete(
-              controller: _pickupCtrl,
-              title: "Pickup location",
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          _TextFieldTile(
-            controller: _destCtrl,
-            icon: Icons.place,
-            iconColor: AppColors.passengerPrimary,
-            hintText: "Destination",
-            isDark: isDark,
-            onTap: () =>
-                _openAutocomplete(controller: _destCtrl, title: "Destination"),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Column(
+                children: [
+                  _TextFieldTile(
+                    controller: _pickupCtrl,
+                    icon: Icons.my_location,
+                    hintText: "Pickup location",
+                    isDark: isDark,
+                    trailingClearance: 34,
+                    onTap: () => _openAutocomplete(
+                      controller: _pickupCtrl,
+                      title: "Pickup location",
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _TextFieldTile(
+                    controller: _destCtrl,
+                    icon: Icons.place,
+                    iconColor: AppColors.passengerPrimary,
+                    hintText: "Destination",
+                    isDark: isDark,
+                    trailingClearance: 34,
+                    onTap: () => _openAutocomplete(
+                      controller: _destCtrl,
+                      title: "Destination",
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                right: -8,
+                top: 40,
+                child: _SwapRouteButton(
+                  isDark: isDark,
+                  onTap: _swapRouteEndpoints,
+                  enabled:
+                      _pickupCtrl.text.trim().isNotEmpty ||
+                      _destCtrl.text.trim().isNotEmpty,
+                ),
+              ),
+            ],
           ),
 
           const SizedBox(height: 14),
@@ -208,6 +329,146 @@ class _WhereToCardState extends State<WhereToCard> {
   }
 }
 
+String _formatPlacemark(Placemark placemark) {
+  final parts = <String>[];
+
+  void add(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return;
+    if (parts.contains(text)) return;
+    parts.add(text);
+  }
+
+  final streetParts = [
+    placemark.subThoroughfare?.trim(),
+    placemark.thoroughfare?.trim(),
+  ].whereType<String>().where((value) => value.isNotEmpty).toList();
+
+  if (streetParts.isNotEmpty) {
+    add(streetParts.join(' '));
+  } else {
+    add(placemark.street);
+    add(placemark.name);
+  }
+
+  add(placemark.locality);
+  add(placemark.administrativeArea);
+  add(placemark.postalCode);
+  add(placemark.country);
+
+  return parts.join(', ');
+}
+
+class _QuickLocationButton extends StatelessWidget {
+  const _QuickLocationButton({
+    required this.isDark,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final bool isDark;
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDark ? const Color(0xFF1C2331) : const Color(0xFFF4F7FC);
+    final border = isDark ? const Color(0xFF2B3345) : const Color(0xFFDCE3EF);
+    final accent = AppColors.passengerPrimary;
+    final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: busy ? null : onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (busy)
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.1,
+                    valueColor: AlwaysStoppedAnimation<Color>(accent),
+                  ),
+                )
+              else
+                Icon(Icons.my_location_rounded, size: 16, color: accent),
+              const SizedBox(width: 7),
+              Text(
+                busy ? 'Locating...' : 'Current',
+                style: TextStyle(
+                  color: busy ? muted : accent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapRouteButton extends StatelessWidget {
+  const _SwapRouteButton({
+    required this.isDark,
+    required this.onTap,
+    required this.enabled,
+  });
+
+  final bool isDark;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDark ? const Color(0xFF1C2331) : Colors.white;
+    final border = isDark ? const Color(0xFF2B3345) : const Color(0xFFDCE3EF);
+    final iconColor = enabled
+        ? AppColors.passengerPrimary
+        : (isDark ? AppColors.darkMuted : AppColors.lightMuted);
+
+    return Material(
+      color: bg,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: enabled ? onTap : null,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: border),
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.18)
+                    : const Color(0x12000000),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: Icon(Icons.swap_vert_rounded, color: iconColor, size: 24),
+        ),
+      ),
+    );
+  }
+}
+
 class _TextFieldTile extends StatelessWidget {
   const _TextFieldTile({
     required this.controller,
@@ -215,6 +476,7 @@ class _TextFieldTile extends StatelessWidget {
     required this.hintText,
     required this.onTap,
     required this.isDark,
+    this.trailingClearance = 0,
     this.iconColor,
   });
 
@@ -223,6 +485,7 @@ class _TextFieldTile extends StatelessWidget {
   final String hintText;
   final VoidCallback onTap;
   final bool isDark;
+  final double trailingClearance;
   final Color? iconColor;
 
   @override
@@ -241,7 +504,7 @@ class _TextFieldTile extends StatelessWidget {
             onTap: onTap,
             child: Container(
               constraints: const BoxConstraints(minHeight: 56),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: EdgeInsets.fromLTRB(14, 10, 14 + trailingClearance, 10),
               child: Row(
                 children: [
                   Icon(
@@ -680,5 +943,38 @@ class _PlacesApi {
     }
 
     return _PlaceDetails.fromJson(data);
+  }
+
+  Future<_PlaceDetails> reverseGeocode({
+    required double lat,
+    required double lng,
+  }) async {
+    final uri = Uri.https('maps.googleapis.com', '/maps/api/geocode/json', {
+      'latlng': '$lat,$lng',
+      'key': apiKey,
+    });
+
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      throw Exception('Reverse geocode HTTP ${res.statusCode}: ${res.body}');
+    }
+
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final status = (data['status'] ?? '').toString();
+    if (status != 'OK') {
+      final msg = (data['error_message'] ?? data['status'] ?? 'Unknown error')
+          .toString();
+      throw Exception('Reverse geocode error: $msg');
+    }
+
+    final results = (data['results'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList(growable: false);
+    if (results.isEmpty) {
+      return const _PlaceDetails();
+    }
+
+    return _PlaceDetails.fromJson({'result': results.first});
   }
 }

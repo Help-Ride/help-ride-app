@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:help_ride/shared/services/api_client.dart';
 import '../models/support_app_config.dart';
@@ -10,10 +12,16 @@ class SupportApi {
   Future<SupportTicket> createTicket({
     required String subject,
     required String description,
+    String? attachmentKey,
   }) async {
     final res = await _client.post(
       '/support-tickets',
-      data: {'subject': subject, 'description': description},
+      data: {
+        'subject': subject,
+        'description': description,
+        if (attachmentKey != null && attachmentKey.trim().isNotEmpty)
+          'attachmentKey': attachmentKey.trim(),
+      },
     );
     final data = res.data;
     if (data is Map<String, dynamic>) {
@@ -88,6 +96,59 @@ class SupportApi {
     }
     throw Exception('Invalid support ticket payload');
   }
+
+  Future<SupportTicketAttachmentPresign> createAttachmentPresign({
+    required String fileName,
+    required String mimeType,
+  }) async {
+    final res = await _client.post(
+      '/support-tickets/attachments/presign',
+      data: {'fileName': fileName, 'mimeType': mimeType},
+    );
+    final data = res.data;
+    if (data is Map) {
+      final uploadUrl = data['uploadUrl']?.toString() ?? '';
+      final attachmentKey = data['attachmentKey']?.toString() ?? '';
+      if (uploadUrl.isNotEmpty && attachmentKey.isNotEmpty) {
+        return SupportTicketAttachmentPresign(
+          uploadUrl: uploadUrl,
+          attachmentKey: attachmentKey,
+        );
+      }
+    }
+    throw Exception('Invalid support ticket attachment upload response');
+  }
+
+  Future<void> uploadFileToPresignedUrl({
+    required String uploadUrl,
+    required Uint8List bytes,
+    required String mimeType,
+  }) async {
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+      ),
+    );
+
+    await dio.put<void>(
+      uploadUrl,
+      data: Stream.fromIterable([bytes]),
+      options: Options(
+        headers: {'Content-Type': mimeType, 'Content-Length': bytes.length},
+      ),
+    );
+  }
+}
+
+class SupportTicketAttachmentPresign {
+  const SupportTicketAttachmentPresign({
+    required this.uploadUrl,
+    required this.attachmentKey,
+  });
+
+  final String uploadUrl;
+  final String attachmentKey;
 }
 
 class SupportAdminApi {

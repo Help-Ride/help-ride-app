@@ -26,12 +26,25 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_ios_podfile_setup
 
+def patch_stripe_ios_podspec(stripe_version)
+  podspec_path = File.join(__dir__, '.symlinks', 'plugins', 'stripe_ios', 'ios', 'stripe_ios.podspec')
+  return unless File.exist?(podspec_path)
+
+  original = File.read(podspec_path)
+  patched = original.gsub(/stripe_version = '.*'/, "stripe_version = '#{stripe_version}'")
+  return if patched == original
+
+  File.write(podspec_path, patched)
+end
+
 target 'Runner' do
   # ✅ This avoids the PromisesObjC framework header issue
   use_frameworks! :linkage => :static
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  # Xcode 26.4 requires Stripe iOS 25.9.0+ to avoid payment-time crashes.
+  patch_stripe_ios_podspec('25.9.0')
 
   target 'RunnerTests' do
     inherit! :search_paths

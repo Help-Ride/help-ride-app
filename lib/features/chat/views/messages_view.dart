@@ -18,15 +18,36 @@ class MessagesView extends StatefulWidget {
 
 class _MessagesViewState extends State<MessagesView> {
   late final ChatConversationsController _controller;
+  Worker? _loadingWorker;
+  Worker? _conversationsWorker;
+  String? _pendingConversationId;
+  bool _didRetryPendingConversationLookup = false;
+  bool _handledPendingConversation = false;
+  bool _openingPendingConversation = false;
 
   @override
   void initState() {
     super.initState();
     _controller = Get.put(ChatConversationsController());
+    _pendingConversationId = _readInitialConversationId();
+    _loadingWorker = ever<bool>(_controller.loading, (_) {
+      _schedulePendingConversationCheck();
+    });
+    _conversationsWorker = ever<List<ChatConversation>>(
+      _controller.conversations,
+      (_) {
+        _schedulePendingConversationCheck();
+      },
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _schedulePendingConversationCheck();
+    });
   }
 
   @override
   void dispose() {
+    _loadingWorker?.dispose();
+    _conversationsWorker?.dispose();
     if (Get.isRegistered<ChatConversationsController>()) {
       Get.delete<ChatConversationsController>();
     }
@@ -141,6 +162,58 @@ class _MessagesViewState extends State<MessagesView> {
     await Get.to(() => ChatThreadView(conversation: conversation));
     _controller.setActiveConversation(null);
     _controller.fetch();
+  }
+
+  String? _readInitialConversationId() {
+    final args = (Get.arguments as Map?) ?? const {};
+    final conversationId =
+        (args['conversationId'] ?? args['conversation_id'] ?? '')
+            .toString()
+            .trim();
+    return conversationId.isEmpty ? null : conversationId;
+  }
+
+  void _schedulePendingConversationCheck() {
+    Future<void>.microtask(_maybeOpenPendingConversation);
+  }
+
+  Future<void> _maybeOpenPendingConversation() async {
+    final conversationId = (_pendingConversationId ?? '').trim();
+    if (conversationId.isEmpty ||
+        _handledPendingConversation ||
+        _openingPendingConversation ||
+        _controller.loading.value) {
+      return;
+    }
+
+    final conversation = _findConversationById(conversationId);
+    if (conversation == null) {
+      if (_didRetryPendingConversationLookup) {
+        _handledPendingConversation = true;
+        Get.snackbar('Messages', 'Conversation is no longer available.');
+        return;
+      }
+      _didRetryPendingConversationLookup = true;
+      await _controller.fetch();
+      return;
+    }
+
+    _openingPendingConversation = true;
+    _handledPendingConversation = true;
+    try {
+      await _openThread(conversation);
+    } finally {
+      _openingPendingConversation = false;
+    }
+  }
+
+  ChatConversation? _findConversationById(String conversationId) {
+    for (final conversation in _controller.conversations) {
+      if (conversation.id == conversationId) {
+        return conversation;
+      }
+    }
+    return null;
   }
 
   String _roleLabel(ChatConversation conversation, String fallback) {

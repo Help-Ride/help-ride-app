@@ -28,7 +28,7 @@ class ProfileApi {
     String? carYear,
     String? carColor,
     required String plateNumber,
-    required String licenseNumber,
+    String? licenseNumber,
     String? insuranceInfo,
   }) async {
     await _client.post<Map<String, dynamic>>(
@@ -72,6 +72,7 @@ class ProfileApi {
   Future<User> updateUserProfile(
     String userId, {
     String? name,
+    String? email,
     String? phone,
     String? providerAvatarUrl,
   }) async {
@@ -79,6 +80,7 @@ class ProfileApi {
       '/users/$userId',
       data: {
         if (name != null) 'name': name,
+        if (email != null) 'email': email,
         if (phone != null) 'phone': phone,
         if (providerAvatarUrl != null) 'providerAvatarUrl': providerAvatarUrl,
       },

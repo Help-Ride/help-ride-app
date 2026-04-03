@@ -6,12 +6,28 @@ class PaymentIntentSession {
     this.paymentIntentId,
     this.amount,
     this.currency,
+    this.customerId,
+    this.customerEphemeralKeySecret,
   });
 
   final String clientSecret;
   final String? paymentIntentId;
   final int? amount;
   final String? currency;
+  final String? customerId;
+  final String? customerEphemeralKeySecret;
+}
+
+class CustomerSheetSession {
+  const CustomerSheetSession({
+    required this.setupIntentClientSecret,
+    required this.customerId,
+    required this.customerEphemeralKeySecret,
+  });
+
+  final String setupIntentClientSecret;
+  final String customerId;
+  final String customerEphemeralKeySecret;
 }
 
 class PaymentIntentStatus {
@@ -34,21 +50,26 @@ class PaymentsApi {
   PaymentsApi(this._client);
 
   final ApiClient _client;
-  String get _intentPath {
+  String get _paymentsBasePath {
     final base = _client.dio.options.baseUrl.trim().toLowerCase();
-    if (base.endsWith('/api')) return '/payments/intent';
-    return 'payments/intent';
+    if (base.endsWith('/api')) return '/payments';
+    return 'payments';
   }
+
+  String get _intentPath => '$_paymentsBasePath/intent';
+
+  String get _setupIntentPath => '$_paymentsBasePath/setup-intent';
 
   Future<PaymentIntentSession> createPaymentIntent({
     required String bookingId,
+    required bool savePaymentMethod,
   }) async {
     final id = bookingId.trim();
     if (id.isEmpty) throw Exception('Missing bookingId');
 
     final res = await _client.post<dynamic>(
       _intentPath,
-      data: {'bookingId': id},
+      data: {'bookingId': id, 'savePaymentMethod': savePaymentMethod},
     );
 
     final root = _toMap(res.data);
@@ -61,6 +82,10 @@ class PaymentsApi {
         _readPaymentIntentId(root) ?? _readPaymentIntentId(nested);
     final amount = _readAmount(root) ?? _readAmount(nested);
     final currency = _readCurrency(root) ?? _readCurrency(nested);
+    final customerId = _readCustomerId(root) ?? _readCustomerId(nested);
+    final customerEphemeralKeySecret =
+        _readCustomerEphemeralKeySecret(root) ??
+        _readCustomerEphemeralKeySecret(nested);
 
     if (secret == null || secret.trim().isEmpty) {
       throw Exception('Missing payment intent client secret.');
@@ -76,6 +101,43 @@ class PaymentsApi {
           : cleanedIntentId,
       amount: amount,
       currency: currency,
+      customerId: customerId,
+      customerEphemeralKeySecret: customerEphemeralKeySecret,
+    );
+  }
+
+  Future<CustomerSheetSession> createCustomerSheetSession() async {
+    final res = await _client.post<dynamic>(
+      _setupIntentPath,
+      data: const <String, dynamic>{},
+    );
+
+    final root = _toMap(res.data);
+    final nested = _toMap(root['data']);
+
+    final setupIntentClientSecret =
+        _readSetupIntentClientSecret(root) ??
+        _readSetupIntentClientSecret(nested);
+    final customerId = _readCustomerId(root) ?? _readCustomerId(nested);
+    final customerEphemeralKeySecret =
+        _readCustomerEphemeralKeySecret(root) ??
+        _readCustomerEphemeralKeySecret(nested);
+
+    if (setupIntentClientSecret == null || setupIntentClientSecret.isEmpty) {
+      throw Exception('Missing setup intent client secret.');
+    }
+    if (customerId == null || customerId.isEmpty) {
+      throw Exception('Missing Stripe customer ID.');
+    }
+    if (customerEphemeralKeySecret == null ||
+        customerEphemeralKeySecret.isEmpty) {
+      throw Exception('Missing Stripe customer ephemeral key.');
+    }
+
+    return CustomerSheetSession(
+      setupIntentClientSecret: setupIntentClientSecret,
+      customerId: customerId,
+      customerEphemeralKeySecret: customerEphemeralKeySecret,
     );
   }
 
@@ -120,6 +182,18 @@ class PaymentsApi {
         data['payment_intent_client_secret'] ??
         (_toMap(data['paymentIntent'])['client_secret']) ??
         (_toMap(data['payment_intent'])['client_secret']);
+    final value = raw?.toString().trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  String? _readSetupIntentClientSecret(Map<String, dynamic> data) {
+    final raw =
+        data['setupIntentClientSecret'] ??
+        data['setup_intent_client_secret'] ??
+        data['clientSecret'] ??
+        data['client_secret'] ??
+        (_toMap(data['setupIntent'])['client_secret']) ??
+        (_toMap(data['setup_intent'])['client_secret']);
     final value = raw?.toString().trim();
     return value == null || value.isEmpty ? null : value;
   }
@@ -171,6 +245,27 @@ class PaymentsApi {
     final value = raw?.toString().trim();
     if (value == null || value.isEmpty) return null;
     return value.toUpperCase();
+  }
+
+  String? _readCustomerId(Map<String, dynamic> data) {
+    final raw =
+        data['customerId'] ??
+        data['customer_id'] ??
+        (_toMap(data['customer'])['id']);
+    final value = raw?.toString().trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  String? _readCustomerEphemeralKeySecret(Map<String, dynamic> data) {
+    final raw =
+        data['customerEphemeralKeySecret'] ??
+        data['customer_ephemeral_key_secret'] ??
+        data['ephemeralKeySecret'] ??
+        data['ephemeral_key_secret'];
+    final value = raw?.toString().trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
   }
 
   String? _readIntentStatus(Map<String, dynamic> data) {

@@ -4,7 +4,13 @@ enum DriverRidesTab { upcoming, past }
 
 enum DriverRideListFilter { all, oneTime, recurring, cancelled, occurrences }
 
-enum DriverRideOccurrenceFilter { all, upcoming, modified, cancelled, completed }
+enum DriverRideOccurrenceFilter {
+  all,
+  upcoming,
+  modified,
+  cancelled,
+  completed,
+}
 
 enum DriverRideSeriesLifecycle { active, paused, ended }
 
@@ -54,7 +60,15 @@ class DriverRideItem {
   String get normalizedStatus => status.trim().toLowerCase();
   bool get isCancelled => normalizedStatus.contains('cancel');
   bool get isCompleted => normalizedStatus.contains('complete');
+  bool get isOngoing =>
+      normalizedStatus.contains('ongoing') ||
+      normalizedStatus.contains('in_progress');
   bool get isUpcoming => startTime.isAfter(DateTime.now());
+  bool get isPastUnmanaged =>
+      !isUpcoming && !isCancelled && !isCompleted && !isOngoing;
+  bool get isEffectivelyCompleted => isCompleted || isPastUnmanaged;
+  bool get canEditOccurrence =>
+      isUpcoming && !isCancelled && !isCompleted && !isOngoing;
   String get routeLabel => '$from → $to';
 }
 
@@ -105,8 +119,10 @@ class DriverRideSeriesSummary {
 
   int get totalOccurrences => occurrences.length;
   int get upcomingCount => upcomingOccurrences.length;
-  int get cancelledCount => occurrences.where((ride) => ride.isCancelled).length;
-  int get completedCount => occurrences.where((ride) => ride.isCompleted).length;
+  int get cancelledCount =>
+      occurrences.where((ride) => ride.isCancelled).length;
+  int get completedCount =>
+      occurrences.where((ride) => ride.isEffectivelyCompleted).length;
   int get modifiedCount => occurrences.where(isModifiedOccurrence).length;
 
   DriverRideSeriesLifecycle get lifecycleStatus {
@@ -143,14 +159,14 @@ class DriverRideSeriesSummary {
         ride.startTime.minute == baseline.startTime.minute;
     final sameRoute = ride.from == baseline.from && ride.to == baseline.to;
     final sameSeats = ride.seatsTotal == baseline.seatsTotal;
-    final samePrice =
-        (ride.pricePerSeat - baseline.pricePerSeat).abs() < 0.01;
+    final samePrice = (ride.pricePerSeat - baseline.pricePerSeat).abs() < 0.01;
     final sameArrivalTime =
         ride.arrivalTime?.hour == baseline.arrivalTime?.hour &&
         ride.arrivalTime?.minute == baseline.arrivalTime?.minute;
     final sameStops = _sameList(ride.stops, baseline.stops);
     final sameAmenities = _sameList(ride.amenities, baseline.amenities);
-    final sameNotes = (ride.notes ?? '').trim() == (baseline.notes ?? '').trim();
+    final sameNotes =
+        (ride.notes ?? '').trim() == (baseline.notes ?? '').trim();
 
     return !sameWeekday ||
         !sameTimeOfDay ||
@@ -163,6 +179,13 @@ class DriverRideSeriesSummary {
         !sameNotes;
   }
 
+  bool shouldSurfaceInOverview(DriverRideItem ride) {
+    if (ride.isUpcoming) return true;
+    if (ride.isCancelled) return true;
+    if (ride.booked > 0) return true;
+    return isModifiedOccurrence(ride);
+  }
+
   static bool _sameList(List<String> a, List<String> b) {
     if (a.length != b.length) return false;
     for (var index = 0; index < a.length; index++) {
@@ -173,12 +196,10 @@ class DriverRideSeriesSummary {
 }
 
 class DriverRideListEntry {
-  const DriverRideListEntry._({
-    this.ride,
-    this.series,
-  });
+  const DriverRideListEntry._({this.ride, this.series});
 
-  const DriverRideListEntry.occurrence(DriverRideItem ride) : this._(ride: ride);
+  const DriverRideListEntry.occurrence(DriverRideItem ride)
+    : this._(ride: ride);
 
   const DriverRideListEntry.series(DriverRideSeriesSummary series)
     : this._(series: series);

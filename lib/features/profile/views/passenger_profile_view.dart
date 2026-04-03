@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_constants.dart';
@@ -103,30 +104,44 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
           user.roleDefault == 'driver' ||
           theme.role.value == AppRole.driver;
       final roleLabel = isDriver ? 'Driver' : 'Passenger';
+      final hasEmail = user.email.trim().isNotEmpty;
       final hasPhone = user.phone?.trim().isNotEmpty ?? false;
-      final needsEmailVerification = !user.emailVerified;
+      final needsEmailVerification = hasEmail && !user.emailVerified;
       final needsPhoneVerification = hasPhone && !user.phoneVerified;
       final hasPendingContactVerification =
           needsEmailVerification || needsPhoneVerification;
       final isVerified =
-          (user.emailVerified && (!hasPhone || user.phoneVerified)) ||
-          user.driverProfile?.isVerified == true;
+          (((!hasEmail || user.emailVerified) &&
+              (!hasPhone || user.phoneVerified)) ||
+          user.driverProfile?.isVerified == true);
 
       return Scaffold(
         backgroundColor: _surfaceBg(isDark),
         body: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
             children: [
-              Text(
-                'Profile',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: _textPrimary(isDark),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Profile',
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.6,
+                        color: _textPrimary(isDark),
+                      ),
+                    ),
+                  ),
+                  _HeaderActionButton(
+                    icon: Icons.tune_rounded,
+                    isDark: isDark,
+                    onTap: () => _openQuickActionsSheet(context, session),
+                  ),
+                ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 18),
               _UserCard(
                 user: user,
                 roleLabel: roleLabel,
@@ -135,13 +150,41 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                     : AppColors.passengerPrimary,
                 isVerified: isVerified,
                 isDark: isDark,
-                onEdit: () => _openUserEditSheet(context, user),
+                avatarUploading:
+                    _controller.avatarUploading.value ||
+                    _controller.loading.value,
+                onUploadPhoto: () =>
+                    _captureAndUploadProfilePhoto(context, user),
                 onOpenVerificationDrawer: hasPendingContactVerification
                     ? () => _openVerificationDrawer(context, user)
                     : null,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 24),
+              _SectionLabel(
+                label: 'Account',
+                subtitle: 'Personal details and ride contact preferences.',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
+              _ActionGroup(
+                items: [
+                  _ActionItem(
+                    icon: Icons.person_outline_rounded,
+                    label: 'Personal info',
+                    subtitle: user.name.trim().isEmpty
+                        ? 'Add the name shown on rides and messages'
+                        : user.name,
+                    onTap: () => _openPersonalInfoSheet(context, user),
+                  ),
+                ],
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
               _ContactMethodsCard(
+                key: ValueKey(
+                  '${user.name}|${user.email}|${user.phone}|${user.emailVerified}|${user.phoneVerified}|${user.pendingEmail}|${user.pendingPhone}',
+                ),
+                controller: _controller,
                 user: user,
                 isDark: isDark,
                 onVerifyEmail: user.emailVerified
@@ -166,8 +209,15 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                     ? () => _openVerificationDrawer(context, user)
                     : null,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 22),
               if (isDriver || _controller.driverProfile.value != null) ...[
+                _SectionLabel(
+                  label: 'Driver profile',
+                  subtitle:
+                      'Vehicle details, verification, and driving documents.',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 10),
                 _DriverProfileCard(
                   controller: _controller,
                   profile: _controller.driverProfile.value,
@@ -177,37 +227,116 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                     context,
                     _controller.driverProfile.value,
                   ),
+                  onOpenDocuments: () => _openDriverDocumentsSheet(context),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 22),
               ],
-              _SectionLabel(label: 'SUPPORT', isDark: isDark),
-              const SizedBox(height: 8),
+              _SectionLabel(
+                label: 'Payments',
+                subtitle: 'Manage cards for bookings and payouts.',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
               _ActionGroup(
                 items: [
                   _ActionItem(
-                    icon: Icons.help_outline,
-                    label: 'Help Center',
-                    onTap: () => Get.toNamed(SupportRoutes.tickets),
+                    icon: Icons.credit_card_outlined,
+                    label: 'Payment methods',
+                    subtitle: _controller.paymentMethodsLoading.value
+                        ? 'Opening card manager...'
+                        : 'Manage cards and saved checkout methods',
+                    trailing: _controller.paymentMethodsLoading.value
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _textPrimary(isDark),
+                            ),
+                          )
+                        : null,
+                    onTap: _controller.paymentMethodsLoading.value
+                        ? null
+                        : () => unawaited(_openPaymentMethods()),
+                  ),
+                ],
+                isDark: isDark,
+              ),
+              if (isDriver ||
+                  _controller.stripeConnectStatus.value.hasStripeAccount) ...[
+                const SizedBox(height: 10),
+                _StripeConnectSection(controller: _controller, isDark: isDark),
+              ],
+              const SizedBox(height: 22),
+              _SectionLabel(
+                label: 'Safety & support',
+                subtitle: 'Get help, policy details, and safety guidance.',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
+              _ActionGroup(
+                items: [
+                  _ActionItem(
+                    icon: Icons.shield_outlined,
+                    label: 'Emergency & safety',
+                    subtitle: 'Safety guidance and support during active trips',
+                    onTap: () => Get.toNamed(
+                      SupportRoutes.tickets,
+                      arguments: const {'topic': 'safety'},
+                    ),
+                  ),
+                  _ActionItem(
+                    icon: Icons.support_agent_outlined,
+                    label: 'Help & support',
+                    subtitle: 'Open support tickets and contact HelpRide',
+                    onTap: () => Get.toNamed(
+                      SupportRoutes.tickets,
+                      arguments: const {'topic': 'support'},
+                    ),
                   ),
                   _ActionItem(
                     icon: Icons.policy_outlined,
-                    label: 'Terms & Privacy',
+                    label: 'Terms & privacy',
+                    subtitle: 'Policies, privacy, and legal information',
                     onTap: () => Get.toNamed(ProfileRoutes.termsPrivacy),
                   ),
                 ],
                 isDark: isDark,
               ),
-              const SizedBox(height: 16),
-              _SectionLabel(label: 'ACCOUNT', isDark: isDark),
-              const SizedBox(height: 8),
+              const SizedBox(height: 22),
+              _SectionLabel(
+                label: 'Account actions',
+                subtitle: 'Manage your session and account access.',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
               _ActionGroup(
                 items: [
                   _ActionItem(
+                    icon: Icons.logout_rounded,
+                    label: 'Log out',
+                    subtitle: 'Sign out from this device',
+                    destructive: true,
+                    onTap: () async {
+                      await session.logout();
+                      Get.offAllNamed(AppRoutes.login);
+                    },
+                  ),
+                  _ActionItem(
                     icon: Icons.delete_forever_outlined,
                     label: _controller.deleteAccountLoading.value
-                        ? 'Deleting Account...'
-                        : 'Delete Account',
+                        ? 'Deleting account...'
+                        : 'Delete account',
+                    subtitle:
+                        'Permanently remove your HelpRide account and profile',
                     destructive: true,
+                    trailing: _controller.deleteAccountLoading.value
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
                     onTap: _controller.deleteAccountLoading.value
                         ? null
                         : () => _confirmDeleteAccount(context),
@@ -215,15 +344,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                 ],
                 isDark: isDark,
               ),
-              const SizedBox(height: 16),
-              _LogoutCard(
-                onLogout: () async {
-                  await session.logout();
-                  Get.offAllNamed(AppRoutes.login);
-                },
-                isDark: isDark,
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               Center(
                 child: Text(
                   'Version 1.0.0',
@@ -245,6 +366,184 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
     if (_didAutoOpenDriverEditor || !widget.openDriverEditorOnLoad) return;
     _didAutoOpenDriverEditor = true;
     await _openDriverEditSheet(context, _controller.driverProfile.value);
+  }
+
+  Future<void> _openPaymentMethods() async {
+    try {
+      final updated = await _controller.openPaymentMethodsSheet();
+      if (!updated) return;
+      Get.snackbar(
+        'Payment methods updated',
+        'Saved cards will be available during checkout.',
+      );
+    } catch (error) {
+      final message = error.toString().replaceFirst('Exception: ', '').trim();
+      Get.snackbar(
+        'Payment methods unavailable',
+        message.isEmpty ? 'Could not open payment methods.' : message,
+      );
+    }
+  }
+
+  Future<void> _openPersonalInfoSheet(BuildContext context, User user) async {
+    final nameCtrl = TextEditingController(text: user.name);
+    final formKey = GlobalKey<FormState>();
+
+    await _showEditSheet(
+      context,
+      title: 'Personal info',
+      saveLabel: 'Save changes',
+      formKey: formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SheetSectionTitle(
+            title: 'Display name',
+            subtitle: 'This name appears on rides, bookings, and messages.',
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
+          const SizedBox(height: 12),
+          _EditField(
+            controller: nameCtrl,
+            label: 'Full name',
+            validator: (value) => InputValidators.requiredText(
+              value ?? '',
+              fieldLabel: 'Full name',
+            ),
+            helperText: 'Keep this aligned with the name riders should see.',
+          ),
+        ],
+      ),
+      onSave: () async {
+        final nextName = nameCtrl.text.trim();
+        if (nextName == user.name.trim()) {
+          return true;
+        }
+        try {
+          await _controller.updateUserProfile(
+            name: nextName,
+            email: user.email,
+            phone: PhoneNumberUtils.formatForDisplay(user.phone),
+            avatarUrl: user.avatarUrl ?? '',
+          );
+          return true;
+        } catch (e) {
+          if (context.mounted) {
+            _showError(context, e);
+          }
+          return false;
+        }
+      },
+      isSaving: _controller.loading,
+    );
+
+    nameCtrl.dispose();
+  }
+
+  Future<void> _openDriverDocumentsSheet(BuildContext context) async {
+    await _controller.refreshDriverDocuments();
+    if (!context.mounted) return;
+    await _showEditSheet(
+      context,
+      title: 'Driver documents',
+      saveLabel: 'Done',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SheetSectionTitle(
+            title: 'Verification uploads',
+            subtitle:
+                'Manage the license, insurance, and supporting documents used for driver review.',
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
+          const SizedBox(height: 12),
+          _DriverDocumentUploadSection(
+            controller: _controller,
+            isDark: Get.find<ThemeController>().isDark.value,
+          ),
+        ],
+      ),
+      onSave: () async => true,
+      isSaving: false.obs,
+    );
+  }
+
+  void _openQuickActionsSheet(BuildContext context, SessionController session) {
+    final isDark = Get.find<ThemeController>().isDark.value;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _surfaceCard(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE6EAF2),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Quick actions',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary(isDark),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _ActionGroup(
+                  isDark: isDark,
+                  items: [
+                    _ActionItem(
+                      icon: Icons.support_agent_outlined,
+                      label: 'Help & support',
+                      subtitle: 'Open support tickets and contact HelpRide',
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        Get.toNamed(SupportRoutes.tickets);
+                      },
+                    ),
+                    _ActionItem(
+                      icon: Icons.policy_outlined,
+                      label: 'Terms & privacy',
+                      subtitle: 'Review policies, privacy, and legal info',
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        Get.toNamed(ProfileRoutes.termsPrivacy);
+                      },
+                    ),
+                    _ActionItem(
+                      icon: Icons.logout_rounded,
+                      label: 'Log out',
+                      subtitle: 'Sign out from this device',
+                      destructive: true,
+                      onTap: () async {
+                        Navigator.of(sheetContext).pop();
+                        await session.logout();
+                        Get.offAllNamed(AppRoutes.login);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _confirmDeleteAccount(BuildContext context) async {
@@ -336,113 +635,51 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
     return normalizedHost == 'stripe' && normalizedPath == '/return';
   }
 
-  Future<void> _openUserEditSheet(BuildContext context, User user) async {
-    final nameCtrl = TextEditingController(text: user.name);
-    final emailCtrl = TextEditingController(text: user.email);
-    final phoneCtrl = TextEditingController(
-      text: PhoneNumberUtils.formatForDisplay(user.phone),
-    );
-    final avatarCtrl = TextEditingController(text: user.avatarUrl ?? '');
-    final formKey = GlobalKey<FormState>();
-    Map<String, dynamic>? pendingPhoneVerification;
+  Future<void> _captureAndUploadProfilePhoto(
+    BuildContext context,
+    User user,
+  ) async {
+    if (_controller.avatarUploading.value || _controller.loading.value) return;
+    final messenger = ScaffoldMessenger.of(context);
 
-    await _showEditSheet(
-      context,
-      title: 'Manage Contact & Profile',
-      formKey: formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SheetSectionTitle(
-            title: 'Profile Photo',
-            subtitle: 'Upload a profile image and save it with your account.',
-            isDark: Get.find<ThemeController>().isDark.value,
-          ),
-          const SizedBox(height: 12),
-          _ProfilePhotoUploadField(
-            controller: _controller,
-            avatarCtrl: avatarCtrl,
-            isDark: Get.find<ThemeController>().isDark.value,
-          ),
-          const SizedBox(height: 12),
-          _EditField(
-            controller: nameCtrl,
-            label: 'Full name',
-            validator: (value) => InputValidators.minLength(
-              value ?? '',
-              fieldLabel: 'Full name',
-              minChars: 2,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _SheetSectionTitle(
-            title: 'Contact Methods',
-            subtitle:
-                'Verified contact methods are used for ride alerts, OTP sign-in, and booking communication.',
-            isDark: Get.find<ThemeController>().isDark.value,
-          ),
-          const SizedBox(height: 12),
-          _ContactStatusSummary(
-            emailVerified: user.emailVerified,
-            phoneVerified: user.phoneVerified,
-            hasPhone: (user.phone?.trim().isNotEmpty ?? false),
-            isDark: Get.find<ThemeController>().isDark.value,
-          ),
-          const SizedBox(height: 12),
-          _EditField(
-            controller: emailCtrl,
-            label: 'Sign-in email',
-            readOnly: true,
-            helperText: user.emailVerified
-                ? 'Verified and stored as your account email.'
-                : 'Unverified. You can verify it from the profile card.',
-          ),
-          const SizedBox(height: 12),
-          _EditField(
-            controller: phoneCtrl,
-            label: 'Mobile number',
-            keyboardType: TextInputType.phone,
-            inputFormatters: const [PhoneTextInputFormatter()],
-            helperText:
-                'Changing this number will require a new SMS verification code before ride alerts resume.',
-            validator: (value) => InputValidators.optionalPhone(value ?? ''),
-          ),
-        ],
-      ),
-      onSave: () async {
-        try {
-          final beforePhone = PhoneNumberUtils.normalizeToE164(
-            user.phone ?? '',
-          );
-          final updatedUser = await _controller.updateUserProfile(
-            name: nameCtrl.text,
-            phone: phoneCtrl.text,
-            avatarUrl: avatarCtrl.text,
-          );
-          final afterPhone = PhoneNumberUtils.normalizeToE164(
-            updatedUser.phone ?? phoneCtrl.text,
-          );
-          final phoneChanged = beforePhone != afterPhone;
-          if (phoneChanged &&
-              (updatedUser.phone?.trim().isNotEmpty ?? false) &&
-              !updatedUser.phoneVerified) {
-            pendingPhoneVerification = {
-              'phone': updatedUser.phone,
-              'email': updatedUser.email,
-              'autoSend': true,
-            };
-          }
-          return true;
-        } catch (e) {
-          _showError(context, e);
-          return false;
-        }
-      },
-      isSaving: _controller.loading,
-    );
+    try {
+      final picker = ImagePicker();
+      final captured = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 86,
+        maxWidth: 1440,
+      );
+      if (!mounted || captured == null) return;
 
-    if (pendingPhoneVerification != null) {
-      Get.toNamed(AuthRoutes.verifyPhone, arguments: pendingPhoneVerification);
+      final uploadedValue = await _controller.uploadProfilePhoto(
+        filePath: captured.path,
+        fileName: captured.name.trim().isNotEmpty
+            ? captured.name.trim()
+            : captured.path.split('/').last,
+        mimeType: lookupMimeType(captured.path) ?? 'image/jpeg',
+      );
+      if (!mounted) return;
+
+      await _controller.updateUserProfile(
+        name: user.name,
+        email: user.email,
+        phone: PhoneNumberUtils.formatForDisplay(user.phone),
+        avatarUrl: uploadedValue,
+      );
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Profile photo updated.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '').trim();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            message.isEmpty ? 'Could not update profile photo.' : message,
+          ),
+        ),
+      );
     }
   }
 
@@ -467,6 +704,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
     await _showEditSheet(
       context,
       title: profile == null ? 'Create Driver Profile' : 'Edit Driver Profile',
+      saveLabel: 'Save changes',
       formKey: formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -515,11 +753,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
           const SizedBox(height: 12),
           _EditField(
             controller: licenseCtrl,
-            label: 'License number',
-            validator: (value) => InputValidators.requiredText(
-              value ?? '',
-              fieldLabel: 'License number',
-            ),
+            label: 'License number (optional)',
           ),
           const SizedBox(height: 18),
           _SheetSectionTitle(
@@ -549,7 +783,9 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
           );
           return true;
         } catch (e) {
-          _showError(context, e);
+          if (context.mounted) {
+            _showError(context, e);
+          }
           return false;
         }
       },
@@ -563,6 +799,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
     required Widget child,
     required Future<bool> Function() onSave,
     required RxBool isSaving,
+    String saveLabel = 'Save',
     GlobalKey<FormState>? formKey,
   }) {
     final isDark = Get.find<ThemeController>().isDark.value;
@@ -646,6 +883,7 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                                 }
                                 final ok = await onSave();
                                 if (!ok) return;
+                                if (!sheetContext.mounted) return;
                                 if (Navigator.of(sheetContext).canPop()) {
                                   Navigator.of(sheetContext).pop();
                                 }
@@ -667,9 +905,11 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text(
-                                'Save',
-                                style: TextStyle(fontWeight: FontWeight.w700),
+                            : Text(
+                                saveLabel,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                       ),
                     );
@@ -691,7 +931,8 @@ class _PassengerProfileViewState extends State<PassengerProfileView>
 
   void _openVerificationDrawer(BuildContext context, User user) {
     final hasPhone = user.phone?.trim().isNotEmpty ?? false;
-    final needsEmailVerification = !user.emailVerified;
+    final needsEmailVerification =
+        user.email.trim().isNotEmpty && !user.emailVerified;
     final needsPhoneVerification = hasPhone && !user.phoneVerified;
     if (!needsEmailVerification && !needsPhoneVerification) return;
 
@@ -795,7 +1036,8 @@ class _UserCard extends StatelessWidget {
     required this.roleColor,
     required this.isVerified,
     required this.isDark,
-    required this.onEdit,
+    required this.avatarUploading,
+    required this.onUploadPhoto,
     this.onOpenVerificationDrawer,
   });
 
@@ -804,7 +1046,8 @@ class _UserCard extends StatelessWidget {
   final Color roleColor;
   final bool isVerified;
   final bool isDark;
-  final VoidCallback onEdit;
+  final bool avatarUploading;
+  final VoidCallback onUploadPhoto;
   final VoidCallback? onOpenVerificationDrawer;
 
   @override
@@ -813,126 +1056,190 @@ class _UserCard extends StatelessWidget {
     final initials = _initialsFor(user.name);
     final formattedPhone = PhoneNumberUtils.formatForDisplay(user.phone);
     final hasPhone = formattedPhone.trim().isNotEmpty;
+    final verificationLabel = isVerified
+        ? 'Contact verified'
+        : 'Verification needed';
+    final verificationColor = isVerified
+        ? AppColors.passengerPrimary
+        : const Color(0xFF9C6A09);
+    final verificationBg = isVerified
+        ? (isDark ? const Color(0xFF14382B) : const Color(0xFFE8FAF3))
+        : (isDark ? const Color(0xFF3A2C10) : const Color(0xFFFFF4D6));
+    final verificationBorder = isVerified
+        ? (isDark ? const Color(0xFF1E5B45) : const Color(0xFFD8F2E5))
+        : (isDark ? const Color(0xFF5A4414) : const Color(0xFFF3D98B));
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _surfaceCard(isDark),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _cardBorder(isDark)),
+        boxShadow: _cardShadow(isDark),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: isDark
-                    ? const Color(0xFF1C2331)
-                    : const Color(0xFFE9EEF6),
-                backgroundImage: avatarUrl.isNotEmpty
-                    ? NetworkImage(avatarUrl)
-                    : null,
-                child: avatarUrl.isEmpty
-                    ? Text(
-                        initials.toUpperCase(),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.lightText,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: isDark
+                        ? const Color(0xFF1C2331)
+                        : const Color(0xFFE9EEF6),
+                    backgroundImage: avatarUrl.isNotEmpty
+                        ? NetworkImage(avatarUrl)
+                        : null,
+                    child: avatarUrl.isEmpty
+                        ? Text(
+                            initials.toUpperCase(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.lightText,
+                            ),
+                          )
+                        : null,
+                  ),
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: avatarUploading ? null : onUploadPhoto,
+                        borderRadius: BorderRadius.circular(99),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: AppColors.passengerPrimary,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _surfaceCard(isDark),
+                              width: 2,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x14000000),
+                                blurRadius: 10,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: avatarUploading
+                                ? SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: _textPrimary(isDark),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.photo_camera_outlined,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
+                          ),
                         ),
-                      )
-                    : null,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Text(
+                      user.name.isNotEmpty ? user.name : 'User',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                        color: _textPrimary(isDark),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        Expanded(
-                          child: Text(
-                            user.name.isNotEmpty ? user.name : 'User',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: _textPrimary(isDark),
-                            ),
+                        _TagChip(
+                          label: roleLabel,
+                          textColor: roleColor,
+                          background: roleColor.withValues(
+                            alpha: isDark ? 0.2 : 0.12,
                           ),
                         ),
-                        IconButton(
-                          onPressed: onEdit,
-                          splashRadius: 20,
-                          tooltip: 'Edit personal information',
-                          constraints: const BoxConstraints(),
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.edit_outlined),
-                          color: AppColors.passengerPrimary,
+                        GestureDetector(
+                          onTap: isVerified ? null : onOpenVerificationDrawer,
+                          child: _OutlinedTagChip(
+                            label: verificationLabel,
+                            textColor: verificationColor,
+                            background: verificationBg,
+                            borderColor: verificationBorder,
+                            icon: isVerified
+                                ? Icons.verified_rounded
+                                : Icons.pending_outlined,
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    _HeaderMetaLine(
-                      icon: Icons.mail_outline,
-                      value: user.email,
-                      isDark: isDark,
-                    ),
-                    if (hasPhone)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: _HeaderMetaLine(
-                          icon: Icons.phone_iphone_outlined,
-                          value: formattedPhone,
-                          isDark: isDark,
-                        ),
-                      ),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _TagChip(
-                label: roleLabel,
-                textColor: roleColor,
-                background: roleColor.withValues(alpha: isDark ? 0.22 : 0.12),
-              ),
-              GestureDetector(
-                onTap: isVerified ? null : onOpenVerificationDrawer,
-                child: _OutlinedTagChip(
-                  label: isVerified
-                      ? 'Contact verified'
-                      : 'Verification needed',
-                  textColor: isVerified
-                      ? AppColors.passengerPrimary
-                      : const Color(0xFF8A5A00),
-                  background: isVerified
-                      ? (isDark
-                            ? const Color(0xFF14382B)
-                            : const Color(0xFFE8FAF3))
-                      : (isDark
-                            ? const Color(0xFF3C2E07)
-                            : const Color(0xFFFFF4D6)),
-                  borderColor: isVerified
-                      ? (isDark
-                            ? const Color(0xFF1E5B45)
-                            : const Color(0xFFD7F1E4))
-                      : (isDark
-                            ? const Color(0xFF5C4411)
-                            : const Color(0xFFF1D98C)),
-                  icon: isVerified
-                      ? Icons.verified_outlined
-                      : Icons.pending_outlined,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: _fieldFill(isDark),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _cardBorder(isDark)),
+            ),
+            child: Column(
+              children: [
+                _HeaderMetaLine(
+                  icon: Icons.mail_outline,
+                  value: user.email.trim().isEmpty
+                      ? 'Add your email address'
+                      : user.email,
+                  isDark: isDark,
                 ),
-              ),
-            ],
+                if (hasPhone) ...[
+                  const SizedBox(height: 10),
+                  Divider(height: 1, color: _cardDivider(isDark)),
+                  const SizedBox(height: 10),
+                ],
+                _HeaderMetaLine(
+                  icon: Icons.phone_iphone_outlined,
+                  value: hasPhone ? formattedPhone : 'Add your mobile number',
+                  isDark: isDark,
+                ),
+                if (avatarUploading) ...[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Updating profile photo...',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _mutedText(isDark),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -950,8 +1257,10 @@ class _UserCard extends StatelessWidget {
   }
 }
 
-class _ContactMethodsCard extends StatelessWidget {
+class _ContactMethodsCard extends StatefulWidget {
   const _ContactMethodsCard({
+    super.key,
+    required this.controller,
     required this.user,
     required this.isDark,
     this.onVerifyEmail,
@@ -959,6 +1268,7 @@ class _ContactMethodsCard extends StatelessWidget {
     this.onOpenVerificationDrawer,
   });
 
+  final ProfileController controller;
   final User user;
   final bool isDark;
   final VoidCallback? onVerifyEmail;
@@ -966,104 +1276,614 @@ class _ContactMethodsCard extends StatelessWidget {
   final VoidCallback? onOpenVerificationDrawer;
 
   @override
+  State<_ContactMethodsCard> createState() => _ContactMethodsCardState();
+}
+
+class _ContactMethodsCardState extends State<_ContactMethodsCard> {
+  Future<void> _openEmailSheet() async {
+    final currentEmail = widget.user.email.trim();
+    final pendingEmail = widget.user.pendingEmail?.trim() ?? '';
+    final hasPendingChange =
+        pendingEmail.isNotEmpty &&
+        pendingEmail.toLowerCase() != currentEmail.toLowerCase();
+    final needsVerification =
+        currentEmail.isNotEmpty && !widget.user.emailVerified;
+
+    if (hasPendingChange) {
+      await _showVerificationFirstSheet(
+        title: 'Verify your new email',
+        value: pendingEmail,
+        message:
+            'Your current email stays active until the new address is verified.',
+        actionLabel: 'Verify new email',
+        onAction: () => Get.toNamed(
+          AuthRoutes.verifyEmail,
+          arguments: {'email': pendingEmail},
+        ),
+      );
+      return;
+    }
+
+    if (needsVerification) {
+      await _showVerificationFirstSheet(
+        title: 'Verify email first',
+        value: currentEmail,
+        message:
+            'Verify your current email before changing it. This helps protect account recovery and important trip updates.',
+        actionLabel: 'Verify email',
+        onAction: widget.onVerifyEmail,
+      );
+      return;
+    }
+
+    final emailCtrl = TextEditingController(text: currentEmail);
+    await _showContactEditorSheet(
+      title: currentEmail.isEmpty ? 'Add email' : 'Edit email',
+      fieldLabel: 'Email',
+      controller: emailCtrl,
+      keyboardType: TextInputType.emailAddress,
+      validator: (value) {
+        final trimmed = value?.trim() ?? '';
+        if (trimmed.isEmpty) return 'Email is required.';
+        return InputValidators.email(trimmed);
+      },
+      helperText:
+          'If you change your email, you will need to verify the new address before it becomes active.',
+      onSave: () async {
+        final beforeEmail = widget.user.email.trim().toLowerCase();
+        final beforePendingEmail = pendingEmail.toLowerCase();
+        final nextEmail = emailCtrl.text.trim().toLowerCase();
+        if (nextEmail == beforeEmail ||
+            (beforePendingEmail.isNotEmpty &&
+                nextEmail == beforePendingEmail)) {
+          return _ContactEditResult.noChanges();
+        }
+        final updatedUser = await widget.controller.updateUserProfile(
+          name: widget.user.name,
+          email: emailCtrl.text,
+          phone: PhoneNumberUtils.formatForDisplay(widget.user.phone),
+          avatarUrl: widget.user.avatarUrl ?? '',
+        );
+        final updatedPendingEmail = updatedUser.pendingEmail?.trim() ?? '';
+        return updatedPendingEmail.isNotEmpty &&
+                updatedPendingEmail.toLowerCase() != beforeEmail
+            ? _ContactEditResult.verifyEmail(updatedPendingEmail)
+            : _ContactEditResult.saved();
+      },
+    );
+    emailCtrl.dispose();
+  }
+
+  Future<void> _openPhoneSheet() async {
+    final hasPhone = widget.user.phone?.trim().isNotEmpty ?? false;
+    final formattedPhone = PhoneNumberUtils.formatForDisplay(widget.user.phone);
+    final pendingPhone = widget.user.pendingPhone?.trim() ?? '';
+    final hasPendingChange =
+        pendingPhone.isNotEmpty &&
+        pendingPhone != (widget.user.phone?.trim() ?? '');
+    final needsVerification = hasPhone && !widget.user.phoneVerified;
+
+    if (hasPendingChange) {
+      await _showVerificationFirstSheet(
+        title: 'Verify your new mobile',
+        value: PhoneNumberUtils.formatForDisplay(pendingPhone),
+        message:
+            'Your current mobile number stays active until the new number is verified.',
+        actionLabel: 'Verify new mobile',
+        onAction: () => Get.toNamed(
+          AuthRoutes.verifyPhone,
+          arguments: {
+            'phone': pendingPhone,
+            'email': widget.user.email,
+            'autoSend': true,
+          },
+        ),
+      );
+      return;
+    }
+
+    if (needsVerification) {
+      await _showVerificationFirstSheet(
+        title: 'Verify mobile first',
+        value: formattedPhone,
+        message:
+            'Verify your current mobile number before changing it. This protects ride alerts and SMS sign-in.',
+        actionLabel: 'Verify mobile',
+        onAction: widget.onVerifyPhone,
+      );
+      return;
+    }
+
+    final phoneCtrl = TextEditingController(text: formattedPhone);
+    await _showContactEditorSheet(
+      title: hasPhone ? 'Edit mobile number' : 'Add mobile number',
+      fieldLabel: 'Mobile number',
+      controller: phoneCtrl,
+      keyboardType: TextInputType.phone,
+      inputFormatters: const [PhoneTextInputFormatter()],
+      validator: (value) => InputValidators.optionalPhone(value ?? ''),
+      helperText:
+          'If you change your number, the new number must be verified before ride alerts and SMS sign-in use it.',
+      onSave: () async {
+        final beforePhone = PhoneNumberUtils.normalizeToE164(
+          widget.user.phone ?? '',
+        );
+        final beforePendingPhone = PhoneNumberUtils.normalizeToE164(
+          pendingPhone,
+        );
+        final nextPhone = PhoneNumberUtils.normalizeToE164(phoneCtrl.text);
+        if (nextPhone == null ||
+            nextPhone == beforePhone ||
+            (beforePendingPhone != null && nextPhone == beforePendingPhone)) {
+          return _ContactEditResult.noChanges();
+        }
+        final updatedUser = await widget.controller.updateUserProfile(
+          name: widget.user.name,
+          email: widget.user.email,
+          phone: phoneCtrl.text,
+          avatarUrl: widget.user.avatarUrl ?? '',
+        );
+        final updatedPendingPhone = updatedUser.pendingPhone?.trim() ?? '';
+        return beforePhone != updatedPendingPhone &&
+                updatedPendingPhone.isNotEmpty
+            ? _ContactEditResult.verifyPhone(
+                phone: updatedPendingPhone,
+                email: updatedUser.email,
+              )
+            : _ContactEditResult.saved();
+      },
+    );
+    phoneCtrl.dispose();
+  }
+
+  Future<void> _showVerificationFirstSheet({
+    required String title,
+    required String value,
+    required String message,
+    required String actionLabel,
+    required VoidCallback? onAction,
+  }) {
+    final isDark = widget.isDark;
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _surfaceCard(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE6EAF2),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary(isDark),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary(isDark),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  style: TextStyle(
+                    color: _mutedText(isDark),
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: onAction == null
+                        ? null
+                        : () {
+                            Navigator.of(sheetContext).pop();
+                            onAction();
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.passengerPrimary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      actionLabel,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showContactEditorSheet({
+    required String title,
+    required String fieldLabel,
+    required TextEditingController controller,
+    required Future<_ContactEditResult> Function() onSave,
+    required String? Function(String?) validator,
+    required String helperText,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+  }) async {
+    final isDark = widget.isDark;
+    final formKey = GlobalKey<FormState>();
+    final messenger = ScaffoldMessenger.of(context);
+    String? apiError;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _surfaceCard(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        final viewInsets = MediaQuery.of(sheetContext).viewInsets.bottom;
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: viewInsets),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6EAF2),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: _textPrimary(isDark),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        helperText,
+                        style: TextStyle(
+                          color: _mutedText(isDark),
+                          fontSize: 13,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _EditField(
+                        controller: controller,
+                        label: fieldLabel,
+                        keyboardType: keyboardType,
+                        inputFormatters: inputFormatters,
+                        validator: validator,
+                        helperText:
+                            'Verification will be required after saving.',
+                        forceErrorText: apiError,
+                        onChanged: (_) {
+                          if (apiError != null) {
+                            setSheetState(() => apiError = null);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Obx(() {
+                        final saving = widget.controller.loading.value;
+                        return SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: saving
+                                ? null
+                                : () async {
+                                    if (!(formKey.currentState?.validate() ??
+                                        false)) {
+                                      return;
+                                    }
+                                    try {
+                                      final result = await onSave();
+                                      if (!mounted || !sheetContext.mounted) {
+                                        return;
+                                      }
+                                      Navigator.of(sheetContext).pop();
+                                      if (result.routeName != null) {
+                                        Get.toNamed(
+                                          result.routeName!,
+                                          arguments: result.arguments,
+                                        );
+                                      } else if (result.snackBarMessage !=
+                                          null) {
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              result.snackBarMessage!,
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (!sheetContext.mounted) return;
+                                      setSheetState(() {
+                                        apiError = e.toString().replaceFirst(
+                                          'Exception: ',
+                                          '',
+                                        );
+                                      });
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.passengerPrimary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: saving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Save changes',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final formattedPhone = PhoneNumberUtils.formatForDisplay(user.phone);
+    final formattedPhone = PhoneNumberUtils.formatForDisplay(widget.user.phone);
     final hasPhone = formattedPhone.trim().isNotEmpty;
-    final needsEmailVerification = !user.emailVerified;
-    final needsPhoneVerification = hasPhone && !user.phoneVerified;
+    final currentEmail = widget.user.email.trim();
+    final pendingEmail = widget.user.pendingEmail?.trim() ?? '';
+    final pendingPhone = widget.user.pendingPhone?.trim() ?? '';
+    final needsEmailVerification =
+        currentEmail.isNotEmpty && !widget.user.emailVerified;
+    final needsPhoneVerification = hasPhone && !widget.user.phoneVerified;
+    final hasPendingEmailChange =
+        pendingEmail.isNotEmpty &&
+        pendingEmail.toLowerCase() != currentEmail.toLowerCase();
+    final normalizedCurrentPhone = PhoneNumberUtils.normalizeToE164(
+      widget.user.phone ?? '',
+    );
+    final normalizedPendingPhone = PhoneNumberUtils.normalizeToE164(
+      pendingPhone,
+    );
+    final hasPendingPhoneChange =
+        normalizedPendingPhone != null &&
+        normalizedPendingPhone != normalizedCurrentPhone;
     final needsAnyVerification =
         needsEmailVerification || needsPhoneVerification;
+    final pendingBannerText = hasPendingEmailChange
+        ? 'Pending email verification for $pendingEmail'
+        : hasPendingPhoneChange
+        ? 'Pending mobile verification for ${PhoneNumberUtils.formatForDisplay(pendingPhone)}'
+        : needsPhoneVerification
+        ? 'Verify your mobile number before changing it.'
+        : needsEmailVerification
+        ? 'Verify your email before changing it.'
+        : null;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
-        color: _surfaceCard(isDark),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _cardBorder(isDark)),
+        color: _surfaceCard(widget.isDark),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cardBorder(widget.isDark)),
+        boxShadow: _cardShadow(widget.isDark),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Contact methods',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: _textPrimary(isDark),
-              letterSpacing: 0.2,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _ContactMethodRow(
-            icon: Icons.mail_outline,
-            title: 'Email',
-            value: user.email,
-            statusLabel: user.emailVerified ? 'Verified' : 'Pending',
-            verified: user.emailVerified,
-            isDark: isDark,
-            actionLabel: needsEmailVerification ? 'Verify' : null,
-            onAction: needsEmailVerification ? onVerifyEmail : null,
-          ),
-          const SizedBox(height: 14),
-          Divider(height: 1, color: _cardBorder(isDark)),
-          const SizedBox(height: 14),
-          _ContactMethodRow(
-            icon: Icons.phone_iphone_outlined,
-            title: 'Mobile',
-            value: hasPhone
-                ? formattedPhone
-                : 'Add a mobile number from Edit Profile',
-            statusLabel: hasPhone
-                ? (user.phoneVerified ? 'Verified' : 'Pending')
-                : 'Missing',
-            verified: hasPhone && user.phoneVerified,
-            isDark: isDark,
-            actionLabel: needsPhoneVerification ? 'Verify' : null,
-            onAction: needsPhoneVerification ? onVerifyPhone : null,
-          ),
-          if (needsAnyVerification || !hasPhone) ...[
-            const SizedBox(height: 14),
-            Divider(height: 1, color: _cardBorder(isDark)),
-            const SizedBox(height: 14),
-            Text(
-              !hasPhone
-                  ? 'Add and verify a mobile number to receive ride alerts and SMS sign-in codes.'
-                  : needsPhoneVerification
-                  ? 'Ride alerts and SMS sign-in stay paused until this mobile number is verified.'
-                  : 'Email verification is still pending for account recovery and important updates.',
-              style: TextStyle(
-                color: _mutedText(isDark),
-                fontSize: 12,
-                height: 1.45,
-              ),
-            ),
-            if (needsAnyVerification && onOpenVerificationDrawer != null) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: onOpenVerificationDrawer,
-                  icon: const Icon(Icons.verified_user_outlined, size: 18),
-                  label: const Text(
-                    'Review verification',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.passengerPrimary,
-                    side: BorderSide(
-                      color: isDark
-                          ? const Color(0xFF1E5B45)
-                          : const Color(0xFFD7F1E4),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Contact methods',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary(widget.isDark),
+                    letterSpacing: -0.2,
                   ),
                 ),
               ),
+              if (needsAnyVerification ||
+                  hasPendingEmailChange ||
+                  hasPendingPhoneChange)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: widget.isDark
+                        ? const Color(0xFF3A2C10)
+                        : const Color(0xFFFFF4D6),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'Needs attention',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF9C6A09),
+                    ),
+                  ),
+                ),
             ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Update the contact details used for alerts, booking updates, and account recovery.',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.45,
+              color: _mutedText(widget.isDark),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _ContactMethodDisplayRow(
+            icon: Icons.mail_outline,
+            title: 'Email',
+            value: currentEmail.isNotEmpty
+                ? widget.user.email
+                : 'Add your email address',
+            supportingText: hasPendingEmailChange
+                ? 'Pending verification: $pendingEmail'
+                : currentEmail.isEmpty
+                ? 'Required for receipts and recovery'
+                : null,
+            statusLabel: currentEmail.isEmpty
+                ? 'Add'
+                : widget.user.emailVerified
+                ? 'Verified'
+                : 'Pending',
+            verified: currentEmail.isNotEmpty && widget.user.emailVerified,
+            isDark: widget.isDark,
+            onTap: _openEmailSheet,
+          ),
+          Divider(height: 24, color: _cardDivider(widget.isDark)),
+          _ContactMethodDisplayRow(
+            icon: Icons.phone_iphone_outlined,
+            title: 'Mobile',
+            value: hasPhone ? formattedPhone : 'Add your mobile number',
+            supportingText: hasPendingPhoneChange
+                ? 'Pending verification: ${PhoneNumberUtils.formatForDisplay(pendingPhone)}'
+                : !hasPhone
+                ? 'Required for SMS ride alerts'
+                : null,
+            statusLabel: hasPhone
+                ? (widget.user.phoneVerified ? 'Verified' : 'Pending')
+                : 'Add',
+            verified: hasPhone && widget.user.phoneVerified,
+            isDark: widget.isDark,
+            onTap: _openPhoneSheet,
+          ),
+          if (pendingBannerText != null || !hasPhone) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: widget.isDark
+                    ? const Color(0xFF171C27)
+                    : const Color(0xFFF8FAFD),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _cardBorder(widget.isDark)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: widget.isDark
+                          ? const Color(0xFF3A2C10)
+                          : const Color(0xFFFFF4D6),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.verified_user_outlined,
+                      size: 16,
+                      color: Color(0xFF9C6A09),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          pendingBannerText ??
+                              'Verified contact details are required for ride alerts and sign-in.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.45,
+                            color: _textPrimary(widget.isDark),
+                          ),
+                        ),
+                        if (widget.onOpenVerificationDrawer != null) ...[
+                          const SizedBox(height: 10),
+                          GestureDetector(
+                            onTap: widget.onOpenVerificationDrawer,
+                            child: Text(
+                              'Review verification',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.passengerPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ],
       ),
@@ -1078,6 +1898,7 @@ class _DriverProfileCard extends StatelessWidget {
     required this.loading,
     required this.isDark,
     required this.onEdit,
+    required this.onOpenDocuments,
   });
 
   final ProfileController controller;
@@ -1085,6 +1906,7 @@ class _DriverProfileCard extends StatelessWidget {
   final bool loading;
   final bool isDark;
   final VoidCallback onEdit;
+  final VoidCallback onOpenDocuments;
 
   @override
   Widget build(BuildContext context) {
@@ -1099,130 +1921,121 @@ class _DriverProfileCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _driverCardBg(isDark),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _driverCardBorder(isDark)),
+        boxShadow: _cardShadow(isDark),
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.directions_car, color: AppColors.driverPrimary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Driver Profile',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                    color: _textPrimary(isDark),
+      child: Obx(() {
+        final docs = controller.driverDocuments;
+        final docCount = docs.length;
+        final approvedCount = docs
+            .where(
+              (doc) => (doc.status ?? '').trim().toLowerCase() == 'approved',
+            )
+            .length;
+
+        return Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.driverPrimary.withValues(
+                      alpha: isDark ? 0.18 : 0.1,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.directions_car_outlined,
+                    color: AppColors.driverPrimary,
                   ),
                 ),
-              ),
-              IconButton(
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined),
-                color: AppColors.driverPrimary,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _DriverInfoRow(
-            label: 'Vehicle',
-            value: _joinParts(profile?.carMake, profile?.carModel),
-            isDark: isDark,
-          ),
-          _DriverInfoRow(
-            label: 'Year',
-            value: profile?.carYear,
-            isDark: isDark,
-          ),
-          _DriverInfoRow(
-            label: 'Color',
-            value: profile?.carColor,
-            isDark: isDark,
-          ),
-          _DriverInfoRow(
-            label: 'License Plate',
-            value: profile?.plateNumber,
-            isDark: isDark,
-          ),
-          _DriverInfoRow(
-            label: 'License No.',
-            value: profile?.licenseNumber,
-            isDark: isDark,
-          ),
-          _DriverInfoRow(
-            label: 'Insurance',
-            value: profile?.insuranceInfo,
-            isDark: isDark,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Status',
-                style: TextStyle(color: _mutedText(isDark), fontSize: 13),
-              ),
-              _StatusPill(
-                isActive: profile?.isVerified == true,
-                isDark: isDark,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _StripeConnectSection(controller: controller, isDark: isDark),
-        ],
-      ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Driver profile',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: _textPrimary(isDark),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Manage your vehicle details and verification documents.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: _mutedText(isDark),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _StatusPill(
+                  isActive: profile?.isVerified == true,
+                  isDark: isDark,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _ActionGroup(
+              isDark: isDark,
+              items: [
+                _ActionItem(
+                  icon: Icons.local_taxi_outlined,
+                  label: 'Vehicle details',
+                  subtitle: _vehicleSummary(profile),
+                  onTap: onEdit,
+                ),
+                _ActionItem(
+                  icon: Icons.verified_user_outlined,
+                  label: 'Driver verification',
+                  subtitle: profile?.isVerified == true
+                      ? 'Verified to drive on HelpRide'
+                      : approvedCount > 0
+                      ? '$approvedCount document${approvedCount == 1 ? '' : 's'} approved'
+                      : 'Selfie, license, and insurance still need review',
+                  trailing: profile?.isVerified == true
+                      ? Icon(
+                          Icons.check_circle_rounded,
+                          size: 18,
+                          color: AppColors.passengerPrimary,
+                        )
+                      : null,
+                  onTap: onOpenDocuments,
+                ),
+                _ActionItem(
+                  icon: Icons.description_outlined,
+                  label: 'Documents',
+                  subtitle: docCount == 0
+                      ? 'Upload your selfie, license, and insurance files'
+                      : '$docCount file${docCount == 1 ? '' : 's'} uploaded',
+                  onTap: onOpenDocuments,
+                ),
+              ],
+            ),
+          ],
+        );
+      }),
     );
   }
 
-  String _joinParts(String? a, String? b) {
+  String _vehicleSummary(DriverProfile? profile) {
     final parts = [
-      a,
-      b,
+      profile?.carMake,
+      profile?.carModel,
+      profile?.carYear,
+      profile?.plateNumber,
     ].where((p) => p != null && p.trim().isNotEmpty).toList();
-    return parts.isEmpty ? '—' : parts.join(' ');
-  }
-}
-
-class _DriverInfoRow extends StatelessWidget {
-  const _DriverInfoRow({
-    required this.label,
-    required this.value,
-    required this.isDark,
-  });
-
-  final String label;
-  final String? value;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: _mutedText(isDark), fontSize: 13),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              (value == null || value!.trim().isEmpty) ? '—' : value!,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: _textPrimary(isDark),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return parts.isEmpty
+        ? 'Add your vehicle and plate details'
+        : parts.join(' • ');
   }
 }
 
@@ -1240,19 +2053,23 @@ class _HeaderMetaLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 15, color: _mutedText(isDark)),
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(icon, size: 15, color: _mutedText(isDark)),
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             value,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13.5,
               fontWeight: FontWeight.w600,
               color: _mutedText(isDark),
-              height: 1.2,
+              height: 1.3,
             ),
           ),
         ),
@@ -1273,7 +2090,7 @@ class _StatusPill extends StatelessWidget {
         ? (isDark ? const Color(0xFF14382B) : const Color(0xFFE8FAF3))
         : _chipNeutralBg(isDark);
     final color = isActive ? AppColors.passengerPrimary : _mutedText(isDark);
-    final label = isActive ? 'Active' : 'Pending';
+    final label = isActive ? 'Verified' : 'Reviewing';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1293,145 +2110,145 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-class _ContactMethodRow extends StatelessWidget {
-  const _ContactMethodRow({
+class _ContactMethodDisplayRow extends StatelessWidget {
+  const _ContactMethodDisplayRow({
     required this.icon,
     required this.title,
     required this.value,
+    this.supportingText,
     required this.statusLabel,
     required this.verified,
     required this.isDark,
-    this.actionLabel,
-    this.onAction,
+    required this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String value;
+  final String? supportingText;
   final String statusLabel;
   final bool verified;
   final bool isDark;
-  final String? actionLabel;
-  final VoidCallback? onAction;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: _surfaceCard(isDark),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _cardBorder(isDark)),
-          ),
-          child: Icon(icon, size: 18, color: _mutedText(isDark)),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: _mutedText(isDark),
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: _textPrimary(isDark),
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        if (actionLabel != null && onAction != null)
-          TextButton(
-            onPressed: onAction,
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.passengerPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              actionLabel!,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          )
-        else
-          _InlineStatusChip(
-            label: statusLabel,
-            verified: verified,
-            isDark: isDark,
-          ),
-      ],
-    );
-  }
-}
-
-class _InlineStatusChip extends StatelessWidget {
-  const _InlineStatusChip({
-    required this.label,
-    required this.verified,
-    required this.isDark,
-  });
-
-  final String label;
-  final bool verified;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = verified
-        ? (isDark ? const Color(0xFF14382B) : const Color(0xFFF0FBF6))
-        : _chipNeutralBg(isDark);
-    final color = verified ? AppColors.passengerPrimary : _mutedText(isDark);
-    final border = verified
-        ? (isDark ? const Color(0xFF1E5B45) : const Color(0xFFD7F1E4))
-        : _cardBorder(isDark);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: border),
-      ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: color,
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: _fieldFill(isDark),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _cardBorder(isDark)),
             ),
+            child: Icon(icon, size: 20, color: _mutedText(isDark)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _mutedText(isDark),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary(isDark),
+                    height: 1.25,
+                  ),
+                ),
+                if (supportingText != null && supportingText!.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      supportingText!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: _mutedText(isDark),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (verified)
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 18,
+                  color: AppColors.passengerPrimary,
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _chipNeutralBg(isDark),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _mutedText(isDark),
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right_rounded, color: _mutedText(isDark)),
+            ],
           ),
         ],
       ),
     );
   }
+}
+
+class _ContactEditResult {
+  _ContactEditResult._({this.routeName, this.arguments, this.snackBarMessage});
+
+  _ContactEditResult.saved()
+    : this._(snackBarMessage: 'Contact details updated.');
+
+  _ContactEditResult.noChanges() : this._();
+
+  _ContactEditResult.verifyEmail(String email)
+    : this._(routeName: AuthRoutes.verifyEmail, arguments: {'email': email});
+
+  _ContactEditResult.verifyPhone({required String phone, required String email})
+    : this._(
+        routeName: AuthRoutes.verifyPhone,
+        arguments: {'phone': phone, 'email': email, 'autoSend': true},
+      );
+
+  final String? routeName;
+  final Map<String, dynamic>? arguments;
+  final String? snackBarMessage;
 }
 
 class _CompactBadge extends StatelessWidget {
@@ -1611,11 +2428,12 @@ class _StripeConnectSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _surfaceCard(isDark),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _cardBorder(isDark)),
+        boxShadow: _cardShadow(isDark),
       ),
       child: Obx(() {
         final status = controller.stripeConnectStatus.value;
@@ -1634,21 +2452,47 @@ class _StripeConnectSection extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.account_balance_wallet_outlined,
-                  size: 18,
-                  color: _textPrimary(isDark),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Stripe Connect',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: _textPrimary(isDark),
-                    ),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF172133)
+                        : const Color(0xFFF3F7FE),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 20,
+                    color: AppColors.driverPrimary,
                   ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Payouts',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: _textPrimary(isDark),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Manage your Stripe payout setup and banking details.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: _mutedText(isDark),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
                 _StripeStatusChip(
                   label: uiState.label,
                   isReady: uiState.ready,
@@ -1656,37 +2500,55 @@ class _StripeConnectSection extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              uiState.message,
-              style: TextStyle(color: _mutedText(isDark), fontSize: 13),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _fieldFill(isDark),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _cardBorder(isDark)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    uiState.message,
+                    style: TextStyle(
+                      color: _textPrimary(isDark),
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (uiState.requiresInformation &&
+                      status.requirementsCurrentlyDue.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    ..._buildRequirementRows(
+                      status.requirementsCurrentlyDue,
+                      isDark: isDark,
+                    ),
+                  ],
+                  if (status.requirementsPendingVerification.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Pending verification',
+                      style: TextStyle(
+                        color: _textPrimary(isDark),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ..._buildRequirementRows(
+                      status.requirementsPendingVerification,
+                      isDark: isDark,
+                    ),
+                  ],
+                ],
+              ),
             ),
-            if (uiState.requiresInformation &&
-                status.requirementsCurrentlyDue.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ..._buildRequirementRows(
-                status.requirementsCurrentlyDue,
-                isDark: isDark,
-              ),
-            ],
-            if (status.requirementsPendingVerification.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Pending verification',
-                style: TextStyle(
-                  color: _textPrimary(isDark),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              ..._buildRequirementRows(
-                status.requirementsPendingVerification,
-                isDark: isDark,
-              ),
-            ],
             if (error != null && error.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text(
                 error,
                 style: const TextStyle(
@@ -1696,7 +2558,7 @@ class _StripeConnectSection extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -1711,11 +2573,11 @@ class _StripeConnectSection extends StatelessWidget {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                        horizontal: 14,
+                        vertical: 11,
                       ),
                     ),
                     child: onboardingLoading
@@ -1738,11 +2600,11 @@ class _StripeConnectSection extends StatelessWidget {
                       foregroundColor: _textPrimary(isDark),
                       side: BorderSide(color: _cardBorder(isDark)),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                        horizontal: 14,
+                        vertical: 11,
                       ),
                     ),
                     child: dashboardLoading
@@ -1755,7 +2617,7 @@ class _StripeConnectSection extends StatelessWidget {
                             ),
                           )
                         : const Text(
-                            'View Pay Details',
+                            'View payout details',
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                   ),
@@ -1797,19 +2659,19 @@ class _StripeConnectSection extends StatelessWidget {
     Uri uri, {
     required String failureMessage,
   }) async {
+    final openedInBrowserView = await launchUrl(
+      uri,
+      mode: LaunchMode.inAppBrowserView,
+    );
+    if (openedInBrowserView) return;
+
     final openedInExternalBrowser = await launchUrl(
       uri,
       mode: LaunchMode.externalApplication,
     );
     if (openedInExternalBrowser) return;
 
-    final openedInBrowserView = await launchUrl(
-      uri,
-      mode: LaunchMode.inAppBrowserView,
-    );
-    if (!openedInBrowserView) {
-      throw Exception(failureMessage);
-    }
+    throw Exception(failureMessage);
   }
 
   List<Widget> _buildRequirementRows(
@@ -2000,19 +2862,75 @@ class _StripeStatusChip extends StatelessWidget {
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label, required this.isDark});
+  const _SectionLabel({
+    required this.label,
+    required this.isDark,
+    this.subtitle,
+  });
 
   final String label;
   final bool isDark;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: TextStyle(
-        color: _mutedText(isDark),
-        fontWeight: FontWeight.w800,
-        letterSpacing: 1,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: _textPrimary(isDark),
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            letterSpacing: -0.2,
+          ),
+        ),
+        if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle!,
+            style: TextStyle(
+              color: _mutedText(isDark),
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _HeaderActionButton extends StatelessWidget {
+  const _HeaderActionButton({
+    required this.icon,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: _surfaceCard(isDark),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _cardBorder(isDark)),
+            boxShadow: _cardShadow(isDark),
+          ),
+          child: Icon(icon, color: _textPrimary(isDark), size: 20),
+        ),
       ),
     );
   }
@@ -2029,8 +2947,9 @@ class _ActionGroup extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: _surfaceCard(isDark),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _cardBorder(isDark)),
+        boxShadow: _cardShadow(isDark),
       ),
       child: Column(
         children: [
@@ -2048,13 +2967,17 @@ class _ActionGroup extends StatelessWidget {
 class _ActionItem {
   final IconData icon;
   final String label;
+  final String? subtitle;
   final bool destructive;
+  final Widget? trailing;
   final VoidCallback? onTap;
 
   const _ActionItem({
     required this.icon,
     required this.label,
+    this.subtitle,
     this.destructive = false,
+    this.trailing,
     this.onTap,
   });
 }
@@ -2067,230 +2990,77 @@ class _ProfileActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accentColor = item.destructive ? Colors.red : _mutedText(isDark);
-    final textColor = item.destructive ? Colors.red : _textPrimary(isDark);
+    final accentColor = item.destructive
+        ? const Color(0xFFDA3C3C)
+        : AppColors.driverPrimary;
+    final textColor = item.destructive
+        ? const Color(0xFFB3261E)
+        : _textPrimary(isDark);
+    final iconTint = item.onTap == null ? _mutedText(isDark) : accentColor;
 
-    return ListTile(
+    return InkWell(
       onTap: item.onTap,
-      leading: Icon(item.icon, color: accentColor),
-      title: Text(
-        item.label,
-        style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
-      ),
-      trailing: Icon(Icons.chevron_right, color: accentColor),
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-    );
-  }
-}
-
-class _LogoutCard extends StatelessWidget {
-  const _LogoutCard({required this.onLogout, required this.isDark});
-
-  final VoidCallback onLogout;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surfaceCard(isDark),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _cardBorder(isDark)),
-      ),
-      child: ListTile(
-        onTap: onLogout,
-        leading: const Icon(Icons.logout, color: Colors.red),
-        title: const Text(
-          'Log out',
-          style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
-        ),
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-      ),
-    );
-  }
-}
-
-class _ProfilePhotoUploadField extends StatefulWidget {
-  const _ProfilePhotoUploadField({
-    required this.controller,
-    required this.avatarCtrl,
-    required this.isDark,
-  });
-
-  final ProfileController controller;
-  final TextEditingController avatarCtrl;
-  final bool isDark;
-
-  @override
-  State<_ProfilePhotoUploadField> createState() =>
-      _ProfilePhotoUploadFieldState();
-}
-
-class _ProfilePhotoUploadFieldState extends State<_ProfilePhotoUploadField> {
-  bool _pickingFile = false;
-
-  Future<void> _pickAndUpload() async {
-    if (_pickingFile || widget.controller.avatarUploading.value) return;
-
-    setState(() => _pickingFile = true);
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowMultiple: false,
-        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
-        withData: false,
-      );
-      if (!mounted || result == null || result.files.isEmpty) return;
-
-      final file = result.files.single;
-      final path = file.path;
-      if (path == null || path.trim().isEmpty) {
-        _showSnack('Could not read the selected file.');
-        return;
-      }
-
-      final fileName = file.name.trim().isNotEmpty
-          ? file.name.trim()
-          : path.split('/').last;
-      final mimeType =
-          lookupMimeType(path, headerBytes: file.bytes) ??
-          _mimeTypeForExt(file.extension);
-
-      final uploadedValue = await widget.controller.uploadProfilePhoto(
-        filePath: path,
-        fileName: fileName,
-        mimeType: mimeType,
-      );
-      if (!mounted) return;
-      widget.avatarCtrl.text = uploadedValue;
-      widget.avatarCtrl.selection = TextSelection.collapsed(
-        offset: uploadedValue.length,
-      );
-      _showSnack('Profile photo uploaded.');
-    } catch (e) {
-      if (!mounted) return;
-      final fromController = widget.controller.avatarUploadError.value;
-      final message = (fromController ?? e.toString())
-          .replaceFirst('Exception: ', '')
-          .trim();
-      _showSnack(message.isEmpty ? 'Profile photo upload failed.' : message);
-    } finally {
-      if (mounted) {
-        setState(() => _pickingFile = false);
-      }
-    }
-  }
-
-  String _mimeTypeForExt(String? ext) {
-    switch ((ext ?? '').toLowerCase()) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'webp':
-        return 'image/webp';
-      default:
-        return 'application/octet-stream';
-    }
-  }
-
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.avatarCtrl,
-      builder: (_, __) {
-        final avatarValue = widget.avatarCtrl.text.trim();
-        final hasHttpUrl =
-            avatarValue.startsWith('https://') ||
-            avatarValue.startsWith('http://');
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _surfaceCard(widget.isDark),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _cardBorder(widget.isDark)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: item.destructive
+                    ? (isDark
+                          ? const Color(0xFF2A1515)
+                          : const Color(0xFFFFF1F1))
+                    : (isDark
+                          ? const Color(0xFF172133)
+                          : const Color(0xFFF3F7FE)),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(item.icon, color: iconTint, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: _chipNeutralBg(widget.isDark),
-                    backgroundImage: hasHttpUrl
-                        ? NetworkImage(avatarValue)
-                        : null,
-                    child: hasHttpUrl
-                        ? null
-                        : Icon(
-                            Icons.person_outline,
-                            color: _mutedText(widget.isDark),
-                          ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Photo preview',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: _textPrimary(widget.isDark),
-                      ),
+                  Text(
+                    item.label,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: textColor,
                     ),
                   ),
+                  if (item.subtitle != null &&
+                      item.subtitle!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      item.subtitle!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: _mutedText(isDark),
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 10),
-              Obx(() {
-                final uploading =
-                    widget.controller.avatarUploading.value || _pickingFile;
-                return SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: uploading ? null : _pickAndUpload,
-                    icon: uploading
-                        ? SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: _textPrimary(widget.isDark),
-                            ),
-                          )
-                        : const Icon(Icons.photo_camera_outlined, size: 18),
-                    label: Text(
-                      uploading
-                          ? 'Uploading...'
-                          : avatarValue.isEmpty
-                          ? 'Upload profile photo'
-                          : 'Replace profile photo',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _textPrimary(widget.isDark),
-                      side: BorderSide(color: _cardBorder(widget.isDark)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                );
-              }),
+            ),
+            if (item.trailing != null) ...[
+              item.trailing!,
+              const SizedBox(width: 8),
             ],
-          ),
-        );
-      },
+            Icon(
+              Icons.chevron_right_rounded,
+              color: item.onTap == null
+                  ? _cardBorder(isDark)
+                  : _mutedText(isDark),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -2322,36 +3092,21 @@ class _DriverDocumentUploadSectionState
       _typeErrors[requirement.type] = null;
     });
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowMultiple: false,
-        allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
-        withData: false,
-      );
-      if (!mounted || result == null || result.files.isEmpty) return;
-
-      final file = result.files.single;
-      final path = file.path;
-      if (path == null || path.trim().isEmpty) {
-        _setTypeError(requirement.type, 'Could not read the selected file.');
-        return;
-      }
-
-      final fileName = file.name.trim().isNotEmpty
-          ? file.name.trim()
-          : path.split('/').last;
-      final mimeType =
-          lookupMimeType(path, headerBytes: file.bytes) ??
-          _mimeTypeForExt(file.extension);
+      final pickedFile = await _pickUploadFile(requirement);
+      if (!mounted || pickedFile == null) return;
 
       await widget.controller.uploadDriverDocument(
         type: requirement.type,
-        filePath: path,
-        fileName: fileName,
-        mimeType: mimeType,
+        filePath: pickedFile.path,
+        fileName: pickedFile.fileName,
+        mimeType: pickedFile.mimeType,
       );
       if (!mounted) return;
-      _showSnack('${requirement.title} uploaded successfully.');
+      _showSnack(
+        requirement.type == 'selfie'
+            ? '${requirement.title} uploaded and set as your profile photo.'
+            : '${requirement.title} uploaded successfully.',
+      );
       _setTypeError(requirement.type, null);
     } catch (e) {
       if (!mounted) return;
@@ -2363,6 +3118,116 @@ class _DriverDocumentUploadSectionState
         setState(() => _uploadingType = null);
       }
     }
+  }
+
+  Future<_PickedDriverDocumentFile?> _pickUploadFile(
+    _DriverDocumentRequirement requirement,
+  ) async {
+    if (requirement.photoOnly) {
+      return _pickSelfiePhoto();
+    }
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowMultiple: false,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
+      withData: false,
+    );
+    if (!mounted || result == null || result.files.isEmpty) return null;
+
+    final file = result.files.single;
+    final path = file.path;
+    if (path == null || path.trim().isEmpty) {
+      _setTypeError(requirement.type, 'Could not read the selected file.');
+      return null;
+    }
+
+    final fileName = file.name.trim().isNotEmpty
+        ? file.name.trim()
+        : path.split('/').last;
+    final mimeType =
+        lookupMimeType(path, headerBytes: file.bytes) ??
+        _mimeTypeForExt(file.extension);
+
+    return _PickedDriverDocumentFile(
+      path: path,
+      fileName: fileName,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<_PickedDriverDocumentFile?> _pickSelfiePhoto() async {
+    final source = await _promptSelfieSource();
+    if (!mounted || source == null) return null;
+
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: source,
+      preferredCameraDevice: CameraDevice.front,
+      imageQuality: 86,
+      maxWidth: 1600,
+    );
+    if (!mounted || image == null) return null;
+
+    final fileName = image.name.trim().isNotEmpty
+        ? image.name.trim()
+        : image.path.split('/').last;
+
+    return _PickedDriverDocumentFile(
+      path: image.path,
+      fileName: fileName,
+      mimeType: lookupMimeType(image.path) ?? 'image/jpeg',
+    );
+  }
+
+  Future<ImageSource?> _promptSelfieSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add selfie photo',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary(isDark),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Use a clear front-facing photo that matches your driver documents. This selfie will also become your profile photo.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: _mutedText(isDark),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.camera_alt_outlined),
+                  title: const Text('Take selfie'),
+                  onTap: () => Navigator.of(context).pop(ImageSource.camera),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('Choose existing photo'),
+                  onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   String _mimeTypeForExt(String? ext) {
@@ -2584,6 +3449,7 @@ class _DriverDocumentRequirement {
     required this.buttonLabel,
     required this.description,
     this.aliases = const [],
+    this.photoOnly = false,
   });
 
   final String type;
@@ -2591,9 +3457,19 @@ class _DriverDocumentRequirement {
   final String buttonLabel;
   final String description;
   final List<String> aliases;
+  final bool photoOnly;
 }
 
 const _driverDocumentRequirements = <_DriverDocumentRequirement>[
+  _DriverDocumentRequirement(
+    type: 'selfie',
+    title: 'Selfie Photo',
+    buttonLabel: 'selfie photo',
+    description:
+        'Take or upload a clear selfie photo so HelpRide can match your account to your driver documents and use it as your profile photo.',
+    aliases: ['driver_selfie', 'photo_selfie'],
+    photoOnly: true,
+  ),
   _DriverDocumentRequirement(
     type: 'license',
     title: 'Driver License',
@@ -2630,6 +3506,18 @@ const _driverDocumentRequirements = <_DriverDocumentRequirement>[
     aliases: ['misc', 'miscellaneous', 'additional_document'],
   ),
 ];
+
+class _PickedDriverDocumentFile {
+  const _PickedDriverDocumentFile({
+    required this.path,
+    required this.fileName,
+    required this.mimeType,
+  });
+
+  final String path;
+  final String fileName;
+  final String mimeType;
+}
 
 class _SheetSectionTitle extends StatelessWidget {
   const _SheetSectionTitle({
@@ -2721,7 +3609,7 @@ class _DriverDocumentTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(isDark ? 0.25 : 0.12),
+              color: statusColor.withValues(alpha: isDark ? 0.25 : 0.12),
               borderRadius: BorderRadius.circular(99),
             ),
             child: Text(
@@ -2739,69 +3627,26 @@ class _DriverDocumentTile extends StatelessWidget {
   }
 }
 
-class _ContactStatusSummary extends StatelessWidget {
-  const _ContactStatusSummary({
-    required this.emailVerified,
-    required this.phoneVerified,
-    required this.hasPhone,
-    required this.isDark,
-  });
-
-  final bool emailVerified;
-  final bool phoneVerified;
-  final bool hasPhone;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _surfaceCard(isDark),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _cardBorder(isDark)),
-      ),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          _InlineStatusChip(
-            label: emailVerified ? 'Email verified' : 'Email pending',
-            verified: emailVerified,
-            isDark: isDark,
-          ),
-          _InlineStatusChip(
-            label: hasPhone
-                ? (phoneVerified ? 'Mobile verified' : 'Mobile pending')
-                : 'Add a mobile number',
-            verified: hasPhone && phoneVerified,
-            isDark: isDark,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _EditField extends StatelessWidget {
   const _EditField({
     required this.controller,
     required this.label,
+    this.onChanged,
     this.keyboardType,
     this.inputFormatters,
     this.validator,
-    this.readOnly = false,
     this.helperText,
+    this.forceErrorText,
   });
 
   final TextEditingController controller;
   final String label;
+  final ValueChanged<String>? onChanged;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final String? Function(String?)? validator;
-  final bool readOnly;
   final String? helperText;
+  final String? forceErrorText;
 
   @override
   Widget build(BuildContext context) {
@@ -2809,14 +3654,15 @@ class _EditField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
-      readOnly: readOnly,
       onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+      onChanged: onChanged,
       validator: validator,
       autovalidateMode: AutovalidateMode.onUserInteraction,
       decoration: appInputDecoration(
         context,
         labelText: label,
         helperText: helperText,
+        errorText: forceErrorText,
         radius: 14,
       ),
     );
@@ -2826,6 +3672,10 @@ class _EditField extends StatelessWidget {
 String _driverDocTypeLabel(String raw) {
   final value = raw.trim().toLowerCase().replaceAll(RegExp(r'[\s\-]'), '_');
   switch (value) {
+    case 'selfie':
+    case 'driver_selfie':
+    case 'photo_selfie':
+      return 'Selfie';
     case 'license':
     case 'driver_license':
       return 'License';
@@ -2888,6 +3738,14 @@ Color _surfaceBg(bool isDark) => isDark ? AppColors.darkBg : AppColors.lightBg;
 
 Color _surfaceCard(bool isDark) =>
     isDark ? AppColors.darkSurface : Colors.white;
+
+List<BoxShadow> _cardShadow(bool isDark) => [
+  BoxShadow(
+    color: isDark ? const Color(0x33000000) : const Color(0x0F101828),
+    blurRadius: 22,
+    offset: const Offset(0, 10),
+  ),
+];
 
 Color _cardBorder(bool isDark) =>
     isDark ? const Color(0xFF232836) : const Color(0xFFE6EAF2);

@@ -9,6 +9,7 @@ class BookingRoutes {
   static const success = '/booking/success';
   static const payNow = '/booking/pay';
   static const paymentProcessing = '/booking/payment-processing';
+  static const myRides = '/my-rides';
 
   static final pages = [
     // wherever your GetPages are (AppRoutes or feature routes)
@@ -24,7 +25,7 @@ class BookingRoutes {
       binding: MyRidesBinding(),
     ),
     GetPage(
-      name: '/my-rides',
+      name: myRides,
       page: () => const MyRidesView(),
       binding: MyRidesBinding(),
     ),

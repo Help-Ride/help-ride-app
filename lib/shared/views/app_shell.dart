@@ -28,6 +28,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int index = 0;
   bool _openDriverEditorOnLoad = false;
+  bool _redirectingToVerification = false;
   late final Worker _roleWorker;
 
   @override
@@ -133,6 +134,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       if (session.status.value != SessionStatus.authenticated) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
+
+      final requiredVerification = session.nextRequiredVerification;
+      if (requiredVerification != null) {
+        if (!_redirectingToVerification) {
+          _redirectingToVerification = true;
+          Future.microtask(() => session.openVerifiedAppDestination());
+        }
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      _redirectingToVerification = false;
 
       final uiRole = theme.role.value;
       final driverGate = Get.find<DriverGateController>();
@@ -278,15 +289,15 @@ class _FigmaBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Figma look: flat white bar, no pill, minimal/no shadow
     final bg = isDark ? const Color(0xFF0F1116) : Colors.white;
     final border = isDark ? const Color(0xFF1C2130) : const Color(0xFFE9ECF2);
-
-    // Selected = near-black in light mode (matches screenshot)
     final selected = isDark ? Colors.white : const Color(0xFF111827);
     final unselected = isDark
         ? const Color(0xFF9AA3B2)
         : const Color(0xFF6B7280);
+    final selectedBg = isDark
+        ? const Color(0xFF1B2230)
+        : const Color(0xFFF4F7FB);
 
     return SafeArea(
       top: false,
@@ -294,40 +305,73 @@ class _FigmaBottomNavBar extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           border: Border(top: BorderSide(color: border, width: 1)),
+          boxShadow: [
+            BoxShadow(
+              color: isDark ? const Color(0x2A000000) : const Color(0x080F172A),
+              blurRadius: 18,
+              offset: const Offset(0, -4),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(items.length, (i) {
             final item = items[i];
             final isSelected = index == i;
             return Expanded(
-              child: InkWell(
-                onTap: () => onChanged(i),
-                borderRadius: BorderRadius.circular(14),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isSelected ? item.selectedIcon : item.icon,
-                        size: 24,
-                        color: isSelected ? selected : unselected,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item.label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.0,
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: isSelected ? selected : unselected,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: InkWell(
+                  onTap: () => onChanged(i),
+                  borderRadius: BorderRadius.circular(18),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected ? selectedBg : Colors.transparent,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOut,
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? (isDark
+                                      ? Colors.white.withValues(alpha: 0.08)
+                                      : Colors.white)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            isSelected ? item.selectedIcon : item.icon,
+                            size: 22,
+                            color: isSelected ? selected : unselected,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 5),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.0,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: isSelected ? selected : unselected,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
