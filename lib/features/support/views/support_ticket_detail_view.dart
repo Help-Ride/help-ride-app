@@ -85,32 +85,33 @@ class _SupportTicketDetailViewState extends State<SupportTicketDetailView> {
       body: _loading && _ticket == null
           ? const Center(child: CircularProgressIndicator())
           : _ticket == null
-              ? _EmptyState(
-                  message: _error ?? 'Ticket not found.',
-                  onRetry: _fetchTicket,
-                  isDark: isDark,
-                )
-              : RefreshIndicator(
-                  onRefresh: _fetchTicket,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-                    children: [
-                      _DetailCard(
-                        title: _ticket!.subject,
-                        status: _ticket!.status,
-                        description: _ticket!.description,
-                        createdAt: _ticket!.createdAt,
-                        updatedAt: _ticket!.updatedAt,
-                        isDark: isDark,
-                      ),
-                      const SizedBox(height: 16),
-                      _ResponseCard(
-                        response: _ticket!.adminResponse,
-                        isDark: isDark,
-                      ),
-                    ],
+          ? _EmptyState(
+              message: _error ?? 'Ticket not found.',
+              onRetry: _fetchTicket,
+              isDark: isDark,
+            )
+          : RefreshIndicator(
+              onRefresh: _fetchTicket,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+                children: [
+                  _DetailCard(
+                    title: _ticket!.subject,
+                    status: _ticket!.status,
+                    description: _ticket!.description,
+                    attachmentUrl: _ticket!.attachmentUrl,
+                    createdAt: _ticket!.createdAt,
+                    updatedAt: _ticket!.updatedAt,
+                    isDark: isDark,
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  _ResponseCard(
+                    response: _ticket!.adminResponse,
+                    isDark: isDark,
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }
@@ -120,6 +121,7 @@ class _DetailCard extends StatelessWidget {
     required this.title,
     required this.status,
     required this.description,
+    required this.attachmentUrl,
     required this.createdAt,
     required this.updatedAt,
     required this.isDark,
@@ -128,6 +130,7 @@ class _DetailCard extends StatelessWidget {
   final String title;
   final SupportTicketStatus status;
   final String description;
+  final String? attachmentUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isDark;
@@ -166,6 +169,37 @@ class _DetailCard extends StatelessWidget {
             description,
             style: TextStyle(color: _textPrimary(isDark), height: 1.4),
           ),
+          if ((attachmentUrl ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              'Attached image',
+              style: TextStyle(
+                color: _textPrimary(isDark),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.network(
+                attachmentUrl!,
+                width: double.infinity,
+                height: 220,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  color: isDark
+                      ? const Color(0xFF1B2230)
+                      : const Color(0xFFF4F7FB),
+                  child: Text(
+                    'Could not load the attached image.',
+                    style: TextStyle(color: _mutedText(isDark)),
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           _DetailRow(label: 'Created', value: created, isDark: isDark),
           _DetailRow(label: 'Updated', value: updated, isDark: isDark),
@@ -343,7 +377,6 @@ _StatusStyle _statusStyle(SupportTicketStatus status, bool isDark) {
         background: _chipNeutralBg(isDark),
       );
     case SupportTicketStatus.open:
-    default:
       return _StatusStyle(
         color: AppColors.driverPrimary,
         background: isDark ? const Color(0xFF162940) : const Color(0xFFEAF2FF),

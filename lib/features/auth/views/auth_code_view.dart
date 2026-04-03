@@ -21,6 +21,7 @@ class AuthCodeView extends GetView<AuthCodeController> {
           : AppColors.passengerPrimary;
 
       return AuthScreenFrame(
+        centerContent: true,
         child: AutofillGroup(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,7 +118,9 @@ class AuthCodeView extends GetView<AuthCodeController> {
               const SizedBox(height: 18),
               Center(
                 child: TextButton(
-                  onPressed: controller.canResend ? controller.resendCode : null,
+                  onPressed: controller.canResend
+                      ? controller.resendCode
+                      : null,
                   child: controller.isSending.value
                       ? const Text('Sending...')
                       : Text(

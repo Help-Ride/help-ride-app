@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 
 import '../../../core/routes/app_routes.dart';
@@ -213,7 +214,7 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Add the vehicle you will drive. Your uploaded license and insurance documents handle verification in the next step.',
+            'Add the vehicle you will drive. Your selfie, license, and insurance uploads handle onboarding verification in the next step.',
             style: TextStyle(color: muted, height: 1.35),
           ),
           const SizedBox(height: 16),
@@ -266,7 +267,7 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView> {
             isDark: isDark,
             title: 'What happens next',
             message:
-                'Upload your license and insurance in step 2. Stripe payout setup and vehicle registration are only enforced after your first 5 completed rides.',
+                'Upload your selfie, license, and insurance in step 2. Stripe payout setup and vehicle registration are only enforced after your first 5 completed rides.',
           ),
           if (err != null && err.trim().isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -306,7 +307,7 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Upload your license and insurance to finish onboarding. Vehicle registration is deferred until after 5 completed rides.',
+            'Upload your selfie, license, and insurance to finish onboarding. Vehicle registration is deferred until after 5 completed rides.',
             style: TextStyle(color: muted, height: 1.35),
           ),
           if (docsLoading) ...[
@@ -352,8 +353,8 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView> {
           const SizedBox(height: 12),
           Text(
             canContinue
-                ? 'License and insurance received. You can finish onboarding now.'
-                : 'Upload both license and insurance to finish onboarding.',
+                ? 'Selfie, license, and insurance received. You can finish onboarding now.'
+                : 'Upload your selfie, license, and insurance to finish onboarding.',
             style: TextStyle(
               color: canContinue ? AppColors.passengerPrimary : muted,
               fontWeight: FontWeight.w600,
@@ -410,38 +411,27 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView> {
     });
 
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowMultiple: false,
-        allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
-      );
-      if (!mounted || result == null || result.files.isEmpty) return;
-
-      final file = result.files.single;
-      final path = file.path;
-      if (path == null || path.trim().isEmpty) {
-        _setTypeError(requirement.type, 'Could not read selected file.');
-        return;
-      }
-
-      final fileName = file.name.trim().isNotEmpty
-          ? file.name.trim()
-          : path.split('/').last;
-      final mimeType =
-          lookupMimeType(path, headerBytes: file.bytes) ??
-          _mimeTypeForExt(file.extension);
+      final pickedFile = await _pickUploadFile(requirement);
+      if (!mounted || pickedFile == null) return;
+      final messenger = ScaffoldMessenger.of(context);
 
       await _profileController.uploadDriverDocument(
         type: requirement.type,
-        filePath: path,
-        fileName: fileName,
-        mimeType: mimeType,
+        filePath: pickedFile.path,
+        fileName: pickedFile.fileName,
+        mimeType: pickedFile.mimeType,
       );
 
       _setTypeError(requirement.type, null);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${requirement.title} uploaded successfully.')),
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            requirement.type == 'selfie'
+                ? '${requirement.title} uploaded and set as your profile photo.'
+                : '${requirement.title} uploaded successfully.',
+          ),
+        ),
       );
     } catch (e) {
       _setTypeError(requirement.type, _cleanError(e));
@@ -461,12 +451,123 @@ class _DriverOnboardingViewState extends State<DriverOnboardingView> {
     setState(() => _typeErrors[type] = message);
   }
 
+  Future<_PickedDriverDocumentFile?> _pickUploadFile(
+    _OnboardingDocumentRequirement requirement,
+  ) async {
+    if (requirement.photoOnly) {
+      return _pickSelfiePhoto();
+    }
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowMultiple: false,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
+    );
+    if (!mounted || result == null || result.files.isEmpty) return null;
+
+    final file = result.files.single;
+    final path = file.path;
+    if (path == null || path.trim().isEmpty) {
+      _setTypeError(requirement.type, 'Could not read selected file.');
+      return null;
+    }
+
+    final fileName = file.name.trim().isNotEmpty
+        ? file.name.trim()
+        : path.split('/').last;
+    final mimeType =
+        lookupMimeType(path, headerBytes: file.bytes) ??
+        _mimeTypeForExt(file.extension);
+
+    return _PickedDriverDocumentFile(
+      path: path,
+      fileName: fileName,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<_PickedDriverDocumentFile?> _pickSelfiePhoto() async {
+    final source = await _promptSelfieSource();
+    if (!mounted || source == null) return null;
+
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: source,
+      preferredCameraDevice: CameraDevice.front,
+      imageQuality: 86,
+      maxWidth: 1600,
+    );
+    if (!mounted || image == null) return null;
+
+    final fileName = image.name.trim().isNotEmpty
+        ? image.name.trim()
+        : image.path.split('/').last;
+    return _PickedDriverDocumentFile(
+      path: image.path,
+      fileName: fileName,
+      mimeType: lookupMimeType(image.path) ?? 'image/jpeg',
+    );
+  }
+
+  Future<ImageSource?> _promptSelfieSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final textColor = isDark ? AppColors.darkText : AppColors.lightText;
+        final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add selfie photo',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Use a clear front-facing photo that matches your driver documents. This selfie will also become your profile photo.',
+                  style: TextStyle(color: muted, height: 1.35),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.camera_alt_outlined),
+                  title: const Text('Take selfie'),
+                  onTap: () => Navigator.of(context).pop(ImageSource.camera),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('Choose existing photo'),
+                  onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   bool _areRequiredDocumentsUploaded(List<DriverDocument> docs) {
     for (final requirement in _onboardingDocRequirements.where(
       (r) => r.required,
     )) {
       final uploaded = _documentsForRequirement(docs, requirement);
-      if (uploaded.isEmpty) return false;
+      final hasAcceptedUpload = uploaded.any((document) {
+        final status = (document.status ?? '').trim().toLowerCase();
+        return status != 'rejected';
+      });
+      if (!hasAcceptedUpload) return false;
     }
     return true;
   }
@@ -668,6 +769,7 @@ class _OnboardingDocumentRequirement {
     required this.buttonLabel,
     required this.required,
     this.aliases = const [],
+    this.photoOnly = false,
   });
 
   final String type;
@@ -676,9 +778,20 @@ class _OnboardingDocumentRequirement {
   final String buttonLabel;
   final bool required;
   final List<String> aliases;
+  final bool photoOnly;
 }
 
 const _onboardingDocRequirements = <_OnboardingDocumentRequirement>[
+  _OnboardingDocumentRequirement(
+    type: 'selfie',
+    title: 'Selfie Photo',
+    description:
+        'Take or upload a clear selfie photo so HelpRide can match your account to your driver documents and use it as your profile photo.',
+    buttonLabel: 'selfie photo',
+    required: true,
+    aliases: ['driver_selfie', 'photo_selfie'],
+    photoOnly: true,
+  ),
   _OnboardingDocumentRequirement(
     type: 'license',
     title: 'Driver License',
@@ -711,6 +824,18 @@ const _onboardingDocRequirements = <_OnboardingDocumentRequirement>[
     ],
   ),
 ];
+
+class _PickedDriverDocumentFile {
+  const _PickedDriverDocumentFile({
+    required this.path,
+    required this.fileName,
+    required this.mimeType,
+  });
+
+  final String path;
+  final String fileName;
+  final String mimeType;
+}
 
 class _DocumentUploadCard extends StatelessWidget {
   const _DocumentUploadCard({

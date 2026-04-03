@@ -136,6 +136,9 @@ class ProfileController extends GetxController {
         mimeType: mimeType,
       );
       await refreshDriverDocuments(silent: true);
+      if (docType == 'selfie') {
+        await _session.bootstrap();
+      }
     } catch (e) {
       docsError.value = e.toString();
       rethrow;
@@ -268,8 +271,7 @@ class ProfileController extends GetxController {
       await Stripe.instance.presentCustomerSheet();
       return true;
     } on StripeException catch (error) {
-      final code = error.error.code.toString().toLowerCase();
-      if (code.contains('cancel')) {
+      if (_isCustomerSheetCancellation(error)) {
         return false;
       }
 
@@ -278,6 +280,13 @@ class ProfileController extends GetxController {
         throw Exception(message);
       }
       throw Exception('Could not open payment methods.');
+    } catch (error) {
+      // flutter_stripe 12.4.0 can misparse the iOS CustomerSheet cancel payload
+      // when a saved card is already selected, surfacing a type-cast error.
+      if (_isCustomerSheetDismissCastError(error)) {
+        return false;
+      }
+      rethrow;
     } finally {
       paymentMethodsLoading.value = false;
     }
@@ -456,5 +465,16 @@ class ProfileController extends GetxController {
       return (error.error as ApiException).message;
     }
     return error.toString().replaceFirst('Exception: ', '').trim();
+  }
+
+  bool _isCustomerSheetCancellation(StripeException error) {
+    final code = error.error.code.toString().toLowerCase();
+    return code.contains('cancel');
+  }
+
+  bool _isCustomerSheetDismissCastError(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains("type 'string' is not a subtype of type") &&
+        message.contains("map<string, dynamic>");
   }
 }

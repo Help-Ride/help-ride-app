@@ -23,6 +23,7 @@ class EmailVerificationView extends GetView<EmailVerificationController> {
           : AppColors.passengerPrimary;
 
       return AuthScreenFrame(
+        centerContent: controller.hasEmail,
         child: AutofillGroup(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

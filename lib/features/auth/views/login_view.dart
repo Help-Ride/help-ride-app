@@ -41,7 +41,7 @@ class LoginView extends GetView<AuthController> {
           : const Color(0xFFDCE3EF);
 
       return AuthScreenFrame(
-        fillHeight: true,
+        centerContent: true,
         child: AutofillGroup(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -5,10 +5,12 @@ class AuthScreenFrame extends StatelessWidget {
     super.key,
     required this.child,
     this.fillHeight = false,
+    this.centerContent = false,
   });
 
   final Widget child;
   final bool fillHeight;
+  final bool centerContent;
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +23,10 @@ class AuthScreenFrame extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, viewport) {
+            final scrollPadding = EdgeInsets.symmetric(
+              horizontal: compact ? 0 : 24,
+              vertical: compact ? 0 : 20,
+            );
             final minHeight = fillHeight
                 ? (compact ? viewport.maxHeight : viewport.maxHeight - 40)
                 : null;
@@ -60,18 +66,22 @@ class AuthScreenFrame extends StatelessWidget {
                     child: child,
                   );
 
+            final contentBox = ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: content,
+            );
+
             return SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: EdgeInsets.symmetric(
-                horizontal: compact ? 0 : 24,
-                vertical: compact ? 0 : 20,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
-                  child: content,
-                ),
-              ),
+              padding: scrollPadding,
+              child: centerContent
+                  ? ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: viewport.maxHeight - scrollPadding.vertical,
+                      ),
+                      child: Center(child: contentBox),
+                    )
+                  : Center(child: contentBox),
             );
           },
         ),

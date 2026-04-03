@@ -62,13 +62,14 @@ class PaymentsApi {
 
   Future<PaymentIntentSession> createPaymentIntent({
     required String bookingId,
+    required bool savePaymentMethod,
   }) async {
     final id = bookingId.trim();
     if (id.isEmpty) throw Exception('Missing bookingId');
 
     final res = await _client.post<dynamic>(
       _intentPath,
-      data: {'bookingId': id},
+      data: {'bookingId': id, 'savePaymentMethod': savePaymentMethod},
     );
 
     final root = _toMap(res.data);

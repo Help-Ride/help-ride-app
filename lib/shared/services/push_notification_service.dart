@@ -51,11 +51,11 @@ class PushNotificationService {
       'push_notification_targets_v1';
   static const int _maxCachedNotificationTargets = 120;
 
-  static const AndroidNotificationChannel _offersChannel =
+  static const AndroidNotificationChannel _defaultChannel =
       AndroidNotificationChannel(
-        'driver_ride_offers',
-        'Driver Ride Offers',
-        description: 'Ride offer alerts for drivers',
+        'helpride_alerts',
+        'HelpRide Alerts',
+        description: 'Ride, booking, payment, and support alerts',
         importance: Importance.max,
       );
   static const Set<String> _driverRideRequestKinds = {
@@ -272,7 +272,7 @@ class PushNotificationService {
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
           >();
-      await androidImpl?.createNotificationChannel(_offersChannel);
+      await androidImpl?.createNotificationChannel(_defaultChannel);
       _localNotificationReady = true;
     } on MissingPluginException {
       // App can continue without foreground local notifications.
@@ -331,9 +331,9 @@ class PushNotificationService {
     }
 
     final androidDetails = AndroidNotificationDetails(
-      _offersChannel.id,
-      _offersChannel.name,
-      channelDescription: _offersChannel.description,
+      _defaultChannel.id,
+      _defaultChannel.name,
+      channelDescription: _defaultChannel.description,
       importance: Importance.max,
       priority: Priority.high,
       ticker: 'ride_offer',

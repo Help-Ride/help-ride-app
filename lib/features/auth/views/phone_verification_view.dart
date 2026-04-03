@@ -24,6 +24,7 @@ class PhoneVerificationView extends GetView<PhoneVerificationController> {
           : AppColors.passengerPrimary;
 
       return AuthScreenFrame(
+        centerContent: controller.hasPhone,
         child: AutofillGroup(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,7 +95,10 @@ class PhoneVerificationView extends GetView<PhoneVerificationController> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
                     msg,
-                    style: TextStyle(color: primary, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: primary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 );
               }),

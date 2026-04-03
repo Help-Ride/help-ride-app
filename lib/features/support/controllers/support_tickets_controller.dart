@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:get/get.dart';
 import 'package:help_ride/shared/services/api_client.dart';
 import '../models/support_ticket.dart';
@@ -73,14 +75,43 @@ class SupportTicketsController extends GetxController {
   Future<SupportTicket?> createTicket({
     required String subject,
     required String description,
+    String? attachmentFilePath,
+    String? attachmentFileName,
+    String? attachmentMimeType,
   }) async {
     if (creating.value) return null;
     creating.value = true;
     error.value = null;
     try {
+      String? attachmentKey;
+      final trimmedPath = attachmentFilePath?.trim() ?? '';
+      if (trimmedPath.isNotEmpty) {
+        final fileName = attachmentFileName?.trim() ?? '';
+        final mimeType = attachmentMimeType?.trim() ?? '';
+        if (fileName.isEmpty || mimeType.isEmpty) {
+          throw Exception('Selected image is missing upload details.');
+        }
+        final file = File(trimmedPath);
+        final bytes = await file.readAsBytes();
+        if (bytes.isEmpty) {
+          throw Exception('Selected image is empty.');
+        }
+        final presign = await _api.createAttachmentPresign(
+          fileName: fileName,
+          mimeType: mimeType,
+        );
+        await _api.uploadFileToPresignedUrl(
+          uploadUrl: presign.uploadUrl,
+          bytes: bytes,
+          mimeType: mimeType,
+        );
+        attachmentKey = presign.attachmentKey;
+      }
+
       final ticket = await _api.createTicket(
         subject: subject,
         description: description,
+        attachmentKey: attachmentKey,
       );
       tickets.insert(0, ticket);
       return ticket;

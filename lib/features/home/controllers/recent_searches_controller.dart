@@ -1,18 +1,31 @@
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import '../../../shared/controllers/session_controller.dart';
 import '../models/recent_search.dart';
 
 class RecentSearchesController extends GetxController {
-  static const _storageKey = 'recent_ride_searches';
+  static const _storageKeyPrefix = 'recent_ride_searches';
   static const _maxItems = 5;
 
   final _box = GetStorage();
   final items = <RecentSearch>[].obs;
+  late final SessionController _session;
+  Worker? _userWorker;
+  String? _activeStorageKey;
 
   @override
   void onInit() {
     super.onInit();
+    _session = Get.find<SessionController>();
+    _activeStorageKey = _storageKeyForCurrentUser();
     _load();
+    _userWorker = ever(_session.user, (_) => _reloadForCurrentUser());
+  }
+
+  @override
+  void onClose() {
+    _userWorker?.dispose();
+    super.onClose();
   }
 
   void addSearch({
@@ -29,9 +42,11 @@ class RecentSearchesController extends GetxController {
     final cleanTo = to.trim();
     if (cleanFrom.isEmpty || cleanTo.isEmpty) return;
 
-    items.removeWhere((item) =>
-        item.from.toLowerCase() == cleanFrom.toLowerCase() &&
-        item.to.toLowerCase() == cleanTo.toLowerCase());
+    items.removeWhere(
+      (item) =>
+          item.from.toLowerCase() == cleanFrom.toLowerCase() &&
+          item.to.toLowerCase() == cleanTo.toLowerCase(),
+    );
 
     items.insert(
       0,
@@ -82,19 +97,43 @@ class RecentSearchesController extends GetxController {
   }
 
   void _load() {
-    final raw = _box.read(_storageKey);
+    final storageKey = _activeStorageKey;
+    if (storageKey == null) {
+      items.clear();
+      return;
+    }
+
+    final raw = _box.read(storageKey);
     if (raw is List) {
       final list = raw.whereType<Map>().map((item) {
         return RecentSearch.fromJson(Map<String, dynamic>.from(item));
       }).toList();
       list.sort((a, b) => b.when.compareTo(a.when));
       items.assignAll(list);
+      return;
     }
+
+    items.clear();
   }
 
   void _save() {
+    final storageKey = _activeStorageKey;
+    if (storageKey == null) return;
     final data = items.map((item) => item.toJson()).toList();
-    _box.write(_storageKey, data);
+    _box.write(storageKey, data);
+  }
+
+  void _reloadForCurrentUser() {
+    final nextStorageKey = _storageKeyForCurrentUser();
+    if (nextStorageKey == _activeStorageKey) return;
+    _activeStorageKey = nextStorageKey;
+    _load();
+  }
+
+  String? _storageKeyForCurrentUser() {
+    final userId = _session.user.value?.id.trim() ?? '';
+    if (userId.isEmpty) return null;
+    return '$_storageKeyPrefix::$userId';
   }
 
   String _formatTime(DateTime dt) {

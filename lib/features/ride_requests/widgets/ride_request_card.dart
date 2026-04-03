@@ -515,7 +515,6 @@ class _DriverInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = driver.name.trim().isEmpty ? 'Driver' : driver.name.trim();
-    final email = (driver.email ?? '').trim();
     final avatarUrl = (driver.avatarUrl ?? '').trim();
     final initials = _initialsFor(name);
 
@@ -553,16 +552,6 @@ class _DriverInfoRow extends StatelessWidget {
                   color: isDark ? AppColors.darkText : AppColors.lightText,
                 ),
               ),
-              if (email.isNotEmpty)
-                Text(
-                  email,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                  ),
-                ),
             ],
           ),
         ),

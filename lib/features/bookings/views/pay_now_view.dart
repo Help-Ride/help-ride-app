@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/save_payment_method_preference_card.dart';
 import '../controllers/my_rides_controller.dart';
 import '../models/booking.dart';
 import '../utils/booking_formatters.dart';
@@ -62,10 +63,30 @@ class BookingPayNowView extends GetView<MyRidesController> {
                   ],
                 );
               }),
+              const SizedBox(height: 14),
+              Obx(() {
+                final savePaymentMethod =
+                    controller.savePaymentMethodForCheckout.value;
+                return Column(
+                  children: [
+                    SavePaymentMethodPreferenceCard(
+                      value: savePaymentMethod,
+                      onChanged: controller.setSavePaymentMethodForCheckout,
+                      title: 'Save payment method for future rides',
+                      description:
+                          'When enabled, HelpRide asks Stripe to save this card so checkout is faster next time.',
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                );
+              }),
               const Spacer(),
               Obx(() {
                 final paying = controller.isPaying(booking.id);
                 final payLabel = controller.payButtonLabel(booking);
+                final savePaymentMethod =
+                    controller.savePaymentMethodForCheckout.value;
                 return SizedBox(
                   height: 52,
                   width: double.infinity,
@@ -75,6 +96,7 @@ class BookingPayNowView extends GetView<MyRidesController> {
                         : () async {
                             final result = await controller.payToConfirm(
                               booking,
+                              savePaymentMethod: savePaymentMethod,
                             );
                             if (result == PaymentAttemptResult.processing) {
                               if (Get.key.currentState?.canPop() ?? false) {

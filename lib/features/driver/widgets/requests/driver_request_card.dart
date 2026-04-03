@@ -70,10 +70,12 @@ class DriverRequestCard extends StatelessWidget {
       booking.passengerDropoffLng,
     );
     final hasRequestLocations = pickupName.isNotEmpty || dropoffName.isNotEmpty;
-    final contact = [
-      (passenger?.phone ?? '').trim(),
-      (passenger?.email ?? '').trim(),
-    ].where((v) => v.isNotEmpty).join(' • ');
+    final contact = canChatPassenger
+        ? [
+            (passenger?.phone ?? '').trim(),
+            (passenger?.email ?? '').trim(),
+          ].where((v) => v.isNotEmpty).join(' • ')
+        : '';
     final created = booking.updatedAt ?? booking.createdAt;
     final note = (booking.note ?? '').trim();
     final isDark = Theme.of(context).brightness == Brightness.dark;

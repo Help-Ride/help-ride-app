@@ -42,6 +42,7 @@ class MyRidesController extends GetxController {
   final payingBookingIds = <String>{}.obs;
   final paymentIntentIds = <String, String>{}.obs;
   final paymentSessions = <String, PaymentIntentSession>{}.obs;
+  final savePaymentMethodForCheckout = false.obs;
   String? _focusedBookingId;
   String? _focusedRideRequestId;
 
@@ -396,7 +397,14 @@ class MyRidesController extends GetxController {
   PaymentIntentSession? paymentSessionForBooking(String bookingId) =>
       paymentSessions[bookingId];
 
-  Future<PaymentAttemptResult> payToConfirm(Booking booking) async {
+  void setSavePaymentMethodForCheckout(bool value) {
+    savePaymentMethodForCheckout.value = value;
+  }
+
+  Future<PaymentAttemptResult> payToConfirm(
+    Booking booking, {
+    required bool savePaymentMethod,
+  }) async {
     final bookingId = booking.id.trim();
     if (bookingId.isEmpty) return PaymentAttemptResult.failed;
     if (payingBookingIds.contains(bookingId)) {
@@ -409,6 +417,7 @@ class MyRidesController extends GetxController {
     try {
       final session = await _paymentsApi.createPaymentIntent(
         bookingId: bookingId,
+        savePaymentMethod: savePaymentMethod,
       );
       paymentSessions[bookingId] = session;
       paymentSessions.refresh();

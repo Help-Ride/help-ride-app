@@ -83,6 +83,10 @@ class DriverHomeView extends GetView<DriverHomeController> {
                             : '${summary.ridesCompleted} completed',
                         badgeText: summaryLoading ? null : '$openRides open',
                         compact: compactCard,
+                        onTap: () => Get.offAllNamed(
+                          AppRoutes.shell,
+                          arguments: const {'tab': 'rides'},
+                        ),
                       ),
                     ),
                     SizedBox(
@@ -360,6 +364,7 @@ class _SummaryCard extends StatelessWidget {
     required this.hint,
     this.badgeText,
     this.compact = false,
+    this.onTap,
   });
 
   final String title;
@@ -367,6 +372,7 @@ class _SummaryCard extends StatelessWidget {
   final String hint;
   final String? badgeText;
   final bool compact;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -377,7 +383,7 @@ class _SummaryCard extends StatelessWidget {
       alpha: isDark ? 0.22 : 0.12,
     );
 
-    return AppCard(
+    final card = AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -436,6 +442,19 @@ class _SummaryCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+
+    if (onTap == null) {
+      return card;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: card,
       ),
     );
   }
