@@ -81,7 +81,6 @@ class PushNotificationService {
     'ride_request_assigned_driver',
   };
   static const Set<String> _passengerRideDetailKinds = {
-    'booking_confirmed',
     'booking_rejected',
     'booking_cancelled_by_driver',
     'booking_payment_succeeded',
@@ -93,6 +92,8 @@ class PushNotificationService {
     'ride_request_accepted',
   };
   static const Set<String> _passengerBookingListKinds = {
+    'booking_confirmed',
+    'booking_payment_required',
     'booking_payment_failed',
   };
   static const Set<String> _passengerRequestKinds = {
@@ -594,7 +595,10 @@ class PushNotificationService {
       await openShellTab(
         'rides',
         resetPassengerRidesController: true,
-        arguments: {'bookingId': bookingId},
+        arguments: {
+          'tab': 'upcoming',
+          if (bookingId.isNotEmpty) 'bookingId': bookingId,
+        },
       );
       return;
     }

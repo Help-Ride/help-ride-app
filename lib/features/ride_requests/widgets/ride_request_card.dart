@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../bookings/routes/booking_routes.dart';
 import '../../bookings/utils/booking_formatters.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/services/api_client.dart';
@@ -329,13 +330,20 @@ Future<void> _handleOfferAction(
   final api = RideRequestsApi(client);
   try {
     if (accept) {
-      await api.acceptOffer(rideRequestId: request.id, offerId: offer.id);
-      Get.snackbar('Accepted', 'Offer accepted.');
+      final booking = await api.acceptOffer(
+        rideRequestId: request.id,
+        offerId: offer.id,
+      );
+      if (Get.isBottomSheetOpen ?? false) {
+        Get.back<void>();
+      }
+      Get.snackbar('Offer accepted', 'Complete payment to confirm your seat.');
+      await Get.toNamed(BookingRoutes.payNow, arguments: {'booking': booking});
     } else {
       await api.rejectOffer(rideRequestId: request.id, offerId: offer.id);
       Get.snackbar('Rejected', 'Offer rejected.');
+      await reload(setState);
     }
-    await reload(setState);
   } catch (e) {
     Get.snackbar('Failed', e.toString());
   }

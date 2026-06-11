@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'dart:math' as math;
 
+import '../../bookings/models/booking.dart';
 import '../../../shared/services/api_client.dart';
 import '../../../shared/services/api_exception.dart';
 import '../models/ride_request.dart';
@@ -400,13 +401,19 @@ class RideRequestsApi {
     return [];
   }
 
-  Future<void> acceptOffer({
+  Future<Booking> acceptOffer({
     required String rideRequestId,
     required String offerId,
   }) async {
-    await _client.put<void>(
+    final res = await _client.put<dynamic>(
       '/ride-requests/$rideRequestId/offers/$offerId/accept',
     );
+    final root = _extractMap(res.data) ?? const <String, dynamic>{};
+    final booking = root['booking'];
+    if (booking is Map) {
+      return Booking.fromJson(booking.cast<String, dynamic>());
+    }
+    throw Exception('Accepted offer response is missing booking details.');
   }
 
   Future<void> rejectOffer({
